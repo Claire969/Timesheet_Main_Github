@@ -93,6 +93,11 @@ export const ClientTimesheets = () => {
   const pendingEntries = entries.filter(e => e.billingStatus === 'pending');
   const archivedEntries = entries.filter(e => e.billingStatus === 'archived');
 
+  const fmtTotal = (list: TimesheetEntry[]) => {
+    const sum = list.reduce((acc, e) => acc + e.total, 0);
+    return Number.isInteger(sum) ? `${sum} €` : `${sum.toFixed(2)} €`;
+  };
+
   const toggleSelect = (set: Set<string>, setFn: (s: Set<string>) => void, id: string) => {
     const next = new Set(set);
     next.has(id) ? next.delete(id) : next.add(id);
@@ -368,7 +373,12 @@ export const ClientTimesheets = () => {
         {/* Section A: Unbilled */}
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-800">Pas encore facturé</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold text-gray-800">Pas encore facturé</h2>
+              {unbilledEntries.length > 0 && (
+                <span className="text-sm font-medium text-gray-500">Total: {fmtTotal(unbilledEntries)}</span>
+              )}
+            </div>
             <button
               onClick={handleExportPending}
               disabled={selectedUnbilled.size === 0}
@@ -411,7 +421,12 @@ export const ClientTimesheets = () => {
         {/* Section B: Pending */}
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-800">Pending</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold text-gray-800">Pending</h2>
+              {pendingEntries.length > 0 && (
+                <span className="text-sm font-medium text-gray-500">Total: {fmtTotal(pendingEntries)}</span>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={handlePendingToUnbilled}
