@@ -304,11 +304,35 @@ export const ClientTimesheets = () => {
 </body>
 </html>`;
 
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(html);
-    win.document.close();
-    win.onload = () => win.print();
+const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+const url = URL.createObjectURL(blob);
+
+const win = window.open(url, '_blank');
+if (!win) {
+  URL.revokeObjectURL(url);
+  alert("Impossible d'ouvrir la fenêtre PDF (popup bloquée ?).");
+  return;
+}
+
+const cleanup = () => {
+  try { URL.revokeObjectURL(url); } catch {}
+};
+
+win.addEventListener('load', () => {
+  try {
+    win.focus();
+    setTimeout(() => {
+      try { win.print(); } catch {}
+    }, 250);
+  } catch {}
+});
+
+// fallback si 'load' ne fire pas
+setTimeout(() => {
+  try { win.focus(); win.print(); } catch {}
+}, 800);
+
+win.addEventListener('afterprint', cleanup);
   };
 
   const validateForm = (): boolean => {
