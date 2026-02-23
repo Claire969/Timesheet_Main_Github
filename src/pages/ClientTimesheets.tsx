@@ -63,20 +63,10 @@ const groupByDate = (entries: TimesheetEntry[], dateKey: 'pendingAt' | 'archived
   return Object.entries(map).sort(([a], [b]) => b.localeCompare(a));
 };
 
-const TABLE_HEADERS = (
-  <tr>
-    <th className="px-3 py-3 w-8" />
-    <th className="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
-    <th className="px-4 py-3 text-left font-semibold text-gray-700">Début</th>
-    <th className="px-4 py-3 text-left font-semibold text-gray-700">Fin</th>
-    <th className="px-4 py-3 text-left font-semibold text-gray-700">Appelant</th>
-    <th className="px-4 py-3 text-left font-semibold text-gray-700">Description</th>
-    <th className="px-4 py-3 text-center font-semibold text-gray-700">Déplacement</th>
-    <th className="px-4 py-3 text-left font-semibold text-gray-700">Client</th>
-    <th className="px-4 py-3 text-right font-semibold text-gray-700">Total (HTVA)</th>
-    <th className="px-4 py-3" />
-  </tr>
-);
+type ConfirmDialog = {
+  message: string;
+  onConfirm: () => void;
+} | null;
 
 export const ClientTimesheets = () => {
   const { clientId } = useParams<{ clientId: string }>();
@@ -93,9 +83,11 @@ export const ClientTimesheets = () => {
   const [tsForm, setTsForm] = useState(emptyForm());
   const [tsErrors, setTsErrors] = useState<Record<string, string>>({});
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null);
 
   const [selectedUnbilled, setSelectedUnbilled] = useState<Set<string>>(new Set());
   const [selectedPending, setSelectedPending] = useState<Set<string>>(new Set());
+  const [selectedArchived, setSelectedArchived] = useState<Set<string>>(new Set());
 
   const unbilledEntries = entries.filter(e => e.billingStatus === 'unbilled');
   const pendingEntries = entries.filter(e => e.billingStatus === 'pending');
@@ -115,28 +107,70 @@ export const ClientTimesheets = () => {
     }
   };
 
-  const handleExportPending = () => {
-    if (selectedUnbilled.size === 0) return;
-    const t = today();
+  const batchUpdate = (ids: Set<string>, updater: (e: TimesheetEntry) => TimesheetEntry) => {
     setClientTimesheets(prev => ({
       ...prev,
-      [client.id]: (prev[client.id] || []).map(e =>
-        selectedUnbilled.has(e.id) ? { ...e, billingStatus: 'pending', pendingAt: t } : e
-      ),
+      [client.id]: (prev[client.id] || []).map(e => ids.has(e.id) ? updater(e) : e),
     }));
-    setSelectedUnbilled(new Set());
+  };
+
+  const handleExportPending = () => {
+    if (selectedUnbilled.size === 0) return;
+    setConfirmDialog({
+      message: `Exporter ${selectedUnbilled.size} entrée(s) de "${client.name}" vers Pending ?`,
+      onConfirm: () => {
+        const t = today();
+        batchUpdate(selectedUnbilled, e => ({ ...e, billingStatus: 'pending', pendingAt: t }));
+        setSelectedUnbilled(new Set());
+        setConfirmDialog(null);
+      },
+    });
   };
 
   const handleArchive = () => {
     if (selectedPending.size === 0) return;
-    const t = today();
-    setClientTimesheets(prev => ({
-      ...prev,
-      [client.id]: (prev[client.id] || []).map(e =>
-        selectedPending.has(e.id) ? { ...e, billingStatus: 'archived', archivedAt: t } : e
-      ),
-    }));
+    setConfirmDialog({
+      message: `Archiver ${selectedPending.size} entrée(s) de "${client.name}" ?`,
+      onConfirm: () => {
+        const t = today();
+        batchUpdate(selectedPending, e => ({ ...e, billingStatus: 'archived', archivedAt: t }));
+        setSelectedPending(new Set());
+        setConfirmDialog(null);
+      },
+    });
+  };
+
+  const handlePendingToUnbilled = () => {
+    if (selectedPending.size === 0) return;
+    batchUpdate(selectedPending, e => {
+      const { pendingAt: _p, ...rest } = e;
+      return { ...rest, billingStatus: 'unbilled' };
+    });
     setSelectedPending(new Set());
+  };
+
+  const handleArchivedToPending = () => {
+    if (selectedArchived.size === 0) return;
+    const t = today();
+    batchUpdate(selectedArchived, e => {
+      const { archivedAt: _a, ...rest } = e;
+      return { ...rest, billingStatus: 'pending', pendingAt: t };
+    });
+    setSelectedArchived(new Set());
+  };
+
+  const handleArchivedToUnbilled = () => {
+    if (selectedArchived.size === 0) return;
+    batchUpdate(selectedArchived, e => {
+      const { pendingAt: _p, archivedAt: _a, ...rest } = e;
+      return { ...rest, billingStatus: 'unbilled' };
+    });
+    setSelectedArchived(new Set());
+  };
+
+  const handleGeneratePdf = () => {
+    if (selectedPending.size === 0) return;
+    alert('PDF à venir');
   };
 
   const validateForm = (): boolean => {
@@ -190,11 +224,26 @@ export const ClientTimesheets = () => {
     if (editingEntryId) {
       setClientTimesheets(prev => ({
         ...prev,
-        [client.id]: (prev[client.id] || []).map(e =>
-          e.id === editingEntryId
-            ? { ...e, date: tsForm.date, startTime, endTime, isForfait: tsForm.isForfait, caller: tsForm.caller, description: tsForm.description, travelUnits: tsForm.travelUnits, total }
-            : e
-        ),
+        [client.id]: (prev[client.id] || []).map(e => {
+          if (e.id !== editingEntryId) return e;
+          const wasArchived = e.billingStatus === 'archived';
+          const updated: TimesheetEntry = {
+            ...e,
+            date: tsForm.date,
+            startTime,
+            endTime,
+            isForfait: tsForm.isForfait,
+            caller: tsForm.caller,
+            description: tsForm.description,
+            travelUnits: tsForm.travelUnits,
+            total,
+          };
+          if (wasArchived) {
+            const { archivedAt: _a, ...rest } = updated;
+            return { ...rest, billingStatus: 'pending', pendingAt: today() };
+          }
+          return updated;
+        }),
       }));
     } else {
       const newEntry: TimesheetEntry = {
@@ -235,17 +284,35 @@ export const ClientTimesheets = () => {
     client.rates
   );
 
-  const renderRow = (entry: TimesheetEntry, checked: boolean, onCheck: () => void, isArchived: boolean) => (
+  const colHeaders = (checkboxEl: React.ReactNode) => (
+    <tr>
+      <th className="px-3 py-3 w-8">{checkboxEl}</th>
+      <th className="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
+      <th className="px-4 py-3 text-left font-semibold text-gray-700">Début</th>
+      <th className="px-4 py-3 text-left font-semibold text-gray-700">Fin</th>
+      <th className="px-4 py-3 text-left font-semibold text-gray-700">Appelant</th>
+      <th className="px-4 py-3 text-left font-semibold text-gray-700">Description</th>
+      <th className="px-4 py-3 text-center font-semibold text-gray-700">Déplacement</th>
+      <th className="px-4 py-3 text-left font-semibold text-gray-700">Client</th>
+      <th className="px-4 py-3 text-right font-semibold text-gray-700">Total (HTVA)</th>
+      <th className="px-4 py-3" />
+    </tr>
+  );
+
+  const renderRow = (
+    entry: TimesheetEntry,
+    checked: boolean,
+    onCheck: () => void,
+    editLabel?: string
+  ) => (
     <tr key={entry.id} className="hover:bg-gray-50 transition-colors">
       <td className="px-3 py-3 text-center">
-        {!isArchived && (
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={onCheck}
-            className="accent-blue-600 w-4 h-4 cursor-pointer"
-          />
-        )}
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onCheck}
+          className="accent-blue-600 w-4 h-4 cursor-pointer"
+        />
       </td>
       <td className="px-4 py-3 text-gray-900 whitespace-nowrap">{entry.date}</td>
       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
@@ -260,17 +327,13 @@ export const ClientTimesheets = () => {
       <td className="px-4 py-3 text-gray-600">{client.name}</td>
       <td className="px-4 py-3 text-gray-900 font-semibold text-right whitespace-nowrap">{entry.total} €</td>
       <td className="px-4 py-3">
-        {isArchived ? (
-          <span className="text-xs text-gray-400 px-3 py-1.5">Archivé</span>
-        ) : (
-          <button
-            onClick={() => openEdit(entry)}
-            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
-          >
-            <Edit2 size={12} />
-            Éditer
-          </button>
-        )}
+        <button
+          onClick={() => openEdit(entry)}
+          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors whitespace-nowrap"
+        >
+          <Edit2 size={12} />
+          {editLabel ?? 'Éditer'}
+        </button>
       </td>
     </tr>
   );
@@ -322,33 +385,21 @@ export const ClientTimesheets = () => {
             <div className="overflow-x-auto rounded-xl border border-gray-200">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-3 py-3 w-8">
-                      <input
-                        type="checkbox"
-                        checked={unbilledEntries.length > 0 && unbilledEntries.every(e => selectedUnbilled.has(e.id))}
-                        onChange={() => toggleAll(unbilledEntries, selectedUnbilled, setSelectedUnbilled)}
-                        className="accent-blue-600 w-4 h-4 cursor-pointer"
-                      />
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Début</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Fin</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Appelant</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Description</th>
-                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Déplacement</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Client</th>
-                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Total (HTVA)</th>
-                    <th className="px-4 py-3" />
-                  </tr>
+                  {colHeaders(
+                    <input
+                      type="checkbox"
+                      checked={unbilledEntries.length > 0 && unbilledEntries.every(e => selectedUnbilled.has(e.id))}
+                      onChange={() => toggleAll(unbilledEntries, selectedUnbilled, setSelectedUnbilled)}
+                      className="accent-blue-600 w-4 h-4 cursor-pointer"
+                    />
+                  )}
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {unbilledEntries.map(entry =>
                     renderRow(
                       entry,
                       selectedUnbilled.has(entry.id),
-                      () => toggleSelect(selectedUnbilled, setSelectedUnbilled, entry.id),
-                      false
+                      () => toggleSelect(selectedUnbilled, setSelectedUnbilled, entry.id)
                     )
                   )}
                 </tbody>
@@ -361,13 +412,29 @@ export const ClientTimesheets = () => {
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-800">Pending</h2>
-            <button
-              onClick={handleArchive}
-              disabled={selectedPending.size === 0}
-              className="px-4 py-2 text-sm font-medium bg-gray-700 hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-lg transition-colors"
-            >
-              Archiver ({selectedPending.size})
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handlePendingToUnbilled}
+                disabled={selectedPending.size === 0}
+                className="px-3 py-2 text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 rounded-lg transition-colors"
+              >
+                Remettre en non facturé ({selectedPending.size})
+              </button>
+              <button
+                onClick={handleGeneratePdf}
+                disabled={selectedPending.size === 0}
+                className="px-3 py-2 text-sm font-medium border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-40 rounded-lg transition-colors"
+              >
+                Générer PDF ({selectedPending.size})
+              </button>
+              <button
+                onClick={handleArchive}
+                disabled={selectedPending.size === 0}
+                className="px-4 py-2 text-sm font-medium bg-gray-700 hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-lg transition-colors"
+              >
+                Archiver ({selectedPending.size})
+              </button>
+            </div>
           </div>
           {pendingEntries.length === 0 ? (
             <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
@@ -377,25 +444,14 @@ export const ClientTimesheets = () => {
             <div className="overflow-x-auto rounded-xl border border-gray-200">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-3 py-3 w-8">
-                      <input
-                        type="checkbox"
-                        checked={pendingEntries.length > 0 && pendingEntries.every(e => selectedPending.has(e.id))}
-                        onChange={() => toggleAll(pendingEntries, selectedPending, setSelectedPending)}
-                        className="accent-blue-600 w-4 h-4 cursor-pointer"
-                      />
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Début</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Fin</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Appelant</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Description</th>
-                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Déplacement</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Client</th>
-                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Total (HTVA)</th>
-                    <th className="px-4 py-3" />
-                  </tr>
+                  {colHeaders(
+                    <input
+                      type="checkbox"
+                      checked={pendingEntries.length > 0 && pendingEntries.every(e => selectedPending.has(e.id))}
+                      onChange={() => toggleAll(pendingEntries, selectedPending, setSelectedPending)}
+                      className="accent-blue-600 w-4 h-4 cursor-pointer"
+                    />
+                  )}
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {groupByDate(pendingEntries, 'pendingAt').map(([date, group]) => (
@@ -409,8 +465,7 @@ export const ClientTimesheets = () => {
                         renderRow(
                           entry,
                           selectedPending.has(entry.id),
-                          () => toggleSelect(selectedPending, setSelectedPending, entry.id),
-                          false
+                          () => toggleSelect(selectedPending, setSelectedPending, entry.id)
                         )
                       )}
                     </>
@@ -423,7 +478,25 @@ export const ClientTimesheets = () => {
 
         {/* Section C: Archived */}
         <section>
-          <h2 className="text-lg font-semibold text-gray-800 mb-3">Archivé</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-800">Archivé</h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleArchivedToUnbilled}
+                disabled={selectedArchived.size === 0}
+                className="px-3 py-2 text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 rounded-lg transition-colors"
+              >
+                Remettre en non facturé ({selectedArchived.size})
+              </button>
+              <button
+                onClick={handleArchivedToPending}
+                disabled={selectedArchived.size === 0}
+                className="px-3 py-2 text-sm font-medium border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-40 rounded-lg transition-colors"
+              >
+                Remettre en pending ({selectedArchived.size})
+              </button>
+            </div>
+          </div>
           {archivedEntries.length === 0 ? (
             <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
               <p className="text-gray-500 text-sm">Aucune entrée archivée.</p>
@@ -432,7 +505,14 @@ export const ClientTimesheets = () => {
             <div className="overflow-x-auto rounded-xl border border-gray-200">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
-                  {TABLE_HEADERS}
+                  {colHeaders(
+                    <input
+                      type="checkbox"
+                      checked={archivedEntries.length > 0 && archivedEntries.every(e => selectedArchived.has(e.id))}
+                      onChange={() => toggleAll(archivedEntries, selectedArchived, setSelectedArchived)}
+                      className="accent-blue-600 w-4 h-4 cursor-pointer"
+                    />
+                  )}
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {groupByDate(archivedEntries, 'archivedAt').map(([date, group]) => (
@@ -443,7 +523,12 @@ export const ClientTimesheets = () => {
                         </td>
                       </tr>
                       {group.map(entry =>
-                        renderRow(entry, false, () => {}, true)
+                        renderRow(
+                          entry,
+                          selectedArchived.has(entry.id),
+                          () => toggleSelect(selectedArchived, setSelectedArchived, entry.id),
+                          'Éditer (→ Pending)'
+                        )
                       )}
                     </>
                   ))}
@@ -454,6 +539,30 @@ export const ClientTimesheets = () => {
         </section>
       </main>
 
+      {/* Confirmation dialog */}
+      {confirmDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
+            <p className="text-gray-800 text-sm mb-6">{confirmDialog.message}</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmDialog.onConfirm}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
+              >
+                Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Entry modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col">
@@ -465,6 +574,12 @@ export const ClientTimesheets = () => {
                 <X size={20} />
               </button>
             </div>
+
+            {editingEntryId && entries.find(e => e.id === editingEntryId)?.billingStatus === 'archived' && (
+              <div className="mx-5 mt-4 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                Cette entrée est archivée. Toute modification la remettra automatiquement en <strong>Pending</strong>.
+              </div>
+            )}
 
             <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-5 space-y-4">
               <div>
