@@ -12,6 +12,7 @@ export const Home = () => {
   const handleSignOut = async () => {
     try {
       setLoading(true);
+      sessionStorage.setItem('force_msal_prompt','1');
       await supabase.auth.signOut();
       navigate('/login');
     } catch (error) {

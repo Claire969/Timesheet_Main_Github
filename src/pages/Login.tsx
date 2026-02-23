@@ -9,6 +9,9 @@ export const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Si on vient d'un logout, on force Microsoft à redemander l'auth
+  const forcePrompt = sessionStorage.getItem('force_msal_prompt') === '1';
+
   if (user) {
     return <Navigate to="/" replace />;
   }
@@ -22,6 +25,10 @@ export const Login = () => {
         provider: 'azure',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
+          scopes: 'openid profile email User.Read',
+          queryParams: {
+            prompt: forcePrompt ? 'login' : 'select_account',
+          },
         },
       });
 

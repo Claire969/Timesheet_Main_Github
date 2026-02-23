@@ -1,74 +1,80 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabaseClient';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabaseClient'
 
 export const AuthCallback = () => {
-  const navigate = useNavigate();
-  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate()
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const handleCallback = async () => {
-      try {
-        const params = new URLSearchParams(window.location.search);
-        const code = params.get('code');
-        const errorParam = params.get('error');
-        const errorDescription = params.get('error_description');
+    const run = async () => {
+      const params = new URLSearchParams(window.location.search)
+      const err = params.get('error') || params.get('error_code')
+      const errDesc = params.get('error_description')
 
-        if (errorParam) {
-          setError(errorDescription || errorParam);
-          return;
-        }
-
-        if (code) {
-          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-
-          if (exchangeError) {
-            setError(exchangeError.message);
-            return;
-          }
-
-          navigate('/', { replace: true });
-        } else {
-          setError('Code d\'authentification manquant');
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Une erreur est survenue');
+      if (err || errDesc) {
+        setError(decodeURIComponent(errDesc || err || 'Erreur OAuth'))
+        return
       }
-    };
 
-    handleCallback();
-  }, [navigate]);
+      // ✅ Si Supabase a déjà créé la session automatiquement, on sort proprement
+      const { data: preData } = await supabase.auth.getSession()
+      if (preData.session) {
+        sessionStorage.removeItem('force_msal_prompt')
+        window.history.replaceState({}, document.title, '/')
+        navigate('/', { replace: true })
+        return
+      }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-          <div className="flex items-center gap-3 mb-4">
-            <AlertCircle className="text-red-600" size={24} />
-            <h1 className="text-xl font-bold text-slate-900">Erreur d'authentification</h1>
-          </div>
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {error}
-          </div>
-          <button
-            onClick={() => navigate('/login')}
-            className="w-full bg-slate-600 hover:bg-slate-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"
-          >
-            Retour à la connexion
-          </button>
-        </div>
-      </div>
-    );
-  }
+      const code = params.get('code')
+      if (!code) {
+        setError("Code OAuth manquant dans l'URL (paramètre ?code=...)")
+        return
+      }
+
+      // Anti double-run (StrictMode/dev)
+      const onceKey = `oauth:used:${code}`
+      if (sessionStorage.getItem(onceKey)) {
+        navigate('/', { replace: true })
+        return
+      }
+      sessionStorage.setItem(onceKey, '1')
+
+      const { error } = await supabase.auth.exchangeCodeForSession(code)
+
+      if (error) {
+        // 🔁 Si l'échange a déjà été fait ailleurs, on re-check la session avant d'afficher une erreur
+        const { data: postData } = await supabase.auth.getSession()
+        if (postData.session) {
+          sessionStorage.removeItem('force_msal_prompt')
+          window.history.replaceState({}, document.title, '/')
+          navigate('/', { replace: true })
+          return
+        }
+
+        setError(error.message)
+        return
+      }
+
+      sessionStorage.removeItem('force_msal_prompt')
+      window.history.replaceState({}, document.title, '/')
+      navigate('/', { replace: true })
+    }
+
+    void run()
+  }, [navigate])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md text-center">
-        <Loader2 className="animate-spin mx-auto mb-4 text-blue-600" size={48} />
-        <h1 className="text-xl font-bold text-slate-900 mb-2">Authentification en cours...</h1>
-        <p className="text-slate-600">Veuillez patienter</p>
-      </div>
+    <div style={{ padding: 24 }}>
+      <h1>Authentification</h1>
+      {error ? (
+        <>
+          <p style={{ color: 'crimson' }}>{error}</p>
+          <a href="/login">Retour à la connexion</a>
+        </>
+      ) : (
+        <p>Connexion en cours…</p>
+      )}
     </div>
-  );
-};
+  )
+}

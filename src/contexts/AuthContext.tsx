@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabaseClient';
+import { createContext, useContext, useEffect, useState } from "react";
+import type { Session, User } from "@supabase/supabase-js";
+import { supabase } from "../lib/supabaseClient";
 
 interface AuthContextType {
   session: Session | null;
@@ -17,7 +17,7 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return context;
 };
@@ -28,21 +28,49 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    let alive = true;
+
+    const applySession = (s: Session | null) => {
+      if (!alive) return;
+      setSession(s);
+      setUser(s?.user ?? null);
       setLoading(false);
-    });
+    };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      (async () => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    const init = async () => {
+      console.log("[auth] init getSession()");
+      const hardTimeout = setTimeout(() => {
+        if (!alive) return;
+        console.warn("[auth] getSession timeout -> stop loading");
         setLoading(false);
-      })();
+      }, 8000);
+
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        clearTimeout(hardTimeout);
+        if (error) console.error("[auth] getSession error:", error);
+        console.log("[auth] getSession ok, user:", data.session?.user?.email ?? null);
+        applySession(data.session ?? null);
+      } catch (e) {
+        clearTimeout(hardTimeout);
+        console.error("[auth] getSession threw:", e);
+        if (alive) setLoading(false);
+      }
+    };
+
+    void init();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, s) => {
+      console.log("[auth] onAuthStateChange:", event, "user:", s?.user?.email ?? null);
+      applySession(s ?? null);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      alive = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   return (
