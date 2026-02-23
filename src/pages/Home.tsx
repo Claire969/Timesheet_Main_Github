@@ -166,33 +166,31 @@ export const Home = () => {
                 <button
                   key={client.id}
                   onClick={() => navigate(`/client/${client.id}`)}
-                  className="aspect-square rounded-2xl flex flex-col items-center justify-between p-6 transition-all bg-blue-600 hover:bg-blue-700 hover:shadow-xl hover:-translate-y-0.5 shadow-md"
+                  className="aspect-square rounded-2xl flex flex-col items-center justify-between p-6 transition-all duration-200 bg-gradient-to-br from-blue-600 to-indigo-600 border border-white/10 shadow-lg hover:shadow-2xl hover:-translate-y-1"
                 >
-                  <span className="text-lg font-bold text-white text-center leading-tight w-full">
+                  <span className="px-3 py-1 rounded-full bg-white/15 text-white text-sm font-semibold text-center line-clamp-1 max-w-full">
                     {client.name}
                   </span>
                   <div className="flex-1 flex items-center justify-center w-full">
-                    {client.logoUrl ? (
-                      <div className="w-40 h-40 flex items-center justify-center">
+                    <div className="bg-white/90 rounded-xl p-4 shadow-sm flex items-center justify-center w-40 h-40">
+                      {client.logoUrl ? (
                         <img
                           src={client.logoUrl}
                           alt={client.name}
-                          className="w-full h-full object-contain rounded-lg"
+                          className="w-full h-full object-contain"
                           onError={(e) => {
                             const target = e.currentTarget;
-                            target.parentElement!.style.display = 'none';
-                            const next = target.parentElement!.nextElementSibling as HTMLElement | null;
-                            if (next) next.style.display = 'flex';
+                            target.style.display = 'none';
+                            const fallback = target.nextElementSibling as HTMLElement | null;
+                            if (fallback) fallback.style.display = 'flex';
                           }}
                         />
-                      </div>
-                    ) : null}
-                    <div
-                      className={`w-20 h-14 rounded-lg bg-white bg-opacity-20 items-center justify-center text-sm text-white text-opacity-70 ${
-                        client.logoUrl ? 'hidden' : 'flex'
-                      }`}
-                    >
-                      Logo
+                      ) : null}
+                      <span
+                        className={`text-sm text-gray-400 font-medium items-center justify-center ${client.logoUrl ? 'hidden' : 'flex'}`}
+                      >
+                        Logo
+                      </span>
                     </div>
                   </div>
                   <div className="w-full" />
