@@ -315,8 +315,31 @@ export const Home = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Logo URL (optionnel)</label>
-                  <input type="text" value={clientFormData.logoUrl} onChange={(e) => setClientFormData({ ...clientFormData, logoUrl: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://..." />
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Logo (optionnel)</label>
+                  <input type="text" value={clientFormData.logoUrl} onChange={(e) => setClientFormData({ ...clientFormData, logoUrl: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2" placeholder="https://..." />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        setClientFormData((prev) => ({ ...prev, logoUrl: ev.target?.result as string }));
+                      };
+                      reader.readAsDataURL(file);
+                      e.target.value = '';
+                    }}
+                  />
+                  {clientFormData.logoUrl && (
+                    <div className="flex items-center gap-3 mt-2">
+                      <img src={clientFormData.logoUrl} alt="Aperçu logo" className="w-12 h-12 object-contain rounded-lg border border-gray-200 bg-gray-50" />
+                      <button type="button" onClick={() => setClientFormData((prev) => ({ ...prev, logoUrl: '' }))} className="text-sm text-red-600 hover:text-red-700 font-medium">
+                        Retirer le logo
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t pt-4">
