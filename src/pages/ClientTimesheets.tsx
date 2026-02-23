@@ -304,36 +304,35 @@ export const ClientTimesheets = () => {
 </body>
 </html>`;
 
-const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-const url = URL.createObjectURL(blob);
+// Print via hidden iframe (works even if window.open is blocked)
+const iframe = document.createElement('iframe');
+iframe.style.position = 'fixed';
+iframe.style.right = '0';
+iframe.style.bottom = '0';
+iframe.style.width = '0';
+iframe.style.height = '0';
+iframe.style.border = '0';
+iframe.style.opacity = '0';
+iframe.setAttribute('aria-hidden', 'true');
 
-const win = window.open(url, '_blank');
-if (!win) {
-  URL.revokeObjectURL(url);
-  alert("Impossible d'ouvrir la fenêtre PDF (popup bloquée ?).");
-  return;
-}
+iframe.srcdoc = html;
+document.body.appendChild(iframe);
 
-const cleanup = () => {
-  try { URL.revokeObjectURL(url); } catch {}
+const doPrint = () => {
+  try {
+    const w = iframe.contentWindow;
+    if (!w) return;
+    w.focus();
+    w.print();
+  } finally {
+    // cleanup after a short delay (print dialog needs the frame)
+    setTimeout(() => {
+      try { document.body.removeChild(iframe); } catch {}
+    }, 1000);
+  }
 };
 
-win.addEventListener('load', () => {
-  try {
-    win.focus();
-    setTimeout(() => {
-      try { win.print(); } catch {}
-    }, 250);
-  } catch {}
-});
-
-// fallback si 'load' ne fire pas
-setTimeout(() => {
-  try { win.focus(); win.print(); } catch {}
-}, 800);
-
-win.addEventListener('afterprint', cleanup);
-  };
+iframe.onload = () => setTimeout(doPrint, 200);
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
