@@ -41,12 +41,11 @@ const emptyForm = () => ({
   travelUnits: 0,
 });
 
-const snapTime = (value: string): string => {
-  const [h, m] = value.split(':').map(Number);
-  const snapped = m < 15 ? 0 : m < 45 ? 30 : 0;
-  const hour = m >= 45 ? (h + 1) % 24 : h;
-  return `${String(hour).padStart(2, '0')}:${String(snapped).padStart(2, '0')}`;
-};
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2);
+  const m = i % 2 === 0 ? '00' : '30';
+  return `${String(h).padStart(2, '0')}:${m}`;
+});
 
 const formatForfait = (f: Forfait) => {
   if (f === 'halfDay') return 'Demi-journée';
@@ -288,28 +287,28 @@ export const ClientTimesheets = () => {
                   <label className={`block text-sm font-medium mb-1.5 ${tsForm.isForfait !== 'none' ? 'text-gray-400' : 'text-gray-700'}`}>
                     Début *
                   </label>
-                  <input
-                    type="time"
-                    step="1800"
+                  <select
                     value={tsForm.isForfait !== 'none' ? '00:00' : tsForm.startTime}
                     disabled={tsForm.isForfait !== 'none'}
-                    onChange={(e) => setTsForm({ ...tsForm, startTime: snapTime(e.target.value) })}
+                    onChange={(e) => setTsForm({ ...tsForm, startTime: e.target.value })}
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${tsForm.isForfait !== 'none' ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : tsErrors.startTime ? 'border-red-500' : 'border-gray-300'}`}
-                  />
+                  >
+                    {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
                   {tsErrors.startTime && <p className="text-xs text-red-600 mt-1">{tsErrors.startTime}</p>}
                 </div>
                 <div>
                   <label className={`block text-sm font-medium mb-1.5 ${tsForm.isForfait !== 'none' ? 'text-gray-400' : 'text-gray-700'}`}>
                     Fin *
                   </label>
-                  <input
-                    type="time"
-                    step="1800"
+                  <select
                     value={tsForm.isForfait !== 'none' ? '00:00' : tsForm.endTime}
                     disabled={tsForm.isForfait !== 'none'}
-                    onChange={(e) => setTsForm({ ...tsForm, endTime: snapTime(e.target.value) })}
+                    onChange={(e) => setTsForm({ ...tsForm, endTime: e.target.value })}
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${tsForm.isForfait !== 'none' ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : tsErrors.endTime ? 'border-red-500' : 'border-gray-300'}`}
-                  />
+                  >
+                    {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
                   {tsErrors.endTime && <p className="text-xs text-red-600 mt-1">{tsErrors.endTime}</p>}
                 </div>
               </div>
