@@ -304,35 +304,12 @@ export const ClientTimesheets = () => {
 </body>
 </html>`;
 
-// Print via hidden iframe (works even if window.open is blocked)
-const iframe = document.createElement('iframe');
-iframe.style.position = 'fixed';
-iframe.style.right = '0';
-iframe.style.bottom = '0';
-iframe.style.width = '0';
-iframe.style.height = '0';
-iframe.style.border = '0';
-iframe.style.opacity = '0';
-iframe.setAttribute('aria-hidden', 'true');
-
-iframe.srcdoc = html;
-document.body.appendChild(iframe);
-
-const doPrint = () => {
-  try {
-    const w = iframe.contentWindow;
-    if (!w) return;
-    w.focus();
-    w.print();
-  } finally {
-    // cleanup after a short delay (print dialog needs the frame)
-    setTimeout(() => {
-      try { document.body.removeChild(iframe); } catch {}
-    }, 1000);
-  }
-};
-
-iframe.onload = () => setTimeout(doPrint, 200);
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.onload = () => win.print();
+  };
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
