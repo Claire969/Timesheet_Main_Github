@@ -185,7 +185,7 @@ export const Home = () => {
         </div>
 
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Clients</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">Clients</h2>
           {activeClients.length === 0 ? (
             <div className="bg-gray-50 rounded-xl p-16 text-center border border-gray-200">
               <p className="text-gray-600 mb-4">Aucun client pour le moment</p>
@@ -201,35 +201,38 @@ export const Home = () => {
                   <button
                     key={client.id}
                     onClick={() => setSelectedClientId(isSelected ? null : client.id)}
-                    className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-4 transition-all border-2 ${
+                    className={`aspect-square rounded-2xl flex flex-col items-center justify-between p-6 transition-all bg-blue-600 hover:bg-blue-700 hover:shadow-xl hover:-translate-y-0.5 ${
                       isSelected
-                        ? 'bg-blue-600 border-blue-600 shadow-lg scale-[1.02]'
-                        : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow-md'
+                        ? 'ring-4 ring-white ring-offset-2 ring-offset-blue-600 shadow-xl'
+                        : 'shadow-md'
                     }`}
                   >
-                    {client.logoUrl ? (
-                      <img
-                        src={client.logoUrl}
-                        alt={client.name}
-                        className="w-16 h-16 object-contain rounded-xl"
-                        onError={(e) => {
-                          const target = e.currentTarget;
-                          target.style.display = 'none';
-                          const next = target.nextElementSibling as HTMLElement | null;
-                          if (next) next.style.display = 'flex';
-                        }}
-                      />
-                    ) : null}
-                    <div
-                      className={`w-16 h-16 rounded-xl flex items-center justify-center text-xl font-bold ${
-                        client.logoUrl ? 'hidden' : 'flex'
-                      } ${isSelected ? 'bg-blue-500 text-white' : 'bg-blue-50 text-blue-600'}`}
-                    >
-                      {getInitials(client.name)}
-                    </div>
-                    <span className={`text-base font-semibold px-3 text-center leading-tight ${isSelected ? 'text-white' : 'text-gray-900'}`}>
+                    <span className="text-lg font-bold text-white text-center leading-tight w-full">
                       {client.name}
                     </span>
+                    <div className="flex-1 flex items-center justify-center w-full">
+                      {client.logoUrl ? (
+                        <img
+                          src={client.logoUrl}
+                          alt={client.name}
+                          className="max-w-[60%] max-h-20 object-contain rounded-lg"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.style.display = 'none';
+                            const next = target.nextElementSibling as HTMLElement | null;
+                            if (next) next.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className={`w-20 h-14 rounded-lg bg-white bg-opacity-20 items-center justify-center text-sm text-white text-opacity-70 ${
+                          client.logoUrl ? 'hidden' : 'flex'
+                        }`}
+                      >
+                        Logo
+                      </div>
+                    </div>
+                    <div className="w-full" />
                   </button>
                 );
               })}
