@@ -53,6 +53,31 @@ const formatForfait = (f: Forfait) => {
   return '—';
 };
 
+const groupByDate = (entries: TimesheetEntry[], dateKey: 'pendingAt' | 'archivedAt') => {
+  const map: Record<string, TimesheetEntry[]> = {};
+  for (const e of entries) {
+    const k = e[dateKey] || 'unknown';
+    if (!map[k]) map[k] = [];
+    map[k].push(e);
+  }
+  return Object.entries(map).sort(([a], [b]) => b.localeCompare(a));
+};
+
+const TABLE_HEADERS = (
+  <tr>
+    <th className="px-3 py-3 w-8" />
+    <th className="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
+    <th className="px-4 py-3 text-left font-semibold text-gray-700">Début</th>
+    <th className="px-4 py-3 text-left font-semibold text-gray-700">Fin</th>
+    <th className="px-4 py-3 text-left font-semibold text-gray-700">Appelant</th>
+    <th className="px-4 py-3 text-left font-semibold text-gray-700">Description</th>
+    <th className="px-4 py-3 text-center font-semibold text-gray-700">Déplacement</th>
+    <th className="px-4 py-3 text-left font-semibold text-gray-700">Client</th>
+    <th className="px-4 py-3 text-right font-semibold text-gray-700">Total (HTVA)</th>
+    <th className="px-4 py-3" />
+  </tr>
+);
+
 export const ClientTimesheets = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
@@ -68,6 +93,51 @@ export const ClientTimesheets = () => {
   const [tsForm, setTsForm] = useState(emptyForm());
   const [tsErrors, setTsErrors] = useState<Record<string, string>>({});
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+
+  const [selectedUnbilled, setSelectedUnbilled] = useState<Set<string>>(new Set());
+  const [selectedPending, setSelectedPending] = useState<Set<string>>(new Set());
+
+  const unbilledEntries = entries.filter(e => e.billingStatus === 'unbilled');
+  const pendingEntries = entries.filter(e => e.billingStatus === 'pending');
+  const archivedEntries = entries.filter(e => e.billingStatus === 'archived');
+
+  const toggleSelect = (set: Set<string>, setFn: (s: Set<string>) => void, id: string) => {
+    const next = new Set(set);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setFn(next);
+  };
+
+  const toggleAll = (list: TimesheetEntry[], set: Set<string>, setFn: (s: Set<string>) => void) => {
+    if (list.every(e => set.has(e.id))) {
+      setFn(new Set());
+    } else {
+      setFn(new Set(list.map(e => e.id)));
+    }
+  };
+
+  const handleExportPending = () => {
+    if (selectedUnbilled.size === 0) return;
+    const t = today();
+    setClientTimesheets(prev => ({
+      ...prev,
+      [client.id]: (prev[client.id] || []).map(e =>
+        selectedUnbilled.has(e.id) ? { ...e, billingStatus: 'pending', pendingAt: t } : e
+      ),
+    }));
+    setSelectedUnbilled(new Set());
+  };
+
+  const handleArchive = () => {
+    if (selectedPending.size === 0) return;
+    const t = today();
+    setClientTimesheets(prev => ({
+      ...prev,
+      [client.id]: (prev[client.id] || []).map(e =>
+        selectedPending.has(e.id) ? { ...e, billingStatus: 'archived', archivedAt: t } : e
+      ),
+    }));
+    setSelectedPending(new Set());
+  };
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -137,6 +207,7 @@ export const ClientTimesheets = () => {
         description: tsForm.description,
         travelUnits: tsForm.travelUnits,
         total,
+        billingStatus: 'unbilled',
       };
       setClientTimesheets(prev => ({
         ...prev,
@@ -164,6 +235,46 @@ export const ClientTimesheets = () => {
     client.rates
   );
 
+  const renderRow = (entry: TimesheetEntry, checked: boolean, onCheck: () => void, isArchived: boolean) => (
+    <tr key={entry.id} className="hover:bg-gray-50 transition-colors">
+      <td className="px-3 py-3 text-center">
+        {!isArchived && (
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={onCheck}
+            className="accent-blue-600 w-4 h-4 cursor-pointer"
+          />
+        )}
+      </td>
+      <td className="px-4 py-3 text-gray-900 whitespace-nowrap">{entry.date}</td>
+      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+        {entry.isForfait !== 'none' ? formatForfait(entry.isForfait) : entry.startTime}
+      </td>
+      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+        {entry.isForfait !== 'none' ? '—' : entry.endTime}
+      </td>
+      <td className="px-4 py-3 text-gray-600">{entry.caller || '—'}</td>
+      <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{entry.description || '—'}</td>
+      <td className="px-4 py-3 text-gray-600 text-center">{entry.travelUnits}</td>
+      <td className="px-4 py-3 text-gray-600">{client.name}</td>
+      <td className="px-4 py-3 text-gray-900 font-semibold text-right whitespace-nowrap">{entry.total} €</td>
+      <td className="px-4 py-3">
+        {isArchived ? (
+          <span className="text-xs text-gray-400 px-3 py-1.5">Archivé</span>
+        ) : (
+          <button
+            onClick={() => openEdit(entry)}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            <Edit2 size={12} />
+            Éditer
+          </button>
+        )}
+      </td>
+    </tr>
+  );
+
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200">
@@ -179,11 +290,9 @@ export const ClientTimesheets = () => {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-12">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Timesheets — {client.name}
-          </h1>
+      <main className="max-w-5xl mx-auto px-6 py-12 space-y-12">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-gray-900">Timesheets — {client.name}</h1>
           <button
             onClick={openNew}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
@@ -193,56 +302,156 @@ export const ClientTimesheets = () => {
           </button>
         </div>
 
-        {entries.length === 0 ? (
-          <div className="bg-gray-50 rounded-xl p-12 text-center border border-gray-200">
-            <p className="text-gray-500">Aucune entrée pour ce client.</p>
+        {/* Section A: Unbilled */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-800">Pas encore facturé</h2>
+            <button
+              onClick={handleExportPending}
+              disabled={selectedUnbilled.size === 0}
+              className="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-lg transition-colors"
+            >
+              Exporter pour la facturation ({selectedUnbilled.size})
+            </button>
           </div>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Début</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Fin</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Appelant</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Description</th>
-                  <th className="px-4 py-3 text-center font-semibold text-gray-700">Déplacement</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Client</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-700">Total (HTVA)</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {entries.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-gray-900 whitespace-nowrap">{entry.date}</td>
-                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                      {entry.isForfait !== 'none' ? formatForfait(entry.isForfait) : entry.startTime}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                      {entry.isForfait !== 'none' ? '—' : entry.endTime}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{entry.caller || '—'}</td>
-                    <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{entry.description || '—'}</td>
-                    <td className="px-4 py-3 text-gray-600 text-center">{entry.travelUnits}</td>
-                    <td className="px-4 py-3 text-gray-600">{client.name}</td>
-                    <td className="px-4 py-3 text-gray-900 font-semibold text-right whitespace-nowrap">{entry.total} €</td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => openEdit(entry)}
-                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
-                      >
-                        <Edit2 size={12} />
-                        Éditer
-                      </button>
-                    </td>
+          {unbilledEntries.length === 0 ? (
+            <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
+              <p className="text-gray-500 text-sm">Aucune entrée non facturée.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-gray-200">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-3 py-3 w-8">
+                      <input
+                        type="checkbox"
+                        checked={unbilledEntries.length > 0 && unbilledEntries.every(e => selectedUnbilled.has(e.id))}
+                        onChange={() => toggleAll(unbilledEntries, selectedUnbilled, setSelectedUnbilled)}
+                        className="accent-blue-600 w-4 h-4 cursor-pointer"
+                      />
+                    </th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Début</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Fin</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Appelant</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Description</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Déplacement</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Client</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Total (HTVA)</th>
+                    <th className="px-4 py-3" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {unbilledEntries.map(entry =>
+                    renderRow(
+                      entry,
+                      selectedUnbilled.has(entry.id),
+                      () => toggleSelect(selectedUnbilled, setSelectedUnbilled, entry.id),
+                      false
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        {/* Section B: Pending */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-800">Pending</h2>
+            <button
+              onClick={handleArchive}
+              disabled={selectedPending.size === 0}
+              className="px-4 py-2 text-sm font-medium bg-gray-700 hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-lg transition-colors"
+            >
+              Archiver ({selectedPending.size})
+            </button>
           </div>
-        )}
+          {pendingEntries.length === 0 ? (
+            <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
+              <p className="text-gray-500 text-sm">Aucune entrée en pending.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-gray-200">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-3 py-3 w-8">
+                      <input
+                        type="checkbox"
+                        checked={pendingEntries.length > 0 && pendingEntries.every(e => selectedPending.has(e.id))}
+                        onChange={() => toggleAll(pendingEntries, selectedPending, setSelectedPending)}
+                        className="accent-blue-600 w-4 h-4 cursor-pointer"
+                      />
+                    </th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Début</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Fin</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Appelant</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Description</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Déplacement</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Client</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Total (HTVA)</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {groupByDate(pendingEntries, 'pendingAt').map(([date, group]) => (
+                    <>
+                      <tr key={`divider-${date}`}>
+                        <td colSpan={10} className="px-4 py-2 bg-blue-50 text-xs font-medium text-blue-700 border-y border-blue-100">
+                          Mis en pending le {date}
+                        </td>
+                      </tr>
+                      {group.map(entry =>
+                        renderRow(
+                          entry,
+                          selectedPending.has(entry.id),
+                          () => toggleSelect(selectedPending, setSelectedPending, entry.id),
+                          false
+                        )
+                      )}
+                    </>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        {/* Section C: Archived */}
+        <section>
+          <h2 className="text-lg font-semibold text-gray-800 mb-3">Archivé</h2>
+          {archivedEntries.length === 0 ? (
+            <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
+              <p className="text-gray-500 text-sm">Aucune entrée archivée.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-gray-200">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  {TABLE_HEADERS}
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {groupByDate(archivedEntries, 'archivedAt').map(([date, group]) => (
+                    <>
+                      <tr key={`divider-${date}`}>
+                        <td colSpan={10} className="px-4 py-2 bg-gray-100 text-xs font-medium text-gray-500 border-y border-gray-200">
+                          Archivé le {date}
+                        </td>
+                      </tr>
+                      {group.map(entry =>
+                        renderRow(entry, false, () => {}, true)
+                      )}
+                    </>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </main>
 
       {isModalOpen && (

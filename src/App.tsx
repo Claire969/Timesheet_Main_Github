@@ -23,6 +23,8 @@ export interface Client {
   };
 }
 
+export type BillingStatus = 'unbilled' | 'pending' | 'archived';
+
 export interface TimesheetEntry {
   id: string;
   date: string;
@@ -33,6 +35,9 @@ export interface TimesheetEntry {
   description: string;
   travelUnits: number;
   total: number;
+  billingStatus: BillingStatus;
+  pendingAt?: string;
+  archivedAt?: string;
 }
 
 export type ClientTimesheetsMap = Record<string, TimesheetEntry[]>;
