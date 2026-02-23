@@ -175,9 +175,140 @@ export const ClientTimesheets = () => {
     setSelectedArchived(new Set());
   };
 
+  const [pdfToast, setPdfToast] = useState(false);
+
   const handleGeneratePdf = () => {
-    if (selectedPending.size === 0) return;
-    alert('PDF à venir');
+    if (selectedPending.size === 0) {
+      setPdfToast(true);
+      setTimeout(() => setPdfToast(false), 3000);
+      return;
+    }
+
+    const selected = pendingEntries
+      .filter(e => selectedPending.has(e.id))
+      .sort((a, b) => {
+        const dateCmp = a.date.localeCompare(b.date);
+        return dateCmp !== 0 ? dateCmp : a.startTime.localeCompare(b.startTime);
+      });
+
+    const fmtDate = (iso: string) => {
+      const [y, m, d] = iso.split('-');
+      return `${d}/${m}/${y}`;
+    };
+
+    const dates = selected.map(e => e.date).sort();
+    const periodFrom = fmtDate(dates[0]);
+    const periodTo = fmtDate(dates[dates.length - 1]);
+
+    const now = new Date();
+    const exportDateTime = now.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      + ' ' + now.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
+
+    const totalHT = selected.reduce((acc, e) => acc + e.total, 0);
+    const travelTotal = selected.reduce((acc, e) => acc + e.travelUnits * client.rates.travelHalfHour, 0);
+    const interventionTotal = totalHT - travelTotal;
+
+    const fmtEur = (n: number) => Number.isInteger(n) ? `${n} €` : `${n.toFixed(2)} €`;
+
+    const rows = selected.map(e => {
+      const isForfait = e.isForfait !== 'none';
+      const startCell = isForfait
+        ? `<span style="color:#999">${e.isForfait === 'halfDay' ? 'Demi-journée' : 'Journée'}</span>`
+        : e.startTime;
+      const endCell = isForfait ? `<span style="color:#999">00:00</span>` : e.endTime;
+      const travel = e.travelUnits * client.rates.travelHalfHour;
+      return `
+        <tr>
+          <td>${fmtDate(e.date)}</td>
+          <td>${startCell}</td>
+          <td>${endCell}</td>
+          <td>${e.caller || '—'}</td>
+          <td>${e.description || '—'}</td>
+          <td style="text-align:center">${e.travelUnits} × ${fmtEur(client.rates.travelHalfHour)} = ${fmtEur(travel)}</td>
+          <td style="text-align:right;font-weight:600">${fmtEur(e.total)}</td>
+        </tr>`;
+    }).join('');
+
+    const logoHtml = client.logoUrl
+      ? `<img src="${client.logoUrl}" alt="${client.name}" style="max-height:60px;max-width:160px;object-fit:contain" />`
+      : '';
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Timesheets — ${client.name}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 13px; color: #111; background: #fff; padding: 32px; }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; border-bottom: 2px solid #111; padding-bottom: 16px; }
+  header .left { display: flex; align-items: center; gap: 16px; }
+  h1 { font-size: 18px; font-weight: 700; }
+  .meta { font-size: 12px; color: #555; margin-top: 2px; }
+  .period { font-size: 13px; font-weight: 600; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  thead tr { background: #f0f0f0; }
+  th { padding: 8px 10px; text-align: left; font-weight: 700; font-size: 12px; border: 1px solid #ccc; }
+  td { padding: 7px 10px; border: 1px solid #ddd; vertical-align: top; font-size: 12px; }
+  tr:nth-child(even) td { background: #fafafa; }
+  tfoot td { border: 1px solid #ccc; padding: 8px 10px; font-size: 12px; }
+  tfoot .label { font-weight: 600; }
+  tfoot .total-row td { background: #111; color: #fff; font-weight: 700; font-size: 14px; }
+  @media print { body { padding: 16px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="left">
+    ${logoHtml}
+    <div>
+      <h1>${client.name}</h1>
+      <div class="meta">Timesheets — Export pour facturation</div>
+    </div>
+  </div>
+  <div style="text-align:right">
+    <div class="meta">Exporté le ${exportDateTime}</div>
+  </div>
+</header>
+<div class="period">Période : ${periodFrom} → ${periodTo}</div>
+<table>
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Début</th>
+      <th>Fin</th>
+      <th>Appelant</th>
+      <th>Description</th>
+      <th>Déplacement</th>
+      <th style="text-align:right">Total (HTVA)</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${rows}
+  </tbody>
+  <tfoot>
+    <tr>
+      <td colspan="6" class="label" style="text-align:right">Sous-total intervention</td>
+      <td style="text-align:right">${fmtEur(interventionTotal)}</td>
+    </tr>
+    <tr>
+      <td colspan="6" class="label" style="text-align:right">Sous-total déplacement</td>
+      <td style="text-align:right">${fmtEur(travelTotal)}</td>
+    </tr>
+    <tr class="total-row">
+      <td colspan="6" style="text-align:right">TOTAL HTVA</td>
+      <td style="text-align:right">${fmtEur(totalHT)}</td>
+    </tr>
+  </tfoot>
+</table>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.onload = () => win.print();
   };
 
   const validateForm = (): boolean => {
@@ -555,6 +686,12 @@ export const ClientTimesheets = () => {
           )}
         </section>
       </main>
+
+      {pdfToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm font-medium px-5 py-3 rounded-xl shadow-lg">
+          Sélectionne au moins une ligne
+        </div>
+      )}
 
       {/* Confirmation dialog */}
       {confirmDialog && (
