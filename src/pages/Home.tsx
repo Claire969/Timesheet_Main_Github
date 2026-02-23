@@ -212,17 +212,19 @@ export const Home = () => {
                     </span>
                     <div className="flex-1 flex items-center justify-center w-full">
                       {client.logoUrl ? (
-                        <img
-                          src={client.logoUrl}
-                          alt={client.name}
-                          className="max-w-[60%] max-h-20 object-contain rounded-lg"
-                          onError={(e) => {
-                            const target = e.currentTarget;
-                            target.style.display = 'none';
-                            const next = target.nextElementSibling as HTMLElement | null;
-                            if (next) next.style.display = 'flex';
-                          }}
-                        />
+                        <div className="w-40 h-40 flex items-center justify-center">
+                          <img
+                            src={client.logoUrl}
+                            alt={client.name}
+                            className="w-full h-full object-contain rounded-lg"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              target.parentElement!.style.display = 'none';
+                              const next = target.parentElement!.nextElementSibling as HTMLElement | null;
+                              if (next) next.style.display = 'flex';
+                            }}
+                          />
+                        </div>
                       ) : null}
                       <div
                         className={`w-20 h-14 rounded-lg bg-white bg-opacity-20 items-center justify-center text-sm text-white text-opacity-70 ${
