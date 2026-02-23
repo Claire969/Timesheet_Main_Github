@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { RequireAuth } from './components/RequireAuth';
-import { Login } from './pages/Login';
+import Login from './pages/Login';
 import { AuthCallback } from './pages/AuthCallback';
 import { Home } from './pages/Home';
 
