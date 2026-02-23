@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "check:router": "node -e \"const fs=require('fs'); const main=fs.readFileSync('src/main.tsx','utf8'); const app=fs.readFileSync('src/App.tsx','utf8'); const count=(main.match(/BrowserRouter/g)||[]).length+(app.match(/BrowserRouter/g)||[]).length; if(count!==1){console.error('Router count != 1 (found '+count+')'); process.exit(1);} if(app.includes('BrowserRouter')){console.error('Do not put BrowserRouter in App.tsx'); process.exit(1);} console.log('OK router');\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
