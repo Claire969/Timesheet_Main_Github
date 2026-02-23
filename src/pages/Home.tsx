@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
-import { LogOut, Plus, Clock, Calendar, Trash2, AlertCircle, Loader2 } from 'lucide-react';
+import { LogOut, Plus, Clock, Calendar, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { timesheetApi, TimesheetEntry, CreateEntryPayload, calculateDuration, formatDuration } from '../lib/timesheetApi';
+import { TimesheetEntry, CreateEntryPayload, calculateDuration, formatDuration, generateId } from '../lib/timesheetTypes';
 import { NewEntryModal } from '../components/NewEntryModal';
 
 export const Home = () => {
@@ -11,27 +11,8 @@ export const Home = () => {
   const navigate = useNavigate();
 
   const [entries, setEntries] = useState<TimesheetEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  const loadEntries = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await timesheetApi.listEntries();
-      setEntries(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du chargement des entrées');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadEntries();
-  }, []);
 
   const handleSignOut = async () => {
     try {
@@ -43,25 +24,26 @@ export const Home = () => {
     }
   };
 
-  const handleCreateEntry = async (payload: CreateEntryPayload) => {
-    await timesheetApi.createEntry(payload);
-    await loadEntries();
+  const handleCreateEntry = (payload: CreateEntryPayload) => {
+    const newEntry: TimesheetEntry = {
+      id: generateId(),
+      ...payload,
+      created_at: new Date().toISOString(),
+    };
+
+    setEntries([newEntry, ...entries]);
   };
 
-  const handleDeleteEntry = async (id: string) => {
+  const handleDeleteEntry = (id: string) => {
     if (!confirm('Voulez-vous vraiment supprimer cette entrée ?')) {
       return;
     }
 
-    try {
-      setDeletingId(id);
-      await timesheetApi.deleteEntry(id);
-      await loadEntries();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Erreur lors de la suppression');
-    } finally {
+    setDeletingId(id);
+    setTimeout(() => {
+      setEntries(entries.filter(entry => entry.id !== id));
       setDeletingId(null);
-    }
+    }, 300);
   };
 
   const formatDate = (dateStr: string) => {
@@ -112,27 +94,7 @@ export const Home = () => {
             </button>
           </div>
 
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-              <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
-              <div className="flex-1">
-                <p className="text-sm text-red-700">{error}</p>
-                <button
-                  onClick={loadEntries}
-                  className="mt-2 text-sm font-medium text-red-700 hover:text-red-800 underline"
-                >
-                  Réessayer
-                </button>
-              </div>
-            </div>
-          )}
-
-          {loading ? (
-            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-              <Loader2 className="animate-spin mx-auto mb-4 text-blue-600" size={48} />
-              <p className="text-slate-600">Chargement des entrées...</p>
-            </div>
-          ) : entries.length === 0 ? (
+          {entries.length === 0 ? (
             <div className="bg-white rounded-xl shadow-sm p-12 text-center">
               <Clock className="mx-auto mb-4 text-slate-300" size={64} />
               <h3 className="text-lg font-semibold text-slate-900 mb-2">Aucune entrée</h3>
@@ -158,11 +120,13 @@ export const Home = () => {
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                          <Calendar className="text-slate-400 flex-shrink-0" size={18} />
-                          <span className="text-sm font-medium text-slate-600">
-                            {formatDate(entry.entry_date)}
-                          </span>
+                        <div className="flex items-center gap-3 mb-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="text-slate-400 flex-shrink-0" size={18} />
+                            <span className="text-sm font-medium text-slate-600">
+                              {formatDate(entry.entry_date)}
+                            </span>
+                          </div>
                           <div className="flex items-center gap-2 text-sm text-slate-500">
                             <Clock size={16} />
                             <span>
@@ -181,7 +145,7 @@ export const Home = () => {
                           </p>
                         )}
 
-                        <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-4 text-sm flex-wrap">
                           <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-medium">
                             {formatDuration(duration)}
                           </div>
@@ -199,11 +163,7 @@ export const Home = () => {
                         className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0"
                         title="Supprimer"
                       >
-                        {isDeleting ? (
-                          <Loader2 className="animate-spin" size={20} />
-                        ) : (
-                          <Trash2 size={20} />
-                        )}
+                        <Trash2 size={20} />
                       </button>
                     </div>
                   </div>

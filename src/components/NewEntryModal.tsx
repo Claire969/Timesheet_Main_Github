@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { X, Save } from 'lucide-react';
-import { CreateEntryPayload } from '../lib/timesheetApi';
+import { CreateEntryPayload } from '../lib/timesheetTypes';
 
 interface NewEntryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (payload: CreateEntryPayload) => Promise<void>;
+  onSubmit: (payload: CreateEntryPayload) => void;
 }
 
 export const NewEntryModal = ({ isOpen, onClose, onSubmit }: NewEntryModalProps) => {
@@ -20,7 +20,6 @@ export const NewEntryModal = ({ isOpen, onClose, onSubmit }: NewEntryModalProps)
     notes: '',
   });
 
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const validateForm = (): string | null => {
@@ -50,7 +49,7 @@ export const NewEntryModal = ({ isOpen, onClose, onSubmit }: NewEntryModalProps)
     return null;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     const validationError = validateForm();
@@ -59,31 +58,23 @@ export const NewEntryModal = ({ isOpen, onClose, onSubmit }: NewEntryModalProps)
       return;
     }
 
-    try {
-      setLoading(true);
-      setError(null);
-      await onSubmit(formData);
-      setFormData({
-        entry_date: today,
-        start_time: '09:00',
-        end_time: '17:00',
-        break_minutes: 60,
-        title: '',
-        notes: '',
-      });
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Une erreur est survenue');
-    } finally {
-      setLoading(false);
-    }
+    setError(null);
+    onSubmit(formData);
+
+    setFormData({
+      entry_date: today,
+      start_time: '09:00',
+      end_time: '17:00',
+      break_minutes: 60,
+      title: '',
+      notes: '',
+    });
+    onClose();
   };
 
   const handleClose = () => {
-    if (!loading) {
-      setError(null);
-      onClose();
-    }
+    setError(null);
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -95,8 +86,7 @@ export const NewEntryModal = ({ isOpen, onClose, onSubmit }: NewEntryModalProps)
           <h2 className="text-xl font-bold text-slate-900">Nouvelle entrée</h2>
           <button
             onClick={handleClose}
-            disabled={loading}
-            className="text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50"
+            className="text-slate-400 hover:text-slate-600 transition-colors"
           >
             <X size={24} />
           </button>
@@ -201,18 +191,16 @@ export const NewEntryModal = ({ isOpen, onClose, onSubmit }: NewEntryModalProps)
             <button
               type="button"
               onClick={handleClose}
-              disabled={loading}
-              className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
             >
               Annuler
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
               <Save size={18} />
-              {loading ? 'Enregistrement...' : 'Enregistrer'}
+              Enregistrer
             </button>
           </div>
         </form>
