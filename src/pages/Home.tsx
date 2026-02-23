@@ -163,38 +163,40 @@ export const Home = () => {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {activeClients.map((client) => (
-                <button
+                <div
                   key={client.id}
+                  className="bg-gradient-to-br from-blue-500 via-sky-500 to-blue-400 p-[2px] rounded-2xl hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
                   onClick={() => navigate(`/client/${client.id}`)}
-                  className="aspect-square rounded-2xl flex flex-col items-center justify-between p-6 transition-all duration-200 bg-gradient-to-br from-blue-600 to-indigo-600 border border-white/10 shadow-lg hover:shadow-2xl hover:-translate-y-1"
                 >
-                  <span className="px-3 py-1 rounded-full bg-white/15 text-white text-sm font-semibold text-center line-clamp-1 max-w-full">
-                    {client.name}
-                  </span>
-                  <div className="flex-1 flex items-center justify-center w-full">
-                    <div className="bg-white/90 rounded-xl p-4 shadow-sm flex items-center justify-center w-40 h-40">
-                      {client.logoUrl ? (
-                        <img
-                          src={client.logoUrl}
-                          alt={client.name}
-                          className="w-full h-full object-contain"
-                          onError={(e) => {
-                            const target = e.currentTarget;
-                            target.style.display = 'none';
-                            const fallback = target.nextElementSibling as HTMLElement | null;
-                            if (fallback) fallback.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
-                      <span
-                        className={`text-sm text-gray-400 font-medium items-center justify-center ${client.logoUrl ? 'hidden' : 'flex'}`}
-                      >
-                        Logo
-                      </span>
+                  <div className="bg-white rounded-2xl h-full w-full flex flex-col items-center justify-between p-6 aspect-square">
+                    <span className="text-xl font-extrabold text-slate-900 truncate w-full text-center">
+                      {client.name}
+                    </span>
+                    <div className="flex-1 flex items-center justify-center w-full">
+                      <div className="bg-slate-50 rounded-xl p-4 shadow-sm flex items-center justify-center w-44 h-44">
+                        {client.logoUrl ? (
+                          <img
+                            src={client.logoUrl}
+                            alt={client.name}
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              target.style.display = 'none';
+                              const fallback = target.nextElementSibling as HTMLElement | null;
+                              if (fallback) fallback.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <span
+                          className={`text-sm text-slate-400 font-medium items-center justify-center ${client.logoUrl ? 'hidden' : 'flex'}`}
+                        >
+                          Logo
+                        </span>
+                      </div>
                     </div>
+                    <div className="w-full" />
                   </div>
-                  <div className="w-full" />
-                </button>
+                </div>
               ))}
             </div>
           )}
