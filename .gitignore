@@ -3,3 +3,4 @@ dist/
 .env
 *.bak
 *.bak.*
+patch_strictmode_dev.sh
