@@ -184,11 +184,21 @@ export const Home = () => {
     setClients(clients.map(c => c.id === clientId ? { ...c, isArchived: !c.isArchived } : c));
   };
 
+  const activeClients = clients.filter(c => !c.isArchived);
+
   const filteredClients = clients.filter(c => {
     const matchesArchive = showArchivedClients || !c.isArchived;
     const matchesSearch = !clientSearch || c.name.toLowerCase().includes(clientSearch.toLowerCase());
     return matchesArchive && matchesSearch;
   });
+
+  const handleOpenNewClientFromMain = () => {
+    setIsClientsModalOpen(true);
+    setEditingClientId(null);
+    setClientFormData({ name: '', logoUrl: '', halfHour: 0, hour: 0, travelHalfHour: 0, halfDay: 0, fullDay: 0 });
+    setClientFormErrors({});
+    setIsClientFormOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -211,6 +221,39 @@ export const Home = () => {
       <main className="max-w-3xl mx-auto px-6 py-16 text-center">
         <h1 className="text-5xl font-bold text-gray-900 mb-4">Timesheet</h1>
         <p className="text-lg text-gray-500 mb-10">{user?.email || 'Mode preview'}</p>
+
+        <div className="text-left mb-12">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Clients</h2>
+          {activeClients.length === 0 ? (
+            <div className="bg-gray-50 rounded-lg p-12 text-center border border-gray-200">
+              <p className="text-gray-600 mb-4">Aucun client pour le moment</p>
+              <button onClick={handleOpenNewClientFromMain} className="text-blue-600 hover:text-blue-700 font-medium">
+                Créer un client
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {activeClients.map((client) => (
+                <div key={client.id} className="bg-blue-600 hover:bg-blue-700 transition-colors rounded-lg p-5 cursor-pointer">
+                  <div className="flex items-center gap-3 mb-3">
+                    {client.logoUrl && <img src={client.logoUrl} alt={client.name} className="w-8 h-8 object-contain rounded bg-white p-0.5" />}
+                    <h3 className="text-lg font-semibold text-white">{client.name}</h3>
+                  </div>
+                  <div className="text-sm text-blue-100 space-y-1">
+                    <div className="flex gap-4">
+                      <span>1/2h: {client.rates.halfHour}€</span>
+                      <span>1h: {client.rates.hour}€</span>
+                    </div>
+                    <div className="flex gap-4">
+                      <span>Demi-journée: {client.rates.halfDay}€</span>
+                      <span>Journée: {client.rates.fullDay}€</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-lg transition-colors inline-flex items-center gap-2 mb-16">
           <Plus size={20} />
