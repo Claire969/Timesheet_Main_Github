@@ -41,11 +41,13 @@ const emptyForm = () => ({
   travelUnits: 0,
 });
 
-const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
-  const h = Math.floor(i / 2);
-  const m = i % 2 === 0 ? '00' : '30';
-  return `${String(h).padStart(2, '0')}:${m}`;
-});
+const parseTime = (t: string) => {
+  const [h, m] = t.split(':').map(Number);
+  return { h: isNaN(h) ? 0 : h, m: isNaN(m) ? 0 : m === 30 ? 30 : 0 };
+};
+
+const buildTime = (h: number, m: number) =>
+  `${String(Math.min(23, Math.max(0, h))).padStart(2, '0')}:${m === 30 ? '30' : '00'}`;
 
 const formatForfait = (f: Forfait) => {
   if (f === 'halfDay') return 'Demi-journée';
@@ -622,34 +624,53 @@ export const ClientTimesheets = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${tsForm.isForfait !== 'none' ? 'text-gray-400' : 'text-gray-700'}`}>
-                    Début *
-                  </label>
-                  <select
-                    value={tsForm.isForfait !== 'none' ? '00:00' : tsForm.startTime}
-                    disabled={tsForm.isForfait !== 'none'}
-                    onChange={(e) => setTsForm({ ...tsForm, startTime: e.target.value })}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${tsForm.isForfait !== 'none' ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : tsErrors.startTime ? 'border-red-500' : 'border-gray-300'}`}
-                  >
-                    {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  {tsErrors.startTime && <p className="text-xs text-red-600 mt-1">{tsErrors.startTime}</p>}
-                </div>
-                <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${tsForm.isForfait !== 'none' ? 'text-gray-400' : 'text-gray-700'}`}>
-                    Fin *
-                  </label>
-                  <select
-                    value={tsForm.isForfait !== 'none' ? '00:00' : tsForm.endTime}
-                    disabled={tsForm.isForfait !== 'none'}
-                    onChange={(e) => setTsForm({ ...tsForm, endTime: e.target.value })}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${tsForm.isForfait !== 'none' ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : tsErrors.endTime ? 'border-red-500' : 'border-gray-300'}`}
-                  >
-                    {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  {tsErrors.endTime && <p className="text-xs text-red-600 mt-1">{tsErrors.endTime}</p>}
-                </div>
+                {(['startTime', 'endTime'] as const).map((field) => {
+                  const label = field === 'startTime' ? 'Début *' : 'Fin *';
+                  const disabled = tsForm.isForfait !== 'none';
+                  const timeVal = disabled ? '00:00' : tsForm[field];
+                  const { h, m } = parseTime(timeVal);
+                  const err = tsErrors[field];
+                  return (
+                    <div key={field}>
+                      <label className={`block text-sm font-medium mb-1.5 ${disabled ? 'text-gray-400' : 'text-gray-700'}`}>
+                        {label}
+                      </label>
+                      <div className={`flex items-center gap-2 px-3 py-2 border rounded-lg ${disabled ? 'bg-gray-100 border-gray-200' : err ? 'border-red-500 bg-white' : 'border-gray-300 bg-white'}`}>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          max={23}
+                          value={disabled ? 0 : h}
+                          disabled={disabled}
+                          onChange={(e) => {
+                            const val = Math.min(23, Math.max(0, parseInt(e.target.value) || 0));
+                            setTsForm({ ...tsForm, [field]: buildTime(val, m) });
+                          }}
+                          className={`w-12 text-center text-sm font-mono border-0 focus:outline-none focus:ring-0 p-0 bg-transparent ${disabled ? 'text-gray-400' : 'text-gray-900'}`}
+                        />
+                        <span className={`text-sm font-mono ${disabled ? 'text-gray-400' : 'text-gray-600'}`}>h</span>
+                        <div className="flex rounded overflow-hidden border border-gray-200 ml-1">
+                          {(['00', '30'] as const).map((min) => {
+                            const active = !disabled && String(m) === min;
+                            return (
+                              <button
+                                key={min}
+                                type="button"
+                                disabled={disabled}
+                                onClick={() => setTsForm({ ...tsForm, [field]: buildTime(h, parseInt(min)) })}
+                                className={`px-2 py-0.5 text-xs font-medium transition-colors ${disabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : active ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                              >
+                                :{min}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      {err && <p className="text-xs text-red-600 mt-1">{err}</p>}
+                    </div>
+                  );
+                })}
               </div>
 
               <div>
