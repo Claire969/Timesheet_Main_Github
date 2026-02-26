@@ -210,22 +210,53 @@ export const ClientTimesheets = () => {
 
     const fmtEur = (n: number) => Number.isInteger(n) ? `${n} €` : `${n.toFixed(2)} €`;
 
+    const buildCommentaire = (e: TimesheetEntry): string => {
+      const parts: string[] = [];
+      if (e.isForfait === 'halfDay') {
+        parts.push(`Demi-journée forfait (${fmtEur(client.rates.halfDay)})`);
+      } else if (e.isForfait === 'fullDay') {
+        parts.push(`Journée forfait (${fmtEur(client.rates.fullDay)})`);
+      } else {
+        const [sh, sm] = e.startTime.split(':').map(Number);
+        const [eh, em] = e.endTime.split(':').map(Number);
+        const durationMinutes = (eh * 60 + em) - (sh * 60 + sm);
+        if (durationMinutes > 0) {
+          const fullHours = Math.floor(durationMinutes / 60);
+          const halfHours = (durationMinutes % 60) / 30;
+          const timeParts: string[] = [];
+          if (fullHours > 0) timeParts.push(`${fullHours}h (${fmtEur(fullHours * client.rates.hour)})`);
+          if (halfHours > 0) timeParts.push(`0h30 (${fmtEur(halfHours * client.rates.halfHour)})`);
+          if (timeParts.length > 0) parts.push(timeParts.join(' + '));
+        }
+      }
+      if (e.travelUnits > 0) {
+        const travelCost = e.travelUnits * client.rates.travelHalfHour;
+        if (e.travelUnits === 1) {
+          parts.push(`1 déplacement (${fmtEur(client.rates.travelHalfHour)})`);
+        } else {
+          parts.push(`${e.travelUnits} déplacements (${e.travelUnits}×${fmtEur(client.rates.travelHalfHour)}) = ${fmtEur(travelCost)}`);
+        }
+      }
+      return parts.join(' + ') + ` = ${fmtEur(e.total)}`;
+    };
+
     const rows = selected.map(e => {
       const isForfait = e.isForfait !== 'none';
       const startCell = isForfait
-        ? `<span style="color:#999">${e.isForfait === 'halfDay' ? 'Demi-journée' : 'Journée'}</span>`
+        ? `<span style="color:#aaa">00:00</span>`
         : e.startTime;
-      const endCell = isForfait ? `<span style="color:#999">00:00</span>` : e.endTime;
-      const travel = e.travelUnits * client.rates.travelHalfHour;
+      const endCell = isForfait ? `<span style="color:#aaa">00:00</span>` : e.endTime;
+      const commentaire = buildCommentaire(e);
       return `
         <tr>
           <td>${fmtDate(e.date)}</td>
           <td>${startCell}</td>
           <td>${endCell}</td>
           <td>${e.caller || '—'}</td>
-          <td>${e.description || '—'}</td>
-          <td style="text-align:center">${e.travelUnits} × ${fmtEur(client.rates.travelHalfHour)} = ${fmtEur(travel)}</td>
+          <td><div class="clamp">${e.description || '—'}</div></td>
+          <td style="text-align:center">${e.travelUnits}</td>
           <td style="text-align:right;font-weight:600">${fmtEur(e.total)}</td>
+          <td><div class="clamp">${commentaire}</div></td>
         </tr>`;
     }).join('');
 
@@ -240,21 +271,22 @@ export const ClientTimesheets = () => {
 <title>Timesheets — ${client.name}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, sans-serif; font-size: 13px; color: #111; background: #fff; padding: 32px; }
-  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; border-bottom: 2px solid #111; padding-bottom: 16px; }
-  header .left { display: flex; align-items: center; gap: 16px; }
-  h1 { font-size: 18px; font-weight: 700; }
-  .meta { font-size: 12px; color: #555; margin-top: 2px; }
-  .period { font-size: 13px; font-weight: 600; margin-bottom: 16px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  body { font-family: Arial, sans-serif; font-size: 10.5px; color: #111; background: #fff; padding: 24px; }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 2px solid #111; padding-bottom: 12px; }
+  header .left { display: flex; align-items: center; gap: 14px; }
+  h1 { font-size: 16px; font-weight: 700; }
+  .meta { font-size: 10px; color: #555; margin-top: 2px; }
+  .period { font-size: 11px; font-weight: 600; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; }
   thead tr { background: #f0f0f0; }
-  th { padding: 8px 10px; text-align: left; font-weight: 700; font-size: 12px; border: 1px solid #ccc; }
-  td { padding: 7px 10px; border: 1px solid #ddd; vertical-align: top; font-size: 12px; }
+  th { padding: 5px 7px; text-align: left; font-weight: 700; font-size: 10px; border: 1px solid #ccc; white-space: nowrap; }
+  td { padding: 5px 7px; border: 1px solid #ddd; vertical-align: top; font-size: 10.5px; }
   tr:nth-child(even) td { background: #fafafa; }
-  tfoot td { border: 1px solid #ccc; padding: 8px 10px; font-size: 12px; }
+  .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-height: 2.8em; }
+  tfoot td { border: 1px solid #ccc; padding: 5px 7px; font-size: 10.5px; }
   tfoot .label { font-weight: 600; }
-  tfoot .total-row td { background: #111; color: #fff; font-weight: 700; font-size: 14px; }
-  @media print { body { padding: 16px; } }
+  tfoot .total-row td { background: #111; color: #fff; font-weight: 700; font-size: 12px; }
+  @media print { body { padding: 12px; } }
 </style>
 </head>
 <body>
@@ -279,8 +311,9 @@ export const ClientTimesheets = () => {
       <th>Fin</th>
       <th>Appelant</th>
       <th>Description</th>
-      <th>Déplacement</th>
+      <th style="text-align:center">Déplacement (×30 min)</th>
       <th style="text-align:right">Total (HTVA)</th>
+      <th>Commentaire prix</th>
     </tr>
   </thead>
   <tbody>
@@ -288,15 +321,15 @@ export const ClientTimesheets = () => {
   </tbody>
   <tfoot>
     <tr>
-      <td colspan="6" class="label" style="text-align:right">Sous-total intervention</td>
+      <td colspan="7" class="label" style="text-align:right">Sous-total intervention</td>
       <td style="text-align:right">${fmtEur(interventionTotal)}</td>
     </tr>
     <tr>
-      <td colspan="6" class="label" style="text-align:right">Sous-total déplacement</td>
+      <td colspan="7" class="label" style="text-align:right">Sous-total déplacement</td>
       <td style="text-align:right">${fmtEur(travelTotal)}</td>
     </tr>
     <tr class="total-row">
-      <td colspan="6" style="text-align:right">TOTAL HTVA</td>
+      <td colspan="7" style="text-align:right">TOTAL HTVA</td>
       <td style="text-align:right">${fmtEur(totalHT)}</td>
     </tr>
   </tfoot>
