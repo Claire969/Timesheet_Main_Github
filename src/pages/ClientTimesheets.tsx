@@ -444,6 +444,15 @@ export const ClientTimesheets = () => {
     padding: 6px 10px;
     border: none;
   }
+ 
+  td:nth-child(8) {
+  font-size: 9px;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
   @media print { body { padding: 10px; } }
 </style>
