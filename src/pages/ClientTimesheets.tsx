@@ -277,12 +277,20 @@ export const ClientTimesheets = () => {
   h1 { font-size: 16px; font-weight: 700; }
   .meta { font-size: 10px; color: #555; margin-top: 2px; }
   .period { font-size: 11px; font-weight: 600; margin-bottom: 12px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; table-layout: fixed; }
   thead tr { background: #f0f0f0; }
-  th { padding: 5px 7px; text-align: left; font-weight: 700; font-size: 10px; border: 1px solid #ccc; white-space: nowrap; }
-  td { padding: 5px 7px; border: 1px solid #ddd; vertical-align: top; font-size: 10.5px; }
+  th { padding: 5px 7px; text-align: left; font-weight: 700; font-size: 10px; border: 1px solid #ccc; white-space: nowrap; overflow: hidden; }
+  td { padding: 5px 7px; border: 1px solid #ddd; vertical-align: top; font-size: 10.5px; word-break: break-word; overflow-wrap: break-word; }
   tr:nth-child(even) td { background: #fafafa; }
-  .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-height: 2.8em; }
+  col.c-date { width: 9%; }
+  col.c-start { width: 6%; }
+  col.c-end { width: 6%; }
+  col.c-caller { width: 10%; }
+  col.c-desc { width: 24%; }
+  col.c-travel { width: 6%; }
+  col.c-total { width: 8%; }
+  col.c-comment { width: 31%; }
+  .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   tfoot td { border: 1px solid #ccc; padding: 5px 7px; font-size: 10.5px; }
   tfoot .label { font-weight: 600; }
   tfoot .total-row td { background: #111; color: #fff; font-weight: 700; font-size: 12px; }
@@ -304,6 +312,9 @@ export const ClientTimesheets = () => {
 </header>
 <div class="period">Période : ${periodFrom} → ${periodTo}</div>
 <table>
+  <colgroup>
+    <col class="c-date" /><col class="c-start" /><col class="c-end" /><col class="c-caller" /><col class="c-desc" /><col class="c-travel" /><col class="c-total" /><col class="c-comment" />
+  </colgroup>
   <thead>
     <tr>
       <th>Date</th>
