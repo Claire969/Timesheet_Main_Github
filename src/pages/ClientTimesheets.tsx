@@ -194,8 +194,14 @@ export const ClientTimesheets = () => {
 
     const fmtDate = (iso: string) => {
       const [y, m, d] = iso.split('-');
-      return `${d}/${m}/${y}`;
+      return `${d}-${m}-${y.slice(2)}`;
     };
+
+    const sortSection = (list: TimesheetEntry[]) =>
+      [...list].sort((a, b) => {
+        const dc = a.date.localeCompare(b.date);
+        return dc !== 0 ? dc : a.startTime.localeCompare(b.startTime);
+      });
 
     const dates = selected.map(e => e.date).sort();
     const periodFrom = fmtDate(dates[0]);
@@ -237,7 +243,7 @@ export const ClientTimesheets = () => {
       return parts.join(' + ') + ` = ${fmtEur(e.total)}`;
     };
 
-    const buildRows = (list: TimesheetEntry[]) => list.map(e => {
+    const buildRows = (list: TimesheetEntry[]) => sortSection(list).map(e => {
       const isForfait = e.isForfait !== 'none';
       const startCell = isForfait ? `<span style="color:#aaa">00:00</span>` : e.startTime;
       const endCell = isForfait ? `<span style="color:#aaa">00:00</span>` : e.endTime;
@@ -248,29 +254,19 @@ export const ClientTimesheets = () => {
           <td>${startCell}</td>
           <td>${endCell}</td>
           <td>${e.caller || '—'}</td>
-          <td><div class="clamp">${e.description || '—'}</div></td>
+          <td>${e.description || '—'}</td>
           <td style="text-align:center">${e.travelUnits}</td>
           <td style="text-align:right;font-weight:600">${fmtEur(e.total)}</td>
-          <td><div class="clamp">${commentaire}</div></td>
+          <td>${commentaire}</td>
         </tr>`;
     }).join('');
 
     const buildSectionFooter = (list: TimesheetEntry[]) => {
       const sTotal = list.reduce((acc, e) => acc + e.total, 0);
-      const sTravel = list.reduce((acc, e) => acc + e.travelUnits * client.rates.travelHalfHour, 0);
-      const sIntervention = sTotal - sTravel;
       return `
-    <tr>
-      <td colspan="7" class="label" style="text-align:right">Sous-total intervention</td>
-      <td style="text-align:right">${fmtEur(sIntervention)}</td>
-    </tr>
-    <tr>
-      <td colspan="7" class="label" style="text-align:right">Sous-total déplacement</td>
-      <td style="text-align:right">${fmtEur(sTravel)}</td>
-    </tr>
     <tr class="total-row">
-      <td colspan="7" style="text-align:right">TOTAL HTVA</td>
-      <td style="text-align:right">${fmtEur(sTotal)}</td>
+      <td colspan="7" style="text-align:right;font-weight:700">TOTAL HTVA</td>
+      <td style="text-align:right;font-weight:700">${fmtEur(sTotal)}</td>
     </tr>`;
     };
 
@@ -283,10 +279,10 @@ export const ClientTimesheets = () => {
       <th>Date</th>
       <th>Début</th>
       <th>Fin</th>
-      <th>Appelant</th>
+      <th>Caller</th>
       <th>Description</th>
       <th style="text-align:center">Déplacement (×30 min)</th>
-      <th style="text-align:right">Total (HTVA)</th>
+      <th style="text-align:right">Prix</th>
       <th>Commentaire prix</th>
     </tr>
   </thead>`;
@@ -314,13 +310,13 @@ export const ClientTimesheets = () => {
   <tbody>
     <tr class="total-row">
       <td style="text-align:right">TOTAL HTVA GLOBAL</td>
-      <td style="text-align:right;width:80px">${fmtEur(globalTotal)}</td>
+      <td style="text-align:right;width:90px">${fmtEur(globalTotal)}</td>
     </tr>
   </tbody>
 </table>` : '';
 
     const logoHtml = client.logoUrl
-      ? `<img src="${client.logoUrl}" alt="${client.name}" style="max-height:60px;max-width:160px;object-fit:contain" />`
+      ? `<img src="${client.logoUrl}" alt="${client.name}" style="max-height:56px;max-width:140px;object-fit:contain" />`
       : '';
 
     const html = `<!DOCTYPE html>
@@ -330,33 +326,31 @@ export const ClientTimesheets = () => {
 <title>Timesheets — ${client.name}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, sans-serif; font-size: 10.5px; color: #111; background: #fff; padding: 24px; }
-  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 2px solid #111; padding-bottom: 12px; }
-  header .left { display: flex; align-items: center; gap: 14px; }
-  h1 { font-size: 16px; font-weight: 700; }
-  .meta { font-size: 10px; color: #555; margin-top: 2px; }
-  .period { font-size: 11px; font-weight: 600; margin-bottom: 12px; }
-  .section-title { font-size: 13px; font-weight: 700; margin: 20px 0 6px; border-left: 3px solid #111; padding-left: 8px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 6px; table-layout: fixed; }
-  thead tr { background: #f0f0f0; }
-  th { padding: 5px 7px; text-align: left; font-weight: 700; font-size: 10px; border: 1px solid #ccc; white-space: nowrap; overflow: hidden; }
-  td { padding: 5px 7px; border: 1px solid #ddd; vertical-align: top; font-size: 10.5px; word-break: break-word; overflow-wrap: break-word; }
-  tr:nth-child(even) td { background: #fafafa; }
-  col.c-date { width: 9%; }
-  col.c-start { width: 6%; }
-  col.c-end { width: 6%; }
+  body { font-family: Arial, sans-serif; font-size: 10px; color: #111; background: #fff; padding: 20px; }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 2px solid #111; padding-bottom: 10px; }
+  header .left { display: flex; align-items: center; gap: 12px; }
+  h1 { font-size: 15px; font-weight: 700; }
+  .meta { font-size: 9px; color: #555; margin-top: 2px; }
+  .period { font-size: 10px; font-weight: 600; margin-bottom: 10px; }
+  .section-title { font-size: 11px; font-weight: 700; margin: 16px 0 4px; border-left: 3px solid #111; padding-left: 7px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 4px; table-layout: fixed; }
+  thead tr { background: #e8e8e8; }
+  th { padding: 4px 5px; text-align: left; font-weight: 700; font-size: 9px; border: 1px solid #bbb; white-space: nowrap; overflow: hidden; }
+  td { padding: 4px 5px; border: 1px solid #ddd; vertical-align: top; font-size: 10px; word-break: break-word; overflow-wrap: break-word; }
+  tr:nth-child(even) td { background: #f5f5f5; }
+  col.c-date { width: 8%; }
+  col.c-start { width: 5%; }
+  col.c-end { width: 5%; }
   col.c-caller { width: 10%; }
   col.c-desc { width: 24%; }
   col.c-travel { width: 6%; }
-  col.c-total { width: 8%; }
-  col.c-comment { width: 31%; }
-  .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  tfoot td { border: 1px solid #ccc; padding: 5px 7px; font-size: 10.5px; }
-  tfoot .label { font-weight: 600; }
-  tfoot .total-row td { background: #111; color: #fff; font-weight: 700; font-size: 12px; }
-  .global-total-table { width: auto; margin-left: auto; margin-top: 16px; }
-  .global-total-table .total-row td { background: #111; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 10px; border: none; }
-  @media print { body { padding: 12px; } }
+  col.c-total { width: 7%; }
+  col.c-comment { width: 35%; }
+  tfoot td { border: none; padding: 0; }
+  .total-row td { background: #222; color: #fff; font-weight: 700; font-size: 11px; padding: 5px 7px; border: none; }
+  .global-total-table { width: auto; margin-left: auto; margin-top: 14px; border-collapse: collapse; }
+  .global-total-table .total-row td { background: #111; color: #fff; font-weight: 700; font-size: 12px; padding: 6px 10px; }
+  @media print { body { padding: 10px; } }
 </style>
 </head>
 <body>
