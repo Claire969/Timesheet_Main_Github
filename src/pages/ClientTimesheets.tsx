@@ -411,10 +411,10 @@ export const ClientTimesheets = () => {
   col.c-start   { width: 7%; }  
   col.c-end     { width: 7%; }  
   col.c-caller  { width: 10%; }
-  col.c-desc    { width: 22%; }
+  col.c-desc    { width: 18%; }
   col.c-travel  { width: 6%; }
   col.c-total   { width: 7%; }
-  col.c-comment { width: 33%; }
+  col.c-comment { width: 37%; }
   
   /* Footer totals */
   tfoot td { border: none; padding: 0; }
