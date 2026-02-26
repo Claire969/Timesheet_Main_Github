@@ -335,8 +335,7 @@ export const ClientTimesheets = () => {
   .section-title { font-size: 11px; font-weight: 700; margin: 16px 0 4px; border-left: 3px solid #111; padding-left: 7px; }
   table { width: 100%; border-collapse: collapse; margin-top: 4px; table-layout: fixed; }
   thead tr { background: #e8e8e8; }
-  th { padding: 4px 5px; text-align: left; font-weight: 700; font-size: 9px; border: 1px solid #bbb; white-space: nowrap; overflow: hidden; }
-  td { padding: 4px 5px; border: 1px solid #ddd; vertical-align: top; font-size: 10px; word-break: break-word; overflow-wrap: break-word; }
+  th { padding: 4px 5px; text-align: left; font-weight: 700; font-size: 9px; border: 1px solid #bbb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}  
   th:nth-child(1), td:nth-child(1),
   th:nth-child(2), td:nth-child(2),
   th:nth-child(3), td:nth-child(3),
