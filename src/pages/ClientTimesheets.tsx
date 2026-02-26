@@ -408,14 +408,14 @@ export const ClientTimesheets = () => {
 
   /* Largeurs colonnes */
   col.c-date    { width: 8%; }
-  col.c-start   { width: 5%; }
-  col.c-end     { width: 5%; }
+  col.c-start   { width: 7%; }  /* au lieu de 5% */
+  col.c-end     { width: 7%; }  /* au lieu de 5% */
   col.c-caller  { width: 10%; }
-  col.c-desc    { width: 24%; }
+  col.c-desc    { width: 22%; } /* ajusté */
   col.c-travel  { width: 6%; }
   col.c-total   { width: 7%; }
-  col.c-comment { width: 35%; }
-
+  col.c-comment { width: 33%; }
+  
   /* Footer totals */
   tfoot td { border: none; padding: 0; }
 
