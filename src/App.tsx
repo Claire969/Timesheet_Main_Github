@@ -35,6 +35,7 @@ export interface TimesheetEntry {
   description: string;
   travelUnits: number;
   total: number;
+  isEvent: boolean;
   billingStatus: BillingStatus;
   pendingAt?: string;
   archivedAt?: string;

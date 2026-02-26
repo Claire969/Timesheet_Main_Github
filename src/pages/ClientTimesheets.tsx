@@ -39,6 +39,7 @@ const emptyForm = () => ({
   caller: '',
   description: '',
   travelUnits: 0,
+  isEvent: false,
 });
 
 const parseTime = (t: string) => {
@@ -204,10 +205,6 @@ export const ClientTimesheets = () => {
     const exportDateTime = now.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' })
       + ' ' + now.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
 
-    const totalHT = selected.reduce((acc, e) => acc + e.total, 0);
-    const travelTotal = selected.reduce((acc, e) => acc + e.travelUnits * client.rates.travelHalfHour, 0);
-    const interventionTotal = totalHT - travelTotal;
-
     const fmtEur = (n: number) => Number.isInteger(n) ? `${n} €` : `${n.toFixed(2)} €`;
 
     const buildCommentaire = (e: TimesheetEntry): string => {
@@ -240,11 +237,9 @@ export const ClientTimesheets = () => {
       return parts.join(' + ') + ` = ${fmtEur(e.total)}`;
     };
 
-    const rows = selected.map(e => {
+    const buildRows = (list: TimesheetEntry[]) => list.map(e => {
       const isForfait = e.isForfait !== 'none';
-      const startCell = isForfait
-        ? `<span style="color:#aaa">00:00</span>`
-        : e.startTime;
+      const startCell = isForfait ? `<span style="color:#aaa">00:00</span>` : e.startTime;
       const endCell = isForfait ? `<span style="color:#aaa">00:00</span>` : e.endTime;
       const commentaire = buildCommentaire(e);
       return `
@@ -259,6 +254,70 @@ export const ClientTimesheets = () => {
           <td><div class="clamp">${commentaire}</div></td>
         </tr>`;
     }).join('');
+
+    const buildSectionFooter = (list: TimesheetEntry[]) => {
+      const sTotal = list.reduce((acc, e) => acc + e.total, 0);
+      const sTravel = list.reduce((acc, e) => acc + e.travelUnits * client.rates.travelHalfHour, 0);
+      const sIntervention = sTotal - sTravel;
+      return `
+    <tr>
+      <td colspan="7" class="label" style="text-align:right">Sous-total intervention</td>
+      <td style="text-align:right">${fmtEur(sIntervention)}</td>
+    </tr>
+    <tr>
+      <td colspan="7" class="label" style="text-align:right">Sous-total déplacement</td>
+      <td style="text-align:right">${fmtEur(sTravel)}</td>
+    </tr>
+    <tr class="total-row">
+      <td colspan="7" style="text-align:right">TOTAL HTVA</td>
+      <td style="text-align:right">${fmtEur(sTotal)}</td>
+    </tr>`;
+    };
+
+    const theadHtml = `
+  <colgroup>
+    <col class="c-date" /><col class="c-start" /><col class="c-end" /><col class="c-caller" /><col class="c-desc" /><col class="c-travel" /><col class="c-total" /><col class="c-comment" />
+  </colgroup>
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Début</th>
+      <th>Fin</th>
+      <th>Appelant</th>
+      <th>Description</th>
+      <th style="text-align:center">Déplacement (×30 min)</th>
+      <th style="text-align:right">Total (HTVA)</th>
+      <th>Commentaire prix</th>
+    </tr>
+  </thead>`;
+
+    const interventions = selected.filter(e => !e.isEvent);
+    const events = selected.filter(e => e.isEvent);
+    const globalTotal = selected.reduce((acc, e) => acc + e.total, 0);
+
+    const interventionsBlock = interventions.length > 0 ? `
+<h2 class="section-title">Interventions</h2>
+<table>${theadHtml}
+  <tbody>${buildRows(interventions)}</tbody>
+  <tfoot>${buildSectionFooter(interventions)}</tfoot>
+</table>` : '';
+
+    const eventsBlock = events.length > 0 ? `
+<h2 class="section-title">Événements</h2>
+<table>${theadHtml}
+  <tbody>${buildRows(events)}</tbody>
+  <tfoot>${buildSectionFooter(events)}</tfoot>
+</table>` : '';
+
+    const globalBlock = (interventions.length > 0 && events.length > 0) ? `
+<table class="global-total-table">
+  <tbody>
+    <tr class="total-row">
+      <td style="text-align:right">TOTAL HTVA GLOBAL</td>
+      <td style="text-align:right;width:80px">${fmtEur(globalTotal)}</td>
+    </tr>
+  </tbody>
+</table>` : '';
 
     const logoHtml = client.logoUrl
       ? `<img src="${client.logoUrl}" alt="${client.name}" style="max-height:60px;max-width:160px;object-fit:contain" />`
@@ -277,6 +336,7 @@ export const ClientTimesheets = () => {
   h1 { font-size: 16px; font-weight: 700; }
   .meta { font-size: 10px; color: #555; margin-top: 2px; }
   .period { font-size: 11px; font-weight: 600; margin-bottom: 12px; }
+  .section-title { font-size: 13px; font-weight: 700; margin: 20px 0 6px; border-left: 3px solid #111; padding-left: 8px; }
   table { width: 100%; border-collapse: collapse; margin-top: 6px; table-layout: fixed; }
   thead tr { background: #f0f0f0; }
   th { padding: 5px 7px; text-align: left; font-weight: 700; font-size: 10px; border: 1px solid #ccc; white-space: nowrap; overflow: hidden; }
@@ -294,6 +354,8 @@ export const ClientTimesheets = () => {
   tfoot td { border: 1px solid #ccc; padding: 5px 7px; font-size: 10.5px; }
   tfoot .label { font-weight: 600; }
   tfoot .total-row td { background: #111; color: #fff; font-weight: 700; font-size: 12px; }
+  .global-total-table { width: auto; margin-left: auto; margin-top: 16px; }
+  .global-total-table .total-row td { background: #111; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 10px; border: none; }
   @media print { body { padding: 12px; } }
 </style>
 </head>
@@ -311,40 +373,9 @@ export const ClientTimesheets = () => {
   </div>
 </header>
 <div class="period">Période : ${periodFrom} → ${periodTo}</div>
-<table>
-  <colgroup>
-    <col class="c-date" /><col class="c-start" /><col class="c-end" /><col class="c-caller" /><col class="c-desc" /><col class="c-travel" /><col class="c-total" /><col class="c-comment" />
-  </colgroup>
-  <thead>
-    <tr>
-      <th>Date</th>
-      <th>Début</th>
-      <th>Fin</th>
-      <th>Appelant</th>
-      <th>Description</th>
-      <th style="text-align:center">Déplacement (×30 min)</th>
-      <th style="text-align:right">Total (HTVA)</th>
-      <th>Commentaire prix</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${rows}
-  </tbody>
-  <tfoot>
-    <tr>
-      <td colspan="7" class="label" style="text-align:right">Sous-total intervention</td>
-      <td style="text-align:right">${fmtEur(interventionTotal)}</td>
-    </tr>
-    <tr>
-      <td colspan="7" class="label" style="text-align:right">Sous-total déplacement</td>
-      <td style="text-align:right">${fmtEur(travelTotal)}</td>
-    </tr>
-    <tr class="total-row">
-      <td colspan="7" style="text-align:right">TOTAL HTVA</td>
-      <td style="text-align:right">${fmtEur(totalHT)}</td>
-    </tr>
-  </tfoot>
-</table>
+${interventionsBlock}
+${eventsBlock}
+${globalBlock}
 </body>
 </html>`;
 
@@ -389,6 +420,7 @@ export const ClientTimesheets = () => {
       caller: entry.caller,
       description: entry.description,
       travelUnits: entry.travelUnits,
+      isEvent: entry.isEvent ?? false,
     });
     setTsErrors({});
     setDeleteConfirm(false);
@@ -419,6 +451,7 @@ export const ClientTimesheets = () => {
             description: tsForm.description,
             travelUnits: tsForm.travelUnits,
             total,
+            isEvent: tsForm.isEvent,
           };
           if (wasArchived) {
             const { archivedAt: _a, ...rest } = updated;
@@ -438,6 +471,7 @@ export const ClientTimesheets = () => {
         description: tsForm.description,
         travelUnits: tsForm.travelUnits,
         total,
+        isEvent: tsForm.isEvent,
         billingStatus: 'unbilled',
       };
       setClientTimesheets(prev => ({
@@ -496,7 +530,16 @@ export const ClientTimesheets = () => {
           className="accent-blue-600 w-4 h-4 cursor-pointer"
         />
       </td>
-      <td className="px-4 py-3 text-gray-900 whitespace-nowrap">{entry.date}</td>
+      <td className="px-4 py-3 text-gray-900 whitespace-nowrap">
+        <div className="flex items-center gap-1.5">
+          {entry.date}
+          {entry.isEvent && (
+            <span className="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-700 rounded">
+              Événement
+            </span>
+          )}
+        </div>
+      </td>
       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
         {entry.isForfait !== 'none' ? formatForfait(entry.isForfait) : entry.startTime}
       </td>
@@ -892,6 +935,19 @@ export const ClientTimesheets = () => {
                 <div className="flex justify-between text-xs text-gray-400 mt-1">
                   {[0,1,2,3,4,5].map(n => <span key={n}>{n}</span>)}
                 </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="isEvent"
+                  checked={tsForm.isEvent}
+                  onChange={(e) => setTsForm({ ...tsForm, isEvent: e.target.checked })}
+                  className="accent-amber-500 w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="isEvent" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+                  Événement
+                </label>
               </div>
 
               <div className="bg-blue-50 rounded-lg px-4 py-3 flex items-center justify-between">
