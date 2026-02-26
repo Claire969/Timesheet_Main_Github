@@ -326,40 +326,125 @@ export const ClientTimesheets = () => {
 <title>Timesheets — ${client.name}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, sans-serif; font-size: 10px; color: #111; background: #fff; padding: 20px; }
-  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 2px solid #111; padding-bottom: 10px; }
+
+  body {
+    font-family: Arial, sans-serif;
+    font-size: 10px;
+    color: #111;
+    background: #fff;
+    padding: 20px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    border-bottom: 2px solid #111;
+    padding-bottom: 10px;
+  }
+
   header .left { display: flex; align-items: center; gap: 12px; }
+
   h1 { font-size: 15px; font-weight: 700; }
+
   .meta { font-size: 9px; color: #555; margin-top: 2px; }
+
   .period { font-size: 10px; font-weight: 600; margin-bottom: 10px; }
-  .section-title { font-size: 11px; font-weight: 700; margin: 16px 0 4px; border-left: 3px solid #111; padding-left: 7px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 4px; table-layout: fixed; }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    margin: 16px 0 4px;
+    border-left: 3px solid #111;
+    padding-left: 7px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 4px;
+    table-layout: fixed;
+    border: 2px solid #111; /* contour plus lisible */
+  }
+
   thead tr { background: #e8e8e8; }
-  th { padding: 4px 5px; text-align: left; font-weight: 700; font-size: 9px; border: 1px solid #bbb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}  
+
+  th {
+    padding: 4px 5px;
+    text-align: left;
+    font-weight: 700;
+    font-size: 9px;
+    border: 1px solid #111;   /* traits noirs */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+  }
+
+  td {
+    padding: 4px 5px;
+    border: 1px solid #111;   /* traits noirs */
+    font-size: 10px;
+    vertical-align: middle;   /* centré verticalement */
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Empêche les retours à la ligne dans les petites colonnes */
   th:nth-child(1), td:nth-child(1),
   th:nth-child(2), td:nth-child(2),
   th:nth-child(3), td:nth-child(3),
   th:nth-child(6), td:nth-child(6),
   th:nth-child(7), td:nth-child(7) {
-  white-space: nowrap !important;
-  word-break: normal !important;
-  overflow-wrap: normal !important;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+    white-space: nowrap !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   tr:nth-child(even) td { background: #f5f5f5; }
-  col.c-date { width: 8%; }
-  col.c-start { width: 5%; }
-  col.c-end { width: 5%; }
-  col.c-caller { width: 10%; }
-  col.c-desc { width: 24%; }
-  col.c-travel { width: 6%; }
-  col.c-total { width: 7%; }
+
+  /* Largeurs colonnes */
+  col.c-date    { width: 8%; }
+  col.c-start   { width: 5%; }
+  col.c-end     { width: 5%; }
+  col.c-caller  { width: 10%; }
+  col.c-desc    { width: 24%; }
+  col.c-travel  { width: 6%; }
+  col.c-total   { width: 7%; }
   col.c-comment { width: 35%; }
+
+  /* Footer totals */
   tfoot td { border: none; padding: 0; }
-  .total-row td { background: #222; color: #fff; font-weight: 700; font-size: 11px; padding: 5px 7px; border: none; }
-  .global-total-table { width: auto; margin-left: auto; margin-top: 14px; border-collapse: collapse; }
-  .global-total-table .total-row td { background: #111; color: #fff; font-weight: 700; font-size: 12px; padding: 6px 10px; }
+
+  .total-row td {
+    background: #222;
+    color: #fff;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 5px 7px;
+    border: none;
+  }
+
+  .global-total-table {
+    width: auto;
+    margin-left: auto;
+    margin-top: 14px;
+    border-collapse: collapse;
+    border: none;
+  }
+
+  .global-total-table .total-row td {
+    background: #111;
+    color: #fff;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 6px 10px;
+    border: none;
+  }
+
   @media print { body { padding: 10px; } }
 </style>
 </head>
