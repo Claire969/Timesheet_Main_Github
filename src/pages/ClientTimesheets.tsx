@@ -337,6 +337,17 @@ export const ClientTimesheets = () => {
   thead tr { background: #e8e8e8; }
   th { padding: 4px 5px; text-align: left; font-weight: 700; font-size: 9px; border: 1px solid #bbb; white-space: nowrap; overflow: hidden; }
   td { padding: 4px 5px; border: 1px solid #ddd; vertical-align: top; font-size: 10px; word-break: break-word; overflow-wrap: break-word; }
+  th:nth-child(1), td:nth-child(1),
+  th:nth-child(2), td:nth-child(2),
+  th:nth-child(3), td:nth-child(3),
+  th:nth-child(6), td:nth-child(6),
+  th:nth-child(7), td:nth-child(7) {
+  white-space: nowrap !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
   tr:nth-child(even) td { background: #f5f5f5; }
   col.c-date { width: 8%; }
   col.c-start { width: 5%; }
