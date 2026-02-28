@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, supabaseEnabled } from '../lib/supabaseClient';
 import { LogOut, Plus, X, Users, Edit2, Archive, ArchiveRestore } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppState } from '../App';
@@ -26,6 +26,42 @@ export const Home = () => {
     fullDay: 0,
   });
   const [clientFormErrors, setClientFormErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const mapDbClients = (rows: { id: string; name: string }[]): Client[] =>
+    rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      logoUrl: undefined,
+      isArchived: false,
+      rates: { halfHour: 0, hour: 0, travelHalfHour: 0, halfDay: 0, fullDay: 0 },
+    }));
+
+  const fetchClients = useCallback(async () => {
+    if (!supabaseEnabled) return;
+    setIsLoading(true);
+    setFetchError(null);
+    try {
+      const { data, error } = await supabase
+        .schema('timesheet')
+        .from('clients')
+        .select('id,name,company,email,created_at')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      setClients(mapDbClients(data ?? []));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erreur lors du chargement des clients';
+      setFetchError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [setClients]);
+
+  useEffect(() => {
+    fetchClients();
+  }, [fetchClients]);
 
   const handleSignOut = async () => {
     try {
@@ -69,7 +105,7 @@ export const Home = () => {
     setIsClientFormOpen(true);
   };
 
-  const handleSaveClient = (e: React.FormEvent) => {
+  const handleSaveClient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateClientForm()) return;
 
@@ -86,6 +122,30 @@ export const Home = () => {
           fullDay: clientFormData.fullDay,
         }
       } : c));
+      setIsClientFormOpen(false);
+      setEditingClientId(null);
+      return;
+    }
+
+    if (supabaseEnabled) {
+      setIsSaving(true);
+      try {
+        const { error } = await supabase
+          .schema('timesheet')
+          .from('clients')
+          .insert([{ name: clientFormData.name.trim(), company: null, email: null }])
+          .select()
+          .single();
+        if (error) throw error;
+        await fetchClients();
+        setIsClientFormOpen(false);
+        setEditingClientId(null);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Erreur lors de la création';
+        setClientFormErrors({ name: msg });
+      } finally {
+        setIsSaving(false);
+      }
     } else {
       const newClient: Client = {
         id: Date.now().toString(),
@@ -101,10 +161,9 @@ export const Home = () => {
         }
       };
       setClients([...clients, newClient]);
+      setIsClientFormOpen(false);
+      setEditingClientId(null);
     }
-
-    setIsClientFormOpen(false);
-    setEditingClientId(null);
   };
 
   const handleToggleArchiveClient = (clientId: string) => {
@@ -151,9 +210,19 @@ export const Home = () => {
           <p className="text-lg text-gray-500">{user?.email || 'Mode preview'}</p>
         </div>
 
+        {fetchError && (
+          <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            {fetchError}
+          </div>
+        )}
+
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">Clients</h2>
-          {activeClients.length === 0 ? (
+          {isLoading ? (
+            <div className="bg-gray-50 rounded-xl p-16 text-center border border-gray-200">
+              <p className="text-gray-400 text-sm">Chargement...</p>
+            </div>
+          ) : activeClients.length === 0 ? (
             <div className="bg-gray-50 rounded-xl p-16 text-center border border-gray-200">
               <p className="text-gray-600 mb-4">Aucun client pour le moment</p>
               <button onClick={handleOpenNewClientFromMain} className="text-blue-600 hover:text-blue-700 font-medium">
@@ -166,7 +235,7 @@ export const Home = () => {
                 <button
                   key={client.id}
                   onClick={() => navigate(`/client/${client.id}`)}
-                  className="aspect-square rounded-2xl flex flex-col items-center justify-between p-6 transition-all duration-200 bg-white border-2 border-blue-400 shadow-sm hover:border-blue-500 hover:shadow-xl hover:-translate-y-0.5"
+                  className="aspect-square rounded-2xl flex flex-col items-center justify-between p-6 transition-all duration-200 bg-white border border-blue-200 shadow-sm hover:border-blue-400 hover:shadow-xl hover:-translate-y-0.5"
                 >
                   <span className="text-2xl font-extrabold text-slate-900 text-center truncate w-full">
                     {client.name}
@@ -337,8 +406,8 @@ export const Home = () => {
                   <button type="button" onClick={() => { setIsClientFormOpen(false); setClientFormErrors({}); }} className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
                     Annuler
                   </button>
-                  <button type="submit" className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors">
-                    {editingClientId ? 'Modifier' : 'Créer'}
+                  <button type="submit" disabled={isSaving} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors">
+                    {isSaving ? 'Enregistrement...' : editingClientId ? 'Modifier' : 'Créer'}
                   </button>
                 </div>
               </form>
