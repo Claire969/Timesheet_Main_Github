@@ -365,7 +365,7 @@ export const ClientTimesheets = () => {
     border-collapse: collapse;
     margin-top: 4px;
     table-layout: fixed;
-    border: 2px solid #111; /* contour plus lisible */
+    border: 2px solid #111;
   }
 
   thead tr { background: #e8e8e8; }
@@ -375,7 +375,7 @@ export const ClientTimesheets = () => {
     text-align: left;
     font-weight: 700;
     font-size: 9px;
-    border: 1px solid #111;   /* traits noirs */
+    border: 1px solid #111;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -384,9 +384,9 @@ export const ClientTimesheets = () => {
 
   td {
     padding: 4px 5px;
-    border: 1px solid #111;   /* traits noirs */
+    border: 1px solid #111;
     font-size: 10px;
-    vertical-align: middle;   /* centré verticalement */
+    vertical-align: middle;
     word-break: break-word;
     overflow-wrap: break-word;
   }
@@ -408,14 +408,24 @@ export const ClientTimesheets = () => {
 
   /* Largeurs colonnes */
   col.c-date    { width: 8%; }
-  col.c-start   { width: 7%; }  
-  col.c-end     { width: 7%; }  
+  col.c-start   { width: 7%; }
+  col.c-end     { width: 7%; }
   col.c-caller  { width: 10%; }
   col.c-desc    { width: 18%; }
   col.c-travel  { width: 6%; }
   col.c-total   { width: 7%; }
   col.c-comment { width: 37%; }
-  
+
+  /* Commentaire prix : compact + max 2 lignes, sans casser le layout table */
+  .comment-clamp {
+    font-size: 9px;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
   /* Footer totals */
   tfoot td { border: none; padding: 0; }
 
@@ -444,15 +454,6 @@ export const ClientTimesheets = () => {
     padding: 6px 10px;
     border: none;
   }
- 
-  td:nth-child(8) {
-  font-size: 9px;
-  line-height: 1.2;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
 
   @media print { body { padding: 10px; } }
 </style>
