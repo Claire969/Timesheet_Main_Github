@@ -601,16 +601,15 @@ ${globalBlock}
 
   const colHeaders = (checkboxEl: React.ReactNode) => (
     <tr>
-      <th className="px-3 py-3 w-8">{checkboxEl}</th>
-      <th className="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
-      <th className="px-4 py-3 text-left font-semibold text-gray-700">Début</th>
-      <th className="px-4 py-3 text-left font-semibold text-gray-700">Fin</th>
-      <th className="px-4 py-3 text-left font-semibold text-gray-700">Appelant</th>
-      <th className="px-4 py-3 text-left font-semibold text-gray-700">Description</th>
-      <th className="px-4 py-3 text-center font-semibold text-gray-700">Déplacement</th>
-      <th className="px-4 py-3 text-left font-semibold text-gray-700">Client</th>
-      <th className="px-4 py-3 text-right font-semibold text-gray-700">Total (HTVA)</th>
-      <th className="px-4 py-3" />
+      <th className="px-2 py-2 w-7">{checkboxEl}</th>
+      <th className="px-2 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Date</th>
+      <th className="px-2 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Début</th>
+      <th className="px-2 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Fin</th>
+      <th className="px-2 py-2 text-left font-semibold text-gray-700">Appelant</th>
+      <th className="px-2 py-2 text-left font-semibold text-gray-700 w-[28%]">Description</th>
+      <th className="px-2 py-2 text-center font-semibold text-gray-700 whitespace-nowrap">Déplt.</th>
+      <th className="px-2 py-2 text-right font-semibold text-gray-700 whitespace-nowrap">Total (HTVA)</th>
+      <th className="px-2 py-2 w-9" />
     </tr>
   );
 
@@ -621,7 +620,7 @@ ${globalBlock}
     editLabel?: string
   ) => (
     <tr key={entry.id} className="hover:bg-gray-50 transition-colors">
-      <td className="px-3 py-3 text-center">
+      <td className="px-2 py-2 text-center">
         <input
           type="checkbox"
           checked={checked}
@@ -629,34 +628,33 @@ ${globalBlock}
           className="accent-blue-600 w-4 h-4 cursor-pointer"
         />
       </td>
-      <td className="px-4 py-3 text-gray-900 whitespace-nowrap">
-        <div className="flex items-center gap-1.5">
+      <td className="px-2 py-2 text-xs text-gray-900 whitespace-nowrap">
+        <div className="flex items-center gap-1">
           {entry.date}
           {entry.isEvent && (
-            <span className="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-700 rounded">
-              Événement
+            <span className="inline-block px-1 py-0.5 text-[9px] font-semibold bg-amber-100 text-amber-700 rounded">
+              Év.
             </span>
           )}
         </div>
       </td>
-      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+      <td className="px-2 py-2 text-xs text-gray-600 whitespace-nowrap">
         {entry.isForfait !== 'none' ? formatForfait(entry.isForfait) : entry.startTime}
       </td>
-      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+      <td className="px-2 py-2 text-xs text-gray-600 whitespace-nowrap">
         {entry.isForfait !== 'none' ? '—' : entry.endTime}
       </td>
-      <td className="px-4 py-3 text-gray-600">{entry.caller || '—'}</td>
-      <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{entry.description || '—'}</td>
-      <td className="px-4 py-3 text-gray-600 text-center">{entry.travelUnits}</td>
-      <td className="px-4 py-3 text-gray-600">{client.name}</td>
-      <td className="px-4 py-3 text-gray-900 font-semibold text-right whitespace-nowrap">{entry.total} €</td>
-      <td className="px-4 py-3">
+      <td className="px-2 py-2 text-xs text-gray-600 whitespace-normal break-words">{entry.caller || '—'}</td>
+      <td className="px-2 py-2 text-xs text-gray-600 whitespace-normal break-words">{entry.description || '—'}</td>
+      <td className="px-2 py-2 text-xs text-gray-600 text-center whitespace-nowrap">{entry.travelUnits}</td>
+      <td className="px-2 py-2 text-xs text-gray-900 font-semibold text-right whitespace-nowrap">{entry.total} €</td>
+      <td className="px-2 py-2">
         <button
           onClick={() => openEdit(entry)}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors whitespace-nowrap"
+          title={editLabel ?? 'Éditer'}
+          className="flex items-center justify-center p-1.5 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
         >
           <Edit2 size={12} />
-          {editLabel ?? 'Éditer'}
         </button>
       </td>
     </tr>
@@ -711,8 +709,8 @@ ${globalBlock}
               <p className="text-gray-500 text-sm">Aucune entrée non facturée.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-gray-200">
-              <table className="w-full text-sm">
+            <div className="rounded-xl border border-gray-200 overflow-hidden">
+              <table className="w-full table-fixed text-xs">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   {colHeaders(
                     <input
@@ -775,8 +773,8 @@ ${globalBlock}
               <p className="text-gray-500 text-sm">Aucune entrée en pending.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-gray-200">
-              <table className="w-full text-sm">
+            <div className="rounded-xl border border-gray-200 overflow-hidden">
+              <table className="w-full table-fixed text-xs">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   {colHeaders(
                     <input
@@ -836,8 +834,8 @@ ${globalBlock}
               <p className="text-gray-500 text-sm">Aucune entrée archivée.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-gray-200">
-              <table className="w-full text-sm">
+            <div className="rounded-xl border border-gray-200 overflow-hidden">
+              <table className="w-full table-fixed text-xs">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   {colHeaders(
                     <input
