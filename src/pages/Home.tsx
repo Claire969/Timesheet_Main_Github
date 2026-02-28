@@ -30,13 +30,19 @@ export const Home = () => {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const mapDbClients = (rows: { id: string; name: string }[]): Client[] =>
+  const mapDbClients = (rows: Record<string, unknown>[]): Client[] =>
     rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      logoUrl: undefined,
+      id: row.id as string,
+      name: row.name as string,
+      logoUrl: (row.logo_url as string) ?? undefined,
       isArchived: false,
-      rates: { halfHour: 0, hour: 0, travelHalfHour: 0, halfDay: 0, fullDay: 0 },
+      rates: {
+        halfHour: Number(row.half_hour) || 0,
+        hour: Number(row.hour) || 0,
+        travelHalfHour: Number(row.travel_half_hour) || 0,
+        halfDay: Number(row.half_day) || 0,
+        fullDay: Number(row.full_day) || 0,
+      },
     }));
 
   const fetchClients = useCallback(async () => {
@@ -47,7 +53,7 @@ export const Home = () => {
       const { data, error } = await supabase
         .schema('timesheet')
         .from('clients')
-        .select('id,name,company,email,created_at')
+        .select('id,name,logo_url,half_hour,hour,travel_half_hour,half_day,full_day,created_at')
         .order('created_at', { ascending: true });
       if (error) throw error;
       setClients(mapDbClients(data ?? []));
@@ -110,20 +116,48 @@ export const Home = () => {
     if (!validateClientForm()) return;
 
     if (editingClientId) {
-      setClients(clients.map(c => c.id === editingClientId ? {
-        ...c,
-        name: clientFormData.name,
-        logoUrl: clientFormData.logoUrl || undefined,
-        rates: {
-          halfHour: clientFormData.halfHour,
-          hour: clientFormData.hour,
-          travelHalfHour: clientFormData.travelHalfHour,
-          halfDay: clientFormData.halfDay,
-          fullDay: clientFormData.fullDay,
+      if (supabaseEnabled) {
+        setIsSaving(true);
+        try {
+          const { error } = await supabase
+            .schema('timesheet')
+            .from('clients')
+            .update({
+              name: clientFormData.name.trim(),
+              logo_url: clientFormData.logoUrl || null,
+              half_hour: clientFormData.halfHour,
+              hour: clientFormData.hour,
+              travel_half_hour: clientFormData.travelHalfHour,
+              half_day: clientFormData.halfDay,
+              full_day: clientFormData.fullDay,
+            })
+            .eq('id', editingClientId);
+          if (error) throw error;
+          await fetchClients();
+          setIsClientFormOpen(false);
+          setEditingClientId(null);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Erreur lors de la mise à jour';
+          setClientFormErrors({ name: msg });
+        } finally {
+          setIsSaving(false);
         }
-      } : c));
-      setIsClientFormOpen(false);
-      setEditingClientId(null);
+      } else {
+        setClients(clients.map(c => c.id === editingClientId ? {
+          ...c,
+          name: clientFormData.name,
+          logoUrl: clientFormData.logoUrl || undefined,
+          rates: {
+            halfHour: clientFormData.halfHour,
+            hour: clientFormData.hour,
+            travelHalfHour: clientFormData.travelHalfHour,
+            halfDay: clientFormData.halfDay,
+            fullDay: clientFormData.fullDay,
+          }
+        } : c));
+        setIsClientFormOpen(false);
+        setEditingClientId(null);
+      }
       return;
     }
 
