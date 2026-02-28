@@ -166,7 +166,7 @@ export const Home = () => {
                 <button
                   key={client.id}
                   onClick={() => navigate(`/client/${client.id}`)}
-                  className="aspect-square rounded-2xl flex flex-col items-center justify-between p-6 transition-all duration-200 bg-white border border-blue-200 shadow-sm hover:border-blue-400 hover:shadow-xl hover:-translate-y-0.5"
+                  className="aspect-square rounded-2xl flex flex-col items-center justify-between p-6 transition-all duration-200 bg-white border-2 border-blue-400 shadow-sm hover:border-blue-500 hover:shadow-xl hover:-translate-y-0.5"
                 >
                   <span className="text-2xl font-extrabold text-slate-900 text-center truncate w-full">
                     {client.name}
