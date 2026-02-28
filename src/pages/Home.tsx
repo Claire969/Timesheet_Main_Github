@@ -415,8 +415,8 @@ export const Home = () => {
           </div>
         </div>
       )}
-      <div className="fixed bottom-2 right-3 text-[10px] text-slate-400 select-none">
-  v{import.meta.env.VITE_BUILD_ID || import.meta.env.VITE_APP_VERSION || import.meta.env.MODE}
+      <div className="fixed bottom-3 right-3 z-[9999] text-xs font-semibold text-slate-700 bg-white/90 backdrop-blur px-2 py-1 rounded-lg border border-slate-200 shadow">
+  v{import.meta.env.VITE_BUILD_ID}
 </div>
     </div>
   );
