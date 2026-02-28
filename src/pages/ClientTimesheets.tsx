@@ -1,8 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { ArrowLeft, Plus, X, Edit2 } from 'lucide-react';
 import { useAppState } from '../App';
 import type { Forfait, TimesheetEntry } from '../App';
+import { supabase, supabaseEnabled } from '../lib/supabaseClient';
+
+type Project = {
+  id: string;
+  client_id: string;
+  name: string;
+  active: boolean;
+  created_at: string;
+};
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -91,6 +100,71 @@ export const ClientTimesheets = () => {
   const [selectedUnbilled, setSelectedUnbilled] = useState<Set<string>>(new Set());
   const [selectedPending, setSelectedPending] = useState<Set<string>>(new Set());
   const [selectedArchived, setSelectedArchived] = useState<Set<string>>(new Set());
+
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
+  const [showArchivedProjects, setShowArchivedProjects] = useState(false);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [projectSaving, setProjectSaving] = useState(false);
+  const [projectNameError, setProjectNameError] = useState('');
+
+  const fetchProjects = useCallback(async () => {
+    if (!supabaseEnabled) return;
+    setProjectsLoading(true);
+    setProjectsError(null);
+    const { data, error } = await supabase
+      .schema('timesheet')
+      .from('projects')
+      .select('id,name,active,created_at,client_id')
+      .eq('client_id', client.id)
+      .order('created_at', { ascending: true });
+    setProjectsLoading(false);
+    if (error) {
+      setProjectsError('Erreur lors du chargement des projets.');
+    } else {
+      setProjects((data ?? []) as Project[]);
+    }
+  }, [client.id]);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
+
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = projectName.trim();
+    if (!trimmed) {
+      setProjectNameError('Le nom du projet est requis.');
+      return;
+    }
+    setProjectNameError('');
+    setProjectSaving(true);
+    const { error } = await supabase
+      .schema('timesheet')
+      .from('projects')
+      .insert([{ client_id: client.id, name: trimmed }])
+      .select('id,name,active,created_at,client_id')
+      .single();
+    setProjectSaving(false);
+    if (error) {
+      setProjectNameError('Erreur lors de la création.');
+      return;
+    }
+    await fetchProjects();
+    setProjectName('');
+    setIsProjectModalOpen(false);
+  };
+
+  const handleToggleProjectActive = async (project: Project) => {
+    const { error } = await supabase
+      .schema('timesheet')
+      .from('projects')
+      .update({ active: !project.active })
+      .eq('id', project.id);
+    if (!error) await fetchProjects();
+  };
 
   const unbilledEntries = entries.filter(e => e.billingStatus === 'unbilled');
   const pendingEntries = entries.filter(e => e.billingStatus === 'pending');
@@ -687,6 +761,109 @@ ${globalBlock}
           </button>
         </div>
 
+        {/* Projects section */}
+        {supabaseEnabled && (
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-gray-800">Projets</h2>
+              <button
+                onClick={() => { setProjectName(''); setProjectNameError(''); setIsProjectModalOpen(true); }}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                <Plus size={15} />
+                Nouveau projet
+              </button>
+            </div>
+
+            {projectsError && (
+              <div className="mb-3 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {projectsError}
+              </div>
+            )}
+
+            {projectsLoading ? (
+              <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
+                <svg className="animate-spin h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+                Chargement…
+              </div>
+            ) : (
+              <>
+                {projects.filter(p => p.active).length === 0 && !showArchivedProjects && (
+                  <p className="text-sm text-gray-400 py-2">Aucun projet actif.</p>
+                )}
+
+                {projects.filter(p => p.active).length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {projects.filter(p => p.active).map(p => (
+                      <span
+                        key={p.id}
+                        className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-50 text-blue-800 border border-blue-200"
+                      >
+                        {p.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-2 text-left font-semibold text-gray-700">Nom</th>
+                        <th className="px-4 py-2 text-left font-semibold text-gray-700">Statut</th>
+                        <th className="px-4 py-2 w-28" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {projects
+                        .filter(p => p.active || showArchivedProjects)
+                        .map(p => (
+                          <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${!p.active ? 'opacity-60' : ''}`}>
+                            <td className="px-4 py-2 text-gray-900">{p.name}</td>
+                            <td className="px-4 py-2">
+                              {p.active ? (
+                                <span className="inline-block px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full">Actif</span>
+                              ) : (
+                                <span className="inline-block px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 rounded-full">Archivé</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              <button
+                                onClick={() => handleToggleProjectActive(p)}
+                                className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                              >
+                                {p.active ? 'Archiver' : 'Réactiver'}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      {projects.length === 0 && (
+                        <tr>
+                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">
+                            Aucun projet pour ce client.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {projects.some(p => !p.active) && (
+                  <button
+                    onClick={() => setShowArchivedProjects(v => !v)}
+                    className="mt-2 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    {showArchivedProjects ? 'Masquer les archivés' : 'Afficher les archivés'}
+                  </button>
+                )}
+              </>
+            )}
+          </section>
+        )}
+
         {/* Section A: Unbilled */}
         <section>
           <div className="flex items-center justify-between mb-3">
@@ -896,6 +1073,50 @@ ${globalBlock}
                 Confirmer
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Project modal */}
+      {isProjectModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Nouveau projet</h3>
+              <button onClick={() => setIsProjectModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-1 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateProject} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Nom du projet *</label>
+                <input
+                  type="text"
+                  value={projectName}
+                  onChange={e => setProjectName(e.target.value)}
+                  autoFocus
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${projectNameError ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="Ex: Refonte site web"
+                />
+                {projectNameError && <p className="text-xs text-red-600 mt-1">{projectNameError}</p>}
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsProjectModalOpen(false)}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={projectSaving}
+                  className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors"
+                >
+                  {projectSaving ? 'Création…' : 'Créer'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
