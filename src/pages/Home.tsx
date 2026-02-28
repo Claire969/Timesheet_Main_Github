@@ -166,13 +166,13 @@ export const Home = () => {
                 <button
                   key={client.id}
                   onClick={() => navigate(`/client/${client.id}`)}
-                  className="aspect-square rounded-2xl flex flex-col items-center justify-between p-6 transition-all duration-200 bg-gradient-to-br from-blue-600 to-indigo-600 border border-white/10 shadow-lg hover:shadow-2xl hover:-translate-y-1"
+                  className="aspect-square rounded-2xl flex flex-col items-center justify-between p-6 transition-all duration-200 bg-white border border-blue-200 shadow-sm hover:border-blue-400 hover:shadow-xl hover:-translate-y-0.5"
                 >
-                  <span className="px-3 py-1 rounded-full bg-white border border-blue-200 text-slate-900 text-sm font-semibold text-center line-clamp-1 max-w-full shadow-sm">
+                  <span className="text-2xl font-extrabold text-slate-900 text-center truncate w-full">
                     {client.name}
                   </span>
                   <div className="flex-1 flex items-center justify-center w-full">
-                    <div className="bg-white/90 rounded-xl p-4 shadow-sm flex items-center justify-center w-40 h-40">
+                    <div className="bg-slate-50 rounded-xl p-4 flex items-center justify-center w-56 h-56">
                       {client.logoUrl ? (
                         <img
                           src={client.logoUrl}
