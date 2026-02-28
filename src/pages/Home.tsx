@@ -415,6 +415,9 @@ export const Home = () => {
           </div>
         </div>
       )}
+      <div className="fixed bottom-2 right-3 text-[10px] text-slate-400 select-none">
+  v{import.meta.env.VITE_BUILD_ID || import.meta.env.VITE_APP_VERSION || import.meta.env.MODE}
+</div>
     </div>
   );
 };
