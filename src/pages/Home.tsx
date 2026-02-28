@@ -45,29 +45,47 @@ export const Home = () => {
       },
     }));
 
-  const fetchClients = useCallback(async () => {
-    if (!supabaseEnabled) return;
-    setIsLoading(true);
-    setFetchError(null);
-    try {
-      const { data, error } = await supabase
-        .schema('timesheet')
-        .from('clients')
-        .select('id,name,logo_url,half_hour,hour,travel_half_hour,half_day,full_day,created_at')
-        .order('created_at', { ascending: true });
-      if (error) throw error;
-      setClients(mapDbClients(data ?? []));
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erreur lors du chargement des clients';
-      setFetchError(msg);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [setClients]);
+const fetchClients = useCallback(async () => {
+  if (!supabaseEnabled) return;
 
-  useEffect(() => {
-    fetchClients();
-  }, [fetchClients]);
+  setIsLoading(true);
+  setFetchError(null);
+
+  try {
+    const { data, error } = await supabase
+      .schema('timesheet')
+      .from('clients')
+      .select('id,name,logo_url,half_hour,hour,travel_half_hour,half_day,full_day,created_at')
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    setClients(
+      (data ?? []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        logoUrl: r.logo_url ?? undefined,
+        isArchived: false,
+        rates: {
+          halfHour: Number(r.half_hour) || 0,
+          hour: Number(r.hour) || 0,
+          travelHalfHour: Number(r.travel_half_hour) || 0,
+          halfDay: Number(r.half_day) || 0,
+          fullDay: Number(r.full_day) || 0,
+        },
+      }))
+    );
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Erreur lors du chargement des clients';
+    setFetchError(msg);
+  } finally {
+    setIsLoading(false);
+  }
+}, [supabaseEnabled, setClients]);
+
+useEffect(() => {
+  void fetchClients();
+}, [fetchClients]);
 
   const handleSignOut = async () => {
     try {
