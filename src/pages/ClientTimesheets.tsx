@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { ArrowLeft, Plus, X, Edit2 } from 'lucide-react';
 import { useAppState } from '../App';
-import type { Forfait, TimesheetEntry } from '../App';
+import type { Forfait } from '../App';
 import { supabase, supabaseEnabled } from '../lib/supabaseClient';
 
 type Project = {
@@ -13,7 +13,43 @@ type Project = {
   created_at: string;
 };
 
+type Entry = {
+  id: string;
+  project_id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  isForfait: Forfait;
+  caller: string;
+  description: string;
+  travelUnits: number;
+  total: number;
+  billingStatus: 'unbilled' | 'pending' | 'archived';
+  pendingAt?: string;
+  archivedAt?: string;
+  isEvent: boolean;
+};
+
 const today = () => new Date().toISOString().slice(0, 10);
+
+const stripSeconds = (t: string) => (t ? t.slice(0, 5) : '00:00');
+
+const mapDbEntry = (row: Record<string, unknown>): Entry => ({
+  id: row.id as string,
+  project_id: row.project_id as string,
+  date: row.work_date as string,
+  startTime: row.start_time ? stripSeconds(row.start_time as string) : '00:00',
+  endTime: row.end_time ? stripSeconds(row.end_time as string) : '00:00',
+  isForfait: (row.is_forfait as Forfait) || 'none',
+  caller: (row.caller as string) || '',
+  description: (row.description as string) || '',
+  travelUnits: (row.travel_units as number) || 0,
+  total: parseFloat(String(row.total ?? 0)),
+  billingStatus: (row.billing_status as Entry['billingStatus']) || 'unbilled',
+  pendingAt: (row.pending_at as string) || undefined,
+  archivedAt: (row.archived_at as string) || undefined,
+  isEvent: Boolean(row.is_event),
+});
 
 const computeTotal = (
   isForfait: Forfait,
@@ -38,6 +74,14 @@ const computeTotal = (
     }
   }
   return base + travelUnits * rates.travelHalfHour;
+};
+
+const computeMinutes = (isForfait: Forfait, startTime: string, endTime: string): number => {
+  if (isForfait === 'halfDay') return 240;
+  if (isForfait === 'fullDay') return 480;
+  const [sh, sm] = startTime.split(':').map(Number);
+  const [eh, em] = endTime.split(':').map(Number);
+  return Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
 };
 
 const emptyForm = () => ({
@@ -65,8 +109,8 @@ const formatForfait = (f: Forfait) => {
   return '—';
 };
 
-const groupByDate = (entries: TimesheetEntry[], dateKey: 'pendingAt' | 'archivedAt') => {
-  const map: Record<string, TimesheetEntry[]> = {};
+const groupByDate = (entries: Entry[], dateKey: 'pendingAt' | 'archivedAt') => {
+  const map: Record<string, Entry[]> = {};
   for (const e of entries) {
     const k = e[dateKey] || 'unknown';
     if (!map[k]) map[k] = [];
@@ -75,31 +119,15 @@ const groupByDate = (entries: TimesheetEntry[], dateKey: 'pendingAt' | 'archived
   return Object.entries(map).sort(([a], [b]) => b.localeCompare(a));
 };
 
-type ConfirmDialog = {
-  message: string;
-  onConfirm: () => void;
-} | null;
+type ConfirmDialog = { message: string; onConfirm: () => void } | null;
 
 export const ClientTimesheets = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
-  const { clients, clientTimesheets, setClientTimesheets } = useAppState();
+  const { clients } = useAppState();
 
   const client = clients.find(c => c.id === clientId);
   if (!client) return <Navigate to="/" replace />;
-
-  const entries: TimesheetEntry[] = clientTimesheets[client.id] || [];
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
-  const [tsForm, setTsForm] = useState(emptyForm());
-  const [tsErrors, setTsErrors] = useState<Record<string, string>>({});
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null);
-
-  const [selectedUnbilled, setSelectedUnbilled] = useState<Set<string>>(new Set());
-  const [selectedPending, setSelectedPending] = useState<Set<string>>(new Set());
-  const [selectedArchived, setSelectedArchived] = useState<Set<string>>(new Set());
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
@@ -109,6 +137,23 @@ export const ClientTimesheets = () => {
   const [projectName, setProjectName] = useState('');
   const [projectSaving, setProjectSaving] = useState(false);
   const [projectNameError, setProjectNameError] = useState('');
+
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [entriesLoading, setEntriesLoading] = useState(false);
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
+  const [tsForm, setTsForm] = useState(emptyForm());
+  const [tsErrors, setTsErrors] = useState<Record<string, string>>({});
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null);
+  const [saving, setSaving] = useState(false);
+
+  const [selectedUnbilled, setSelectedUnbilled] = useState<Set<string>>(new Set());
+  const [selectedPending, setSelectedPending] = useState<Set<string>>(new Set());
+  const [selectedArchived, setSelectedArchived] = useState<Set<string>>(new Set());
+  const [pdfToast, setPdfToast] = useState(false);
 
   const fetchProjects = useCallback(async () => {
     if (!supabaseEnabled) return;
@@ -124,21 +169,38 @@ export const ClientTimesheets = () => {
     if (error) {
       setProjectsError('Erreur lors du chargement des projets.');
     } else {
-      setProjects((data ?? []) as Project[]);
+      const list = (data ?? []) as Project[];
+      setProjects(list);
+      setSelectedProjectId(prev => {
+        if (prev && list.find(p => p.id === prev)) return prev;
+        const first = list.find(p => p.active);
+        return first ? first.id : null;
+      });
     }
   }, [client.id]);
 
-  useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+  useEffect(() => { fetchProjects(); }, [fetchProjects]);
+
+  const fetchEntries = useCallback(async () => {
+    if (!supabaseEnabled || !selectedProjectId) { setEntries([]); return; }
+    setEntriesLoading(true);
+    const { data, error } = await supabase
+      .schema('timesheet')
+      .from('entries')
+      .select('id,project_id,work_date,start_time,end_time,minutes,caller,description,travel_units,is_forfait,total,billing_status,pending_at,archived_at,is_event,created_at')
+      .eq('project_id', selectedProjectId)
+      .order('work_date', { ascending: true })
+      .order('created_at', { ascending: true });
+    setEntriesLoading(false);
+    if (!error) setEntries((data ?? []).map(r => mapDbEntry(r as Record<string, unknown>)));
+  }, [selectedProjectId]);
+
+  useEffect(() => { fetchEntries(); setSelectedUnbilled(new Set()); setSelectedPending(new Set()); setSelectedArchived(new Set()); }, [fetchEntries]);
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = projectName.trim();
-    if (!trimmed) {
-      setProjectNameError('Le nom du projet est requis.');
-      return;
-    }
+    if (!trimmed) { setProjectNameError('Le nom du projet est requis.'); return; }
     setProjectNameError('');
     setProjectSaving(true);
     const { error } = await supabase
@@ -148,10 +210,7 @@ export const ClientTimesheets = () => {
       .select('id,name,active,created_at,client_id')
       .single();
     setProjectSaving(false);
-    if (error) {
-      setProjectNameError('Erreur lors de la création.');
-      return;
-    }
+    if (error) { setProjectNameError('Erreur lors de la création.'); return; }
     await fetchProjects();
     setProjectName('');
     setIsProjectModalOpen(false);
@@ -170,7 +229,7 @@ export const ClientTimesheets = () => {
   const pendingEntries = entries.filter(e => e.billingStatus === 'pending');
   const archivedEntries = entries.filter(e => e.billingStatus === 'archived');
 
-  const fmtTotal = (list: TimesheetEntry[]) => {
+  const fmtTotal = (list: Entry[]) => {
     const sum = list.reduce((acc, e) => acc + e.total, 0);
     return Number.isInteger(sum) ? `${sum} €` : `${sum.toFixed(2)} €`;
   };
@@ -181,30 +240,28 @@ export const ClientTimesheets = () => {
     setFn(next);
   };
 
-  const toggleAll = (list: TimesheetEntry[], set: Set<string>, setFn: (s: Set<string>) => void) => {
-    if (list.every(e => set.has(e.id))) {
-      setFn(new Set());
-    } else {
-      setFn(new Set(list.map(e => e.id)));
-    }
+  const toggleAll = (list: Entry[], set: Set<string>, setFn: (s: Set<string>) => void) => {
+    setFn(list.every(e => set.has(e.id)) ? new Set() : new Set(list.map(e => e.id)));
   };
 
-  const batchUpdate = (ids: Set<string>, updater: (e: TimesheetEntry) => TimesheetEntry) => {
-    setClientTimesheets(prev => ({
-      ...prev,
-      [client.id]: (prev[client.id] || []).map(e => ids.has(e.id) ? updater(e) : e),
-    }));
+  const batchDbUpdate = async (ids: Set<string>, fields: Record<string, unknown>) => {
+    if (ids.size === 0) return;
+    await supabase
+      .schema('timesheet')
+      .from('entries')
+      .update(fields)
+      .in('id', Array.from(ids));
+    await fetchEntries();
   };
 
   const handleExportPending = () => {
     if (selectedUnbilled.size === 0) return;
     setConfirmDialog({
       message: `Exporter ${selectedUnbilled.size} entrée(s) de "${client.name}" vers Pending ?`,
-      onConfirm: () => {
-        const t = today();
-        batchUpdate(selectedUnbilled, e => ({ ...e, billingStatus: 'pending', pendingAt: t }));
-        setSelectedUnbilled(new Set());
+      onConfirm: async () => {
         setConfirmDialog(null);
+        await batchDbUpdate(selectedUnbilled, { billing_status: 'pending', pending_at: today() });
+        setSelectedUnbilled(new Set());
       },
     });
   };
@@ -213,81 +270,49 @@ export const ClientTimesheets = () => {
     if (selectedPending.size === 0) return;
     setConfirmDialog({
       message: `Archiver ${selectedPending.size} entrée(s) de "${client.name}" ?`,
-      onConfirm: () => {
-        const t = today();
-        batchUpdate(selectedPending, e => ({ ...e, billingStatus: 'archived', archivedAt: t }));
-        setSelectedPending(new Set());
+      onConfirm: async () => {
         setConfirmDialog(null);
+        await batchDbUpdate(selectedPending, { billing_status: 'archived', archived_at: today() });
+        setSelectedPending(new Set());
       },
     });
   };
 
-  const handlePendingToUnbilled = () => {
+  const handlePendingToUnbilled = async () => {
     if (selectedPending.size === 0) return;
-    batchUpdate(selectedPending, e => {
-      const { pendingAt: _p, ...rest } = e;
-      return { ...rest, billingStatus: 'unbilled' };
-    });
+    await batchDbUpdate(selectedPending, { billing_status: 'unbilled', pending_at: null });
     setSelectedPending(new Set());
   };
 
-  const handleArchivedToPending = () => {
+  const handleArchivedToPending = async () => {
     if (selectedArchived.size === 0) return;
-    const t = today();
-    batchUpdate(selectedArchived, e => {
-      const { archivedAt: _a, ...rest } = e;
-      return { ...rest, billingStatus: 'pending', pendingAt: t };
-    });
+    await batchDbUpdate(selectedArchived, { billing_status: 'pending', pending_at: today(), archived_at: null });
     setSelectedArchived(new Set());
   };
 
-  const handleArchivedToUnbilled = () => {
+  const handleArchivedToUnbilled = async () => {
     if (selectedArchived.size === 0) return;
-    batchUpdate(selectedArchived, e => {
-      const { pendingAt: _p, archivedAt: _a, ...rest } = e;
-      return { ...rest, billingStatus: 'unbilled' };
-    });
+    await batchDbUpdate(selectedArchived, { billing_status: 'unbilled', pending_at: null, archived_at: null });
     setSelectedArchived(new Set());
   };
-
-  const [pdfToast, setPdfToast] = useState(false);
 
   const handleGeneratePdf = () => {
-    if (selectedPending.size === 0) {
-      setPdfToast(true);
-      setTimeout(() => setPdfToast(false), 3000);
-      return;
-    }
+    if (selectedPending.size === 0) { setPdfToast(true); setTimeout(() => setPdfToast(false), 3000); return; }
 
     const selected = pendingEntries
       .filter(e => selectedPending.has(e.id))
-      .sort((a, b) => {
-        const dateCmp = a.date.localeCompare(b.date);
-        return dateCmp !== 0 ? dateCmp : a.startTime.localeCompare(b.startTime);
-      });
+      .sort((a, b) => { const dc = a.date.localeCompare(b.date); return dc !== 0 ? dc : a.startTime.localeCompare(b.startTime); });
 
-    const fmtDate = (iso: string) => {
-      const [y, m, d] = iso.split('-');
-      return `${d}-${m}-${y.slice(2)}`;
-    };
-
-    const sortSection = (list: TimesheetEntry[]) =>
-      [...list].sort((a, b) => {
-        const dc = a.date.localeCompare(b.date);
-        return dc !== 0 ? dc : a.startTime.localeCompare(b.startTime);
-      });
-
+    const fmtDate = (iso: string) => { const [y, m, d] = iso.split('-'); return `${d}-${m}-${y.slice(2)}`; };
+    const sortSection = (list: Entry[]) => [...list].sort((a, b) => { const dc = a.date.localeCompare(b.date); return dc !== 0 ? dc : a.startTime.localeCompare(b.startTime); });
     const dates = selected.map(e => e.date).sort();
     const periodFrom = fmtDate(dates[0]);
     const periodTo = fmtDate(dates[dates.length - 1]);
-
     const now = new Date();
-    const exportDateTime = now.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-      + ' ' + now.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
-
+    const exportDateTime = now.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + now.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
     const fmtEur = (n: number) => Number.isInteger(n) ? `${n} €` : `${n.toFixed(2)} €`;
 
-    const buildCommentaire = (e: TimesheetEntry): string => {
+    const buildCommentaire = (e: Entry): string => {
       const parts: string[] = [];
       if (e.isForfait === 'halfDay') {
         parts.push(`Demi-journée forfait (${fmtEur(client.rates.halfDay)})`);
@@ -308,249 +333,35 @@ export const ClientTimesheets = () => {
       }
       if (e.travelUnits > 0) {
         const travelCost = e.travelUnits * client.rates.travelHalfHour;
-        if (e.travelUnits === 1) {
-          parts.push(`1 déplacement (${fmtEur(client.rates.travelHalfHour)})`);
-        } else {
-          parts.push(`${e.travelUnits} déplacements (${e.travelUnits}×${fmtEur(client.rates.travelHalfHour)}) = ${fmtEur(travelCost)}`);
-        }
+        parts.push(e.travelUnits === 1 ? `1 déplacement (${fmtEur(client.rates.travelHalfHour)})` : `${e.travelUnits} déplacements (${e.travelUnits}×${fmtEur(client.rates.travelHalfHour)}) = ${fmtEur(travelCost)}`);
       }
       return parts.join(' + ') + ` = ${fmtEur(e.total)}`;
     };
 
-    const buildRows = (list: TimesheetEntry[]) => sortSection(list).map(e => {
+    const buildRows = (list: Entry[]) => sortSection(list).map(e => {
       const isForfait = e.isForfait !== 'none';
       const startCell = isForfait ? `<span style="color:#aaa">00:00</span>` : e.startTime;
       const endCell = isForfait ? `<span style="color:#aaa">00:00</span>` : e.endTime;
-      const commentaire = buildCommentaire(e);
-      return `
-        <tr>
-          <td>${fmtDate(e.date)}</td>
-          <td>${startCell}</td>
-          <td>${endCell}</td>
-          <td>${e.caller || '—'}</td>
-          <td>${e.description || '—'}</td>
-          <td style="text-align:center">${e.travelUnits}</td>
-          <td style="text-align:right;font-weight:600">${fmtEur(e.total)}</td>
-          <td>${commentaire}</td>
-        </tr>`;
+      return `<tr><td>${fmtDate(e.date)}</td><td>${startCell}</td><td>${endCell}</td><td>${e.caller || '—'}</td><td>${e.description || '—'}</td><td style="text-align:center">${e.travelUnits}</td><td style="text-align:right;font-weight:600">${fmtEur(e.total)}</td><td>${buildCommentaire(e)}</td></tr>`;
     }).join('');
 
-    const buildSectionFooter = (list: TimesheetEntry[]) => {
+    const buildSectionFooter = (list: Entry[]) => {
       const sTotal = list.reduce((acc, e) => acc + e.total, 0);
-      return `
-    <tr class="total-row">
-      <td colspan="7" style="text-align:right;font-weight:700">TOTAL HTVA</td>
-      <td style="text-align:right;font-weight:700">${fmtEur(sTotal)}</td>
-    </tr>`;
+      return `<tr class="total-row"><td colspan="7" style="text-align:right;font-weight:700">TOTAL HTVA</td><td style="text-align:right;font-weight:700">${fmtEur(sTotal)}</td></tr>`;
     };
 
-    const theadHtml = `
-  <colgroup>
-    <col class="c-date" /><col class="c-start" /><col class="c-end" /><col class="c-caller" /><col class="c-desc" /><col class="c-travel" /><col class="c-total" /><col class="c-comment" />
-  </colgroup>
-  <thead>
-    <tr>
-      <th>Date</th>
-      <th>Début</th>
-      <th>Fin</th>
-      <th>Caller</th>
-      <th>Description</th>
-      <th style="text-align:center">Déplacement (×30 min)</th>
-      <th style="text-align:right">Prix</th>
-      <th>Commentaire prix</th>
-    </tr>
-  </thead>`;
+    const theadHtml = `<colgroup><col class="c-date" /><col class="c-start" /><col class="c-end" /><col class="c-caller" /><col class="c-desc" /><col class="c-travel" /><col class="c-total" /><col class="c-comment" /></colgroup><thead><tr><th>Date</th><th>Début</th><th>Fin</th><th>Caller</th><th>Description</th><th style="text-align:center">Déplacement (×30 min)</th><th style="text-align:right">Prix</th><th>Commentaire prix</th></tr></thead>`;
 
     const interventions = selected.filter(e => !e.isEvent);
     const events = selected.filter(e => e.isEvent);
     const globalTotal = selected.reduce((acc, e) => acc + e.total, 0);
 
-    const interventionsBlock = interventions.length > 0 ? `
-<h2 class="section-title">Interventions</h2>
-<table>${theadHtml}
-  <tbody>${buildRows(interventions)}</tbody>
-  <tfoot>${buildSectionFooter(interventions)}</tfoot>
-</table>` : '';
+    const interventionsBlock = interventions.length > 0 ? `<h2 class="section-title">Interventions</h2><table>${theadHtml}<tbody>${buildRows(interventions)}</tbody><tfoot>${buildSectionFooter(interventions)}</tfoot></table>` : '';
+    const eventsBlock = events.length > 0 ? `<h2 class="section-title">Événements</h2><table>${theadHtml}<tbody>${buildRows(events)}</tbody><tfoot>${buildSectionFooter(events)}</tfoot></table>` : '';
+    const globalBlock = (interventions.length > 0 && events.length > 0) ? `<table class="global-total-table"><tbody><tr class="total-row"><td style="text-align:right">TOTAL HTVA GLOBAL</td><td style="text-align:right;width:90px">${fmtEur(globalTotal)}</td></tr></tbody></table>` : '';
+    const logoHtml = client.logoUrl ? `<img src="${client.logoUrl}" alt="${client.name}" style="max-height:56px;max-width:140px;object-fit:contain" />` : '';
 
-    const eventsBlock = events.length > 0 ? `
-<h2 class="section-title">Événements</h2>
-<table>${theadHtml}
-  <tbody>${buildRows(events)}</tbody>
-  <tfoot>${buildSectionFooter(events)}</tfoot>
-</table>` : '';
-
-    const globalBlock = (interventions.length > 0 && events.length > 0) ? `
-<table class="global-total-table">
-  <tbody>
-    <tr class="total-row">
-      <td style="text-align:right">TOTAL HTVA GLOBAL</td>
-      <td style="text-align:right;width:90px">${fmtEur(globalTotal)}</td>
-    </tr>
-  </tbody>
-</table>` : '';
-
-    const logoHtml = client.logoUrl
-      ? `<img src="${client.logoUrl}" alt="${client.name}" style="max-height:56px;max-width:140px;object-fit:contain" />`
-      : '';
-
-    const html = `<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8" />
-<title>Timesheets — ${client.name}</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    font-family: Arial, sans-serif;
-    font-size: 10px;
-    color: #111;
-    background: #fff;
-    padding: 20px;
-  }
-
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-    border-bottom: 2px solid #111;
-    padding-bottom: 10px;
-  }
-
-  header .left { display: flex; align-items: center; gap: 12px; }
-
-  h1 { font-size: 15px; font-weight: 700; }
-
-  .meta { font-size: 9px; color: #555; margin-top: 2px; }
-
-  .period { font-size: 10px; font-weight: 600; margin-bottom: 10px; }
-
-  .section-title {
-    font-size: 11px;
-    font-weight: 700;
-    margin: 16px 0 4px;
-    border-left: 3px solid #111;
-    padding-left: 7px;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 4px;
-    table-layout: fixed;
-    border: 2px solid #111;
-  }
-
-  thead tr { background: #e8e8e8; }
-
-  th {
-    padding: 4px 5px;
-    text-align: left;
-    font-weight: 700;
-    font-size: 9px;
-    border: 1px solid #111;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    vertical-align: middle;
-  }
-
-  td {
-    padding: 4px 5px;
-    border: 1px solid #111;
-    font-size: 10px;
-    vertical-align: middle;
-    word-break: break-word;
-    overflow-wrap: break-word;
-  }
-
-  /* Empêche les retours à la ligne dans les petites colonnes */
-  th:nth-child(1), td:nth-child(1),
-  th:nth-child(2), td:nth-child(2),
-  th:nth-child(3), td:nth-child(3),
-  th:nth-child(6), td:nth-child(6),
-  th:nth-child(7), td:nth-child(7) {
-    white-space: nowrap !important;
-    word-break: normal !important;
-    overflow-wrap: normal !important;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  tr:nth-child(even) td { background: #f5f5f5; }
-
-  /* Largeurs colonnes */
-  col.c-date    { width: 8%; }
-  col.c-start   { width: 7%; }
-  col.c-end     { width: 7%; }
-  col.c-caller  { width: 10%; }
-  col.c-desc    { width: 18%; }
-  col.c-travel  { width: 6%; }
-  col.c-total   { width: 7%; }
-  col.c-comment { width: 37%; }
-
-  /* Commentaire prix : compact + max 2 lignes, sans casser le layout table */
-  .comment-clamp {
-    font-size: 9px;
-    line-height: 1.2;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  /* Footer totals */
-  tfoot td { border: none; padding: 0; }
-
-  .total-row td {
-    background: #222;
-    color: #fff;
-    font-weight: 700;
-    font-size: 11px;
-    padding: 5px 7px;
-    border: none;
-  }
-
-  .global-total-table {
-    width: auto;
-    margin-left: auto;
-    margin-top: 14px;
-    border-collapse: collapse;
-    border: none;
-  }
-
-  .global-total-table .total-row td {
-    background: #111;
-    color: #fff;
-    font-weight: 700;
-    font-size: 12px;
-    padding: 6px 10px;
-    border: none;
-  }
-
-  @media print { body { padding: 10px; } }
-</style>
-</head>
-<body>
-<header>
-  <div class="left">
-    ${logoHtml}
-    <div>
-      <h1>${client.name}</h1>
-      <div class="meta">Timesheets — Export pour facturation</div>
-    </div>
-  </div>
-  <div style="text-align:right">
-    <div class="meta">Exporté le ${exportDateTime}</div>
-  </div>
-</header>
-<div class="period">Période : ${periodFrom} → ${periodTo}</div>
-${interventionsBlock}
-${eventsBlock}
-${globalBlock}
-</body>
-</html>`;
+    const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8" /><title>Timesheets — ${client.name}</title><style>* { box-sizing: border-box; margin: 0; padding: 0; } body { font-family: Arial, sans-serif; font-size: 10px; color: #111; background: #fff; padding: 20px; } header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 2px solid #111; padding-bottom: 10px; } header .left { display: flex; align-items: center; gap: 12px; } h1 { font-size: 15px; font-weight: 700; } .meta { font-size: 9px; color: #555; margin-top: 2px; } .period { font-size: 10px; font-weight: 600; margin-bottom: 10px; } .section-title { font-size: 11px; font-weight: 700; margin: 16px 0 4px; border-left: 3px solid #111; padding-left: 7px; } table { width: 100%; border-collapse: collapse; margin-top: 4px; table-layout: fixed; border: 2px solid #111; } thead tr { background: #e8e8e8; } th { padding: 4px 5px; text-align: left; font-weight: 700; font-size: 9px; border: 1px solid #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; } td { padding: 4px 5px; border: 1px solid #111; font-size: 10px; vertical-align: middle; word-break: break-word; overflow-wrap: break-word; } th:nth-child(1), td:nth-child(1), th:nth-child(2), td:nth-child(2), th:nth-child(3), td:nth-child(3), th:nth-child(6), td:nth-child(6), th:nth-child(7), td:nth-child(7) { white-space: nowrap !important; word-break: normal !important; overflow-wrap: normal !important; overflow: hidden; text-overflow: ellipsis; } tr:nth-child(even) td { background: #f5f5f5; } col.c-date { width: 8%; } col.c-start { width: 7%; } col.c-end { width: 7%; } col.c-caller { width: 10%; } col.c-desc { width: 18%; } col.c-travel { width: 6%; } col.c-total { width: 7%; } col.c-comment { width: 37%; } tfoot td { border: none; padding: 0; } .total-row td { background: #222; color: #fff; font-weight: 700; font-size: 11px; padding: 5px 7px; border: none; } .global-total-table { width: auto; margin-left: auto; margin-top: 14px; border-collapse: collapse; border: none; } .global-total-table .total-row td { background: #111; color: #fff; font-weight: 700; font-size: 12px; padding: 6px 10px; border: none; } @media print { body { padding: 10px; } }</style></head><body><header><div class="left">${logoHtml}<div><h1>${client.name}</h1><div class="meta">Timesheets — Export pour facturation</div></div></div><div style="text-align:right"><div class="meta">Exporté le ${exportDateTime}</div></div></header><div class="period">Période : ${periodFrom} → ${periodTo}</div>${interventionsBlock}${eventsBlock}${globalBlock}</body></html>`;
 
     const win = window.open('', '_blank');
     if (!win) return;
@@ -576,15 +387,15 @@ ${globalBlock}
   };
 
   const openNew = () => {
-    setEditingEntryId(null);
+    setEditingEntry(null);
     setTsForm(emptyForm());
     setTsErrors({});
     setDeleteConfirm(false);
     setIsModalOpen(true);
   };
 
-  const openEdit = (entry: TimesheetEntry) => {
-    setEditingEntryId(entry.id);
+  const openEdit = (entry: Entry) => {
+    setEditingEntry(entry);
     setTsForm({
       date: entry.date,
       isForfait: entry.isForfait,
@@ -593,75 +404,73 @@ ${globalBlock}
       caller: entry.caller,
       description: entry.description,
       travelUnits: entry.travelUnits,
-      isEvent: entry.isEvent ?? false,
+      isEvent: entry.isEvent,
     });
     setTsErrors({});
     setDeleteConfirm(false);
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (!validateForm() || !selectedProjectId) return;
+    setSaving(true);
 
-    const startTime = tsForm.isForfait !== 'none' ? '00:00' : tsForm.startTime;
-    const endTime = tsForm.isForfait !== 'none' ? '00:00' : tsForm.endTime;
-    const total = computeTotal(tsForm.isForfait, startTime, endTime, tsForm.travelUnits, client.rates);
+    const startTime = tsForm.isForfait !== 'none' ? null : tsForm.startTime;
+    const endTime = tsForm.isForfait !== 'none' ? null : tsForm.endTime;
+    const effectiveStart = startTime ?? '00:00';
+    const effectiveEnd = endTime ?? '00:00';
+    const total = computeTotal(tsForm.isForfait, effectiveStart, effectiveEnd, tsForm.travelUnits, client.rates);
+    const minutes = computeMinutes(tsForm.isForfait, effectiveStart, effectiveEnd);
 
-    if (editingEntryId) {
-      setClientTimesheets(prev => ({
-        ...prev,
-        [client.id]: (prev[client.id] || []).map(e => {
-          if (e.id !== editingEntryId) return e;
-          const wasArchived = e.billingStatus === 'archived';
-          const updated: TimesheetEntry = {
-            ...e,
-            date: tsForm.date,
-            startTime,
-            endTime,
-            isForfait: tsForm.isForfait,
-            caller: tsForm.caller,
-            description: tsForm.description,
-            travelUnits: tsForm.travelUnits,
-            total,
-            isEvent: tsForm.isEvent,
-          };
-          if (wasArchived) {
-            const { archivedAt: _a, ...rest } = updated;
-            return { ...rest, billingStatus: 'pending', pendingAt: today() };
-          }
-          return updated;
-        }),
-      }));
-    } else {
-      const newEntry: TimesheetEntry = {
-        id: Date.now().toString(),
-        date: tsForm.date,
-        startTime,
-        endTime,
-        isForfait: tsForm.isForfait,
+    if (editingEntry) {
+      const wasArchived = editingEntry.billingStatus === 'archived';
+      const fields: Record<string, unknown> = {
+        work_date: tsForm.date,
+        start_time: startTime,
+        end_time: endTime,
+        minutes,
         caller: tsForm.caller,
         description: tsForm.description,
-        travelUnits: tsForm.travelUnits,
+        travel_units: tsForm.travelUnits,
+        is_forfait: tsForm.isForfait,
         total,
-        isEvent: tsForm.isEvent,
-        billingStatus: 'unbilled',
+        is_event: tsForm.isEvent,
       };
-      setClientTimesheets(prev => ({
-        ...prev,
-        [client.id]: [newEntry, ...(prev[client.id] || [])],
-      }));
+      if (wasArchived) {
+        fields.billing_status = 'pending';
+        fields.pending_at = today();
+        fields.archived_at = null;
+      }
+      await supabase.schema('timesheet').from('entries').update(fields).eq('id', editingEntry.id);
+    } else {
+      await supabase.schema('timesheet').from('entries').insert([{
+        project_id: selectedProjectId,
+        work_date: tsForm.date,
+        start_time: startTime,
+        end_time: endTime,
+        minutes,
+        caller: tsForm.caller,
+        description: tsForm.description,
+        travel_units: tsForm.travelUnits,
+        is_forfait: tsForm.isForfait,
+        total,
+        billing_status: 'unbilled',
+        is_event: tsForm.isEvent,
+      }]);
     }
 
+    setSaving(false);
+    await fetchEntries();
     setIsModalOpen(false);
   };
 
-  const handleDelete = () => {
-    if (!editingEntryId) return;
-    setClientTimesheets(prev => ({
-      ...prev,
-      [client.id]: (prev[client.id] || []).filter(e => e.id !== editingEntryId),
-    }));
+  const handleDelete = async () => {
+    if (!editingEntry) return;
+    setSaving(true);
+    await supabase.schema('timesheet').from('entries').delete().eq('id', editingEntry.id);
+    setSaving(false);
+    await fetchEntries();
     setIsModalOpen(false);
   };
 
@@ -687,61 +496,39 @@ ${globalBlock}
     </tr>
   );
 
-  const renderRow = (
-    entry: TimesheetEntry,
-    checked: boolean,
-    onCheck: () => void,
-    editLabel?: string
-  ) => (
+  const renderRow = (entry: Entry, checked: boolean, onCheck: () => void, editLabel?: string) => (
     <tr key={entry.id} className="hover:bg-gray-50 transition-colors">
       <td className="px-2 py-2 text-center">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={onCheck}
-          className="accent-blue-600 w-4 h-4 cursor-pointer"
-        />
+        <input type="checkbox" checked={checked} onChange={onCheck} className="accent-blue-600 w-4 h-4 cursor-pointer" />
       </td>
       <td className="px-2 py-2 text-xs text-gray-900 whitespace-nowrap">
         <div className="flex items-center gap-1">
           {entry.date}
-          {entry.isEvent && (
-            <span className="inline-block px-1 py-0.5 text-[9px] font-semibold bg-amber-100 text-amber-700 rounded">
-              Év.
-            </span>
-          )}
+          {entry.isEvent && <span className="inline-block px-1 py-0.5 text-[9px] font-semibold bg-amber-100 text-amber-700 rounded">Év.</span>}
         </div>
       </td>
-      <td className="px-2 py-2 text-xs text-gray-600 whitespace-nowrap">
-        {entry.isForfait !== 'none' ? formatForfait(entry.isForfait) : entry.startTime}
-      </td>
-      <td className="px-2 py-2 text-xs text-gray-600 whitespace-nowrap">
-        {entry.isForfait !== 'none' ? '—' : entry.endTime}
-      </td>
+      <td className="px-2 py-2 text-xs text-gray-600 whitespace-nowrap">{entry.isForfait !== 'none' ? formatForfait(entry.isForfait) : entry.startTime}</td>
+      <td className="px-2 py-2 text-xs text-gray-600 whitespace-nowrap">{entry.isForfait !== 'none' ? '—' : entry.endTime}</td>
       <td className="px-2 py-2 text-xs text-gray-600 whitespace-normal break-words">{entry.caller || '—'}</td>
       <td className="px-2 py-2 text-xs text-gray-600 whitespace-normal break-words">{entry.description || '—'}</td>
       <td className="px-2 py-2 text-xs text-gray-600 text-center whitespace-nowrap">{entry.travelUnits}</td>
       <td className="px-2 py-2 text-xs text-gray-900 font-semibold text-right whitespace-nowrap">{entry.total} €</td>
       <td className="px-2 py-2">
-        <button
-          onClick={() => openEdit(entry)}
-          title={editLabel ?? 'Éditer'}
-          className="flex items-center justify-center p-1.5 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
-        >
+        <button onClick={() => openEdit(entry)} title={editLabel ?? 'Éditer'} className="flex items-center justify-center p-1.5 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors">
           <Edit2 size={12} />
         </button>
       </td>
     </tr>
   );
 
+  const activeProjects = projects.filter(p => p.active);
+  const hasNoProjects = !projectsLoading && activeProjects.length === 0;
+
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
+          <button onClick={() => navigate('/')} className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors">
             <ArrowLeft size={16} />
             Retour
           </button>
@@ -754,7 +541,8 @@ ${globalBlock}
           <h1 className="text-3xl font-bold text-gray-900">Timesheets — {client.name}</h1>
           <button
             onClick={openNew}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            disabled={!selectedProjectId}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
           >
             <Plus size={18} />
             Nouveau timesheet
@@ -776,9 +564,7 @@ ${globalBlock}
             </div>
 
             {projectsError && (
-              <div className="mb-3 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {projectsError}
-              </div>
+              <div className="mb-3 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{projectsError}</div>
             )}
 
             {projectsLoading ? (
@@ -791,19 +577,16 @@ ${globalBlock}
               </div>
             ) : (
               <>
-                {projects.filter(p => p.active).length === 0 && !showArchivedProjects && (
-                  <p className="text-sm text-gray-400 py-2">Aucun projet actif.</p>
-                )}
-
-                {projects.filter(p => p.active).length > 0 && (
+                {activeProjects.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {projects.filter(p => p.active).map(p => (
-                      <span
+                    {activeProjects.map(p => (
+                      <button
                         key={p.id}
-                        className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-50 text-blue-800 border border-blue-200"
+                        onClick={() => setSelectedProjectId(p.id)}
+                        className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${selectedProjectId === p.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'}`}
                       >
                         {p.name}
-                      </span>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -818,33 +601,25 @@ ${globalBlock}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {projects
-                        .filter(p => p.active || showArchivedProjects)
-                        .map(p => (
-                          <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${!p.active ? 'opacity-60' : ''}`}>
-                            <td className="px-4 py-2 text-gray-900">{p.name}</td>
-                            <td className="px-4 py-2">
-                              {p.active ? (
-                                <span className="inline-block px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full">Actif</span>
-                              ) : (
-                                <span className="inline-block px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 rounded-full">Archivé</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-2 text-right">
-                              <button
-                                onClick={() => handleToggleProjectActive(p)}
-                                className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
-                              >
-                                {p.active ? 'Archiver' : 'Réactiver'}
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                      {projects.filter(p => p.active || showArchivedProjects).map(p => (
+                        <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${!p.active ? 'opacity-60' : ''}`}>
+                          <td className="px-4 py-2 text-gray-900">{p.name}</td>
+                          <td className="px-4 py-2">
+                            {p.active
+                              ? <span className="inline-block px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full">Actif</span>
+                              : <span className="inline-block px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 rounded-full">Archivé</span>
+                            }
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <button onClick={() => handleToggleProjectActive(p)} className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors">
+                              {p.active ? 'Archiver' : 'Réactiver'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                       {projects.length === 0 && (
                         <tr>
-                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">
-                            Aucun projet pour ce client.
-                          </td>
+                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">Aucun projet pour ce client.</td>
                         </tr>
                       )}
                     </tbody>
@@ -852,10 +627,7 @@ ${globalBlock}
                 </div>
 
                 {projects.some(p => !p.active) && (
-                  <button
-                    onClick={() => setShowArchivedProjects(v => !v)}
-                    className="mt-2 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
-                  >
+                  <button onClick={() => setShowArchivedProjects(v => !v)} className="mt-2 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors">
                     {showArchivedProjects ? 'Masquer les archivés' : 'Afficher les archivés'}
                   </button>
                 )}
@@ -864,188 +636,156 @@ ${globalBlock}
           </section>
         )}
 
-        {/* Section A: Unbilled */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold text-gray-800">Pas encore facturé</h2>
-              {unbilledEntries.length > 0 && (
-                <span className="text-sm font-medium text-gray-500">Total: {fmtTotal(unbilledEntries)}</span>
-              )}
-            </div>
-            <button
-              onClick={handleExportPending}
-              disabled={selectedUnbilled.size === 0}
-              className="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-lg transition-colors"
+        {/* No active projects message */}
+        {supabaseEnabled && hasNoProjects && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-6 py-5 text-center">
+            <p className="text-amber-800 text-sm font-medium">Crée un projet pour encoder des timesheets.</p>
+          </div>
+        )}
+
+        {/* Project selector for entries (when supabase is enabled and there are active projects) */}
+        {supabaseEnabled && activeProjects.length > 1 && selectedProjectId && (
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Projet sélectionné :</label>
+            <select
+              value={selectedProjectId}
+              onChange={e => setSelectedProjectId(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              Exporter pour la facturation ({selectedUnbilled.size})
-            </button>
+              {activeProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
           </div>
-          {unbilledEntries.length === 0 ? (
-            <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
-              <p className="text-gray-500 text-sm">Aucune entrée non facturée.</p>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-gray-200 overflow-hidden">
-              <table className="w-full table-fixed text-xs">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  {colHeaders(
-                    <input
-                      type="checkbox"
-                      checked={unbilledEntries.length > 0 && unbilledEntries.every(e => selectedUnbilled.has(e.id))}
-                      onChange={() => toggleAll(unbilledEntries, selectedUnbilled, setSelectedUnbilled)}
-                      className="accent-blue-600 w-4 h-4 cursor-pointer"
-                    />
-                  )}
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {unbilledEntries.map(entry =>
-                    renderRow(
-                      entry,
-                      selectedUnbilled.has(entry.id),
-                      () => toggleSelect(selectedUnbilled, setSelectedUnbilled, entry.id)
-                    )
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        )}
 
-        {/* Section B: Pending */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold text-gray-800">Pending</h2>
-              {pendingEntries.length > 0 && (
-                <span className="text-sm font-medium text-gray-500">Total: {fmtTotal(pendingEntries)}</span>
+        {/* Entries sections - only show when a project is selected */}
+        {(!supabaseEnabled || selectedProjectId) && (
+          <>
+            {entriesLoading && (
+              <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
+                <svg className="animate-spin h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+                Chargement des entrées…
+              </div>
+            )}
+
+            {/* Section A: Unbilled */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-semibold text-gray-800">Pas encore facturé</h2>
+                  {unbilledEntries.length > 0 && <span className="text-sm font-medium text-gray-500">Total: {fmtTotal(unbilledEntries)}</span>}
+                </div>
+                <button
+                  onClick={handleExportPending}
+                  disabled={selectedUnbilled.size === 0}
+                  className="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-lg transition-colors"
+                >
+                  Exporter pour la facturation ({selectedUnbilled.size})
+                </button>
+              </div>
+              {unbilledEntries.length === 0 ? (
+                <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
+                  <p className="text-gray-500 text-sm">Aucune entrée non facturée.</p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-gray-200 overflow-hidden">
+                  <table className="w-full table-fixed text-xs">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      {colHeaders(<input type="checkbox" checked={unbilledEntries.length > 0 && unbilledEntries.every(e => selectedUnbilled.has(e.id))} onChange={() => toggleAll(unbilledEntries, selectedUnbilled, setSelectedUnbilled)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {unbilledEntries.map(entry => renderRow(entry, selectedUnbilled.has(entry.id), () => toggleSelect(selectedUnbilled, setSelectedUnbilled, entry.id)))}
+                    </tbody>
+                  </table>
+                </div>
               )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handlePendingToUnbilled}
-                disabled={selectedPending.size === 0}
-                className="px-3 py-2 text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 rounded-lg transition-colors"
-              >
-                Remettre en non facturé ({selectedPending.size})
-              </button>
-              <button
-                onClick={handleGeneratePdf}
-                disabled={selectedPending.size === 0}
-                className="px-3 py-2 text-sm font-medium border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-40 rounded-lg transition-colors"
-              >
-                Générer PDF ({selectedPending.size})
-              </button>
-              <button
-                onClick={handleArchive}
-                disabled={selectedPending.size === 0}
-                className="px-4 py-2 text-sm font-medium bg-gray-700 hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-lg transition-colors"
-              >
-                Archiver ({selectedPending.size})
-              </button>
-            </div>
-          </div>
-          {pendingEntries.length === 0 ? (
-            <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
-              <p className="text-gray-500 text-sm">Aucune entrée en pending.</p>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-gray-200 overflow-hidden">
-              <table className="w-full table-fixed text-xs">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  {colHeaders(
-                    <input
-                      type="checkbox"
-                      checked={pendingEntries.length > 0 && pendingEntries.every(e => selectedPending.has(e.id))}
-                      onChange={() => toggleAll(pendingEntries, selectedPending, setSelectedPending)}
-                      className="accent-blue-600 w-4 h-4 cursor-pointer"
-                    />
-                  )}
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {groupByDate(pendingEntries, 'pendingAt').map(([date, group]) => (
-                    <>
-                      <tr key={`divider-${date}`}>
-                        <td colSpan={10} className="px-4 py-2 bg-blue-50 text-xs font-medium text-blue-700 border-y border-blue-100">
-                          Mis en pending le {date}
-                        </td>
-                      </tr>
-                      {group.map(entry =>
-                        renderRow(
-                          entry,
-                          selectedPending.has(entry.id),
-                          () => toggleSelect(selectedPending, setSelectedPending, entry.id)
-                        )
-                      )}
-                    </>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+            </section>
 
-        {/* Section C: Archived */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-800">Archivé</h2>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleArchivedToUnbilled}
-                disabled={selectedArchived.size === 0}
-                className="px-3 py-2 text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 rounded-lg transition-colors"
-              >
-                Remettre en non facturé ({selectedArchived.size})
-              </button>
-              <button
-                onClick={handleArchivedToPending}
-                disabled={selectedArchived.size === 0}
-                className="px-3 py-2 text-sm font-medium border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-40 rounded-lg transition-colors"
-              >
-                Remettre en pending ({selectedArchived.size})
-              </button>
-            </div>
-          </div>
-          {archivedEntries.length === 0 ? (
-            <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
-              <p className="text-gray-500 text-sm">Aucune entrée archivée.</p>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-gray-200 overflow-hidden">
-              <table className="w-full table-fixed text-xs">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  {colHeaders(
-                    <input
-                      type="checkbox"
-                      checked={archivedEntries.length > 0 && archivedEntries.every(e => selectedArchived.has(e.id))}
-                      onChange={() => toggleAll(archivedEntries, selectedArchived, setSelectedArchived)}
-                      className="accent-blue-600 w-4 h-4 cursor-pointer"
-                    />
-                  )}
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {groupByDate(archivedEntries, 'archivedAt').map(([date, group]) => (
-                    <>
-                      <tr key={`divider-${date}`}>
-                        <td colSpan={10} className="px-4 py-2 bg-gray-100 text-xs font-medium text-gray-500 border-y border-gray-200">
-                          Archivé le {date}
-                        </td>
-                      </tr>
-                      {group.map(entry =>
-                        renderRow(
-                          entry,
-                          selectedArchived.has(entry.id),
-                          () => toggleSelect(selectedArchived, setSelectedArchived, entry.id),
-                          'Éditer (→ Pending)'
-                        )
-                      )}
-                    </>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+            {/* Section B: Pending */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-semibold text-gray-800">Pending</h2>
+                  {pendingEntries.length > 0 && <span className="text-sm font-medium text-gray-500">Total: {fmtTotal(pendingEntries)}</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={handlePendingToUnbilled} disabled={selectedPending.size === 0} className="px-3 py-2 text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 rounded-lg transition-colors">
+                    Remettre en non facturé ({selectedPending.size})
+                  </button>
+                  <button onClick={handleGeneratePdf} disabled={selectedPending.size === 0} className="px-3 py-2 text-sm font-medium border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-40 rounded-lg transition-colors">
+                    Générer PDF ({selectedPending.size})
+                  </button>
+                  <button onClick={handleArchive} disabled={selectedPending.size === 0} className="px-4 py-2 text-sm font-medium bg-gray-700 hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-lg transition-colors">
+                    Archiver ({selectedPending.size})
+                  </button>
+                </div>
+              </div>
+              {pendingEntries.length === 0 ? (
+                <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
+                  <p className="text-gray-500 text-sm">Aucune entrée en pending.</p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-gray-200 overflow-hidden">
+                  <table className="w-full table-fixed text-xs">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      {colHeaders(<input type="checkbox" checked={pendingEntries.length > 0 && pendingEntries.every(e => selectedPending.has(e.id))} onChange={() => toggleAll(pendingEntries, selectedPending, setSelectedPending)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {groupByDate(pendingEntries, 'pendingAt').map(([date, group]) => (
+                        <>
+                          <tr key={`divider-${date}`}>
+                            <td colSpan={10} className="px-4 py-2 bg-blue-50 text-xs font-medium text-blue-700 border-y border-blue-100">Mis en pending le {date}</td>
+                          </tr>
+                          {group.map(entry => renderRow(entry, selectedPending.has(entry.id), () => toggleSelect(selectedPending, setSelectedPending, entry.id)))}
+                        </>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            {/* Section C: Archived */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold text-gray-800">Archivé</h2>
+                <div className="flex items-center gap-2">
+                  <button onClick={handleArchivedToUnbilled} disabled={selectedArchived.size === 0} className="px-3 py-2 text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 rounded-lg transition-colors">
+                    Remettre en non facturé ({selectedArchived.size})
+                  </button>
+                  <button onClick={handleArchivedToPending} disabled={selectedArchived.size === 0} className="px-3 py-2 text-sm font-medium border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-40 rounded-lg transition-colors">
+                    Remettre en pending ({selectedArchived.size})
+                  </button>
+                </div>
+              </div>
+              {archivedEntries.length === 0 ? (
+                <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
+                  <p className="text-gray-500 text-sm">Aucune entrée archivée.</p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-gray-200 overflow-hidden">
+                  <table className="w-full table-fixed text-xs">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      {colHeaders(<input type="checkbox" checked={archivedEntries.length > 0 && archivedEntries.every(e => selectedArchived.has(e.id))} onChange={() => toggleAll(archivedEntries, selectedArchived, setSelectedArchived)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {groupByDate(archivedEntries, 'archivedAt').map(([date, group]) => (
+                        <>
+                          <tr key={`divider-${date}`}>
+                            <td colSpan={10} className="px-4 py-2 bg-gray-100 text-xs font-medium text-gray-500 border-y border-gray-200">Archivé le {date}</td>
+                          </tr>
+                          {group.map(entry => renderRow(entry, selectedArchived.has(entry.id), () => toggleSelect(selectedArchived, setSelectedArchived, entry.id), 'Éditer (→ Pending)'))}
+                        </>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </>
+        )}
       </main>
 
       {pdfToast && (
@@ -1060,18 +800,8 @@ ${globalBlock}
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
             <p className="text-gray-800 text-sm mb-6">{confirmDialog.message}</p>
             <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setConfirmDialog(null)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={confirmDialog.onConfirm}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
-              >
-                Confirmer
-              </button>
+              <button onClick={() => setConfirmDialog(null)} className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">Annuler</button>
+              <button onClick={confirmDialog.onConfirm} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors">Confirmer</button>
             </div>
           </div>
         </div>
@@ -1083,9 +813,7 @@ ${globalBlock}
           <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full">
             <div className="flex items-center justify-between p-5 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">Nouveau projet</h3>
-              <button onClick={() => setIsProjectModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-1 transition-colors">
-                <X size={20} />
-              </button>
+              <button onClick={() => setIsProjectModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-1 transition-colors"><X size={20} /></button>
             </div>
             <form onSubmit={handleCreateProject} className="p-5 space-y-4">
               <div>
@@ -1101,18 +829,8 @@ ${globalBlock}
                 {projectNameError && <p className="text-xs text-red-600 mt-1">{projectNameError}</p>}
               </div>
               <div className="flex gap-3 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setIsProjectModalOpen(false)}
-                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={projectSaving}
-                  className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors"
-                >
+                <button type="button" onClick={() => setIsProjectModalOpen(false)} className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">Annuler</button>
+                <button type="submit" disabled={projectSaving} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors">
                   {projectSaving ? 'Création…' : 'Créer'}
                 </button>
               </div>
@@ -1126,15 +844,11 @@ ${globalBlock}
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {editingEntryId ? 'Modifier le timesheet' : 'Nouveau timesheet'}
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-1 transition-colors">
-                <X size={20} />
-              </button>
+              <h3 className="text-lg font-semibold text-gray-900">{editingEntry ? 'Modifier le timesheet' : 'Nouveau timesheet'}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-1 transition-colors"><X size={20} /></button>
             </div>
 
-            {editingEntryId && entries.find(e => e.id === editingEntryId)?.billingStatus === 'archived' && (
+            {editingEntry?.billingStatus === 'archived' && (
               <div className="mx-5 mt-4 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
                 Cette entrée est archivée. Toute modification la remettra automatiquement en <strong>Pending</strong>.
               </div>
@@ -1174,9 +888,7 @@ ${globalBlock}
                   const err = tsErrors[field];
                   return (
                     <div key={field}>
-                      <label className={`block text-sm font-medium mb-1.5 ${disabled ? 'text-gray-400' : 'text-gray-700'}`}>
-                        {label}
-                      </label>
+                      <label className={`block text-sm font-medium mb-1.5 ${disabled ? 'text-gray-400' : 'text-gray-700'}`}>{label}</label>
                       <div className={`flex items-center gap-2 px-3 py-2 border rounded-lg ${disabled ? 'bg-gray-100 border-gray-200' : err ? 'border-red-500 bg-white' : 'border-gray-300 bg-white'}`}>
                         <input
                           type="number"
@@ -1185,10 +897,7 @@ ${globalBlock}
                           max={23}
                           value={disabled ? 0 : h}
                           disabled={disabled}
-                          onChange={(e) => {
-                            const val = Math.min(23, Math.max(0, parseInt(e.target.value) || 0));
-                            setTsForm({ ...tsForm, [field]: buildTime(val, m) });
-                          }}
+                          onChange={(e) => { const val = Math.min(23, Math.max(0, parseInt(e.target.value) || 0)); setTsForm({ ...tsForm, [field]: buildTime(val, m) }); }}
                           className={`w-12 text-center text-sm font-mono border-0 focus:outline-none focus:ring-0 p-0 bg-transparent ${disabled ? 'text-gray-400' : 'text-gray-900'}`}
                         />
                         <span className={`text-sm font-mono ${disabled ? 'text-gray-400' : 'text-gray-600'}`}>h</span>
@@ -1263,9 +972,7 @@ ${globalBlock}
                   onChange={(e) => setTsForm({ ...tsForm, isEvent: e.target.checked })}
                   className="accent-amber-500 w-4 h-4 cursor-pointer"
                 />
-                <label htmlFor="isEvent" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
-                  Événement
-                </label>
+                <label htmlFor="isEvent" className="text-sm font-medium text-gray-700 cursor-pointer select-none">Événement</label>
               </div>
 
               <div className="bg-blue-50 rounded-lg px-4 py-3 flex items-center justify-between">
@@ -1273,57 +980,29 @@ ${globalBlock}
                 <span className="text-lg font-bold text-blue-900">{liveTotal} €</span>
               </div>
 
-              {editingEntryId ? (
+              {editingEntry ? (
                 <div className="flex gap-3 pt-2">
                   {deleteConfirm ? (
                     <div className="flex-1 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={handleDelete}
-                        className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
-                      >
+                      <button type="button" onClick={handleDelete} disabled={saving} className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors">
                         Confirmer suppression
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteConfirm(false)}
-                        className="px-4 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        Annuler
-                      </button>
+                      <button type="button" onClick={() => setDeleteConfirm(false)} className="px-4 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">Annuler</button>
                     </div>
                   ) : (
                     <>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteConfirm(true)}
-                        className="px-4 py-2.5 border border-red-300 text-red-600 font-medium rounded-lg hover:bg-red-50 transition-colors"
-                      >
-                        Supprimer
-                      </button>
-                      <button
-                        type="submit"
-                        className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
-                      >
-                        Enregistrer
+                      <button type="button" onClick={() => setDeleteConfirm(true)} className="px-4 py-2.5 border border-red-300 text-red-600 font-medium rounded-lg hover:bg-red-50 transition-colors">Supprimer</button>
+                      <button type="submit" disabled={saving} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors">
+                        {saving ? 'Enregistrement…' : 'Enregistrer'}
                       </button>
                     </>
                   )}
                 </div>
               ) : (
                 <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
-                  >
-                    Créer
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">Annuler</button>
+                  <button type="submit" disabled={saving} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors">
+                    {saving ? 'Création…' : 'Créer'}
                   </button>
                 </div>
               )}
