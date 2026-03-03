@@ -256,8 +256,8 @@ useEffect(() => {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-16 relative" style={{ backgroundImage: "url('/images/ui/clients-bg.png')", backgroundRepeat: "no-repeat", backgroundPosition: "right center", backgroundSize: "900px auto" }}>
-        <div className="pointer-events-none absolute inset-0 bg-white/70" />
+      <main className="max-w-5xl mx-auto px-6 py-16 relative" style={{ backgroundImage: "url('/images/ui/clients-bg.png')", backgroundRepeat: "no-repeat", backgroundPosition: "right 120px", backgroundSize: "900px auto", backgroundBlendMode: "multiply" }}>
+        <div className="pointer-events-none absolute inset-0 bg-white/80" />
         <div className="relative z-10">
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold text-gray-900 mb-4">Timesheet</h1>
@@ -265,7 +265,7 @@ useEffect(() => {
         </div>
 
         {fetchError && (
-          <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <div className="mb-6 px-4 py-3 bg-red-50/70 backdrop-blur-sm border border-red-200 rounded-lg text-sm text-red-700">
             {fetchError}
           </div>
         )}
@@ -273,11 +273,11 @@ useEffect(() => {
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">Clients</h2>
           {isLoading ? (
-            <div className="bg-gray-50 rounded-xl p-16 text-center border border-gray-200">
+            <div className="bg-white/70 backdrop-blur-sm rounded-xl p-16 text-center border border-gray-200">
               <p className="text-gray-400 text-sm">Chargement...</p>
             </div>
           ) : activeClients.length === 0 ? (
-            <div className="bg-gray-50 rounded-xl p-16 text-center border border-gray-200">
+            <div className="bg-white/70 backdrop-blur-sm rounded-xl p-16 text-center border border-gray-200">
               <p className="text-gray-600 mb-4">Aucun client pour le moment</p>
               <button onClick={handleOpenNewClientFromMain} className="text-blue-600 hover:text-blue-700 font-medium">
                 Créer un client
