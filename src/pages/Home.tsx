@@ -256,7 +256,7 @@ useEffect(() => {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-16 relative" style={{ backgroundImage: "url('/images/ui/clients-bg.png')", backgroundRepeat: "no-repeat", backgroundPosition: "right 120px", backgroundSize: "900px auto", backgroundBlendMode: "multiply" }}>
+      <main className="max-w-5xl mx-auto px-6 py-16 relative" style={{ backgroundImage: "url('/images/ui/clients-bg.png')", backgroundRepeat: "no-repeat", backgroundPosition: "right 40px", backgroundSize: "750px auto", backgroundBlendMode: "multiply" }}>
         <div className="pointer-events-none absolute inset-0 bg-white/80" />
         <div className="relative z-10">
         <div className="text-center mb-12">
