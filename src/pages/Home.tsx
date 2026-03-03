@@ -300,16 +300,16 @@ useEffect(() => {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {activeClients.map((client) => (
+                <div key={client.id} className="bg-gradient-to-br from-blue-400 via-blue-200 to-white p-[2px] rounded-3xl shadow-sm hover:shadow-xl transition-all duration-200 hover:-translate-y-0.5">
                 <button
-                  key={client.id}
                   onClick={() => navigate(`/client/${client.id}`)}
-                  className="aspect-square rounded-2xl flex flex-col items-center justify-between p-6 transition-all duration-200 bg-white border border-blue-200 shadow-sm hover:border-blue-400 hover:shadow-xl hover:-translate-y-0.5"
+                  className="aspect-square w-full bg-white/80 backdrop-blur-sm rounded-[22px] flex flex-col items-center justify-between p-6"
                 >
                   <span className="text-2xl font-extrabold text-slate-900 text-center truncate w-full">
                     {client.name}
                   </span>
                   <div className="flex-1 flex items-center justify-center w-full">
-                    <div className="bg-slate-50 rounded-xl p-4 flex items-center justify-center w-56 h-56">
+                    <div className="bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl p-4 flex items-center justify-center w-56 h-56">
                       {client.logoUrl ? (
                         <img
                           src={client.logoUrl}
@@ -332,6 +332,7 @@ useEffect(() => {
                   </div>
                   <div className="w-full" />
                 </button>
+                </div>
               ))}
             </div>
           )}
