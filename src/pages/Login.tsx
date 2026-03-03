@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { LogIn } from 'lucide-react';
 
+const bypassAllowed = import.meta.env.DEV && !window.location.hostname.endsWith('clearcomputing.be');
+
 const Login = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Si on vient d'un logout, on force Microsoft à redemander l'auth
   const forcePrompt = sessionStorage.getItem('force_msal_prompt') === '1';
 
   if (user) {
@@ -64,6 +66,18 @@ const Login = () => {
           <LogIn size={20} />
           {loading ? 'Connexion...' : 'Se connecter avec Microsoft'}
         </button>
+
+        {bypassAllowed && (
+          <button
+            onClick={() => {
+              sessionStorage.setItem('ts_auth_bypass', '1');
+              navigate('/');
+            }}
+            className="mt-3 w-full border border-slate-300 hover:bg-slate-50 text-slate-600 font-medium py-3 px-4 rounded-lg transition-colors"
+          >
+            Mode preview (bypass auth)
+          </button>
+        )}
 
         <p className="mt-6 text-center text-sm text-slate-500">
           Authentification sécurisée via Microsoft Azure
