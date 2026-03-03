@@ -256,7 +256,9 @@ useEffect(() => {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-16">
+      <main className="max-w-5xl mx-auto px-6 py-16 relative" style={{ backgroundImage: "url('/images/ui/clients-bg.png')", backgroundRepeat: "no-repeat", backgroundPosition: "right center", backgroundSize: "900px auto" }}>
+        <div className="pointer-events-none absolute inset-0 bg-white/70" />
+        <div className="relative z-10">
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold text-gray-900 mb-4">Timesheet</h1>
           <p className="text-lg text-gray-500">{user?.email || 'Mode preview'}</p>
@@ -319,6 +321,7 @@ useEffect(() => {
               ))}
             </div>
           )}
+        </div>
         </div>
       </main>
 
