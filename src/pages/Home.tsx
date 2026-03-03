@@ -87,6 +87,20 @@ useEffect(() => {
   void fetchClients();
 }, [fetchClients]);
 
+const isBypass = sessionStorage.getItem('ts_auth_bypass') === '1';
+
+useEffect(() => {
+  if (!isBypass) return;
+  if (clients.length > 0) return;
+  setClients([{
+    id: 'demo',
+    name: 'Demo Client',
+    logoUrl: '/images/ui/logo-clear-computing.png',
+    isArchived: false,
+    rates: { halfHour: 35, hour: 70, travelHalfHour: 25, halfDay: 200, fullDay: 400 }
+  }]);
+}, []);
+
   const handleSignOut = async () => {
     try {
       sessionStorage.setItem('force_msal_prompt', '1');
