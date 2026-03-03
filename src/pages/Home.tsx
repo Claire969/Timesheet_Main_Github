@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, supabaseEnabled } from '../lib/supabaseClient';
-import { LogOut, Plus, X, Users, Edit2, Archive, ArchiveRestore } from 'lucide-react';
+import { LogOut, Plus, X, Users, CreditCard as Edit2, Archive, ArchiveRestore } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppState } from '../App';
 import type { Client } from '../App';
@@ -242,13 +242,13 @@ useEffect(() => {
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="text-sm text-gray-500">Clear_Computing</div>
+          <img src="/images/ui/logo-clear-computing.png" alt="Clear Computing" className="h-6 w-auto" />
           <div className="flex items-center gap-3">
-            <button onClick={() => setIsClientsModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 transition-colors">
+            <button onClick={() => setIsClientsModalOpen(true)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-3 shadow-sm transition-colors">
               <Users size={16} />
               Gestion clients
             </button>
-            <button onClick={handleSignOut} className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 transition-colors">
+            <button onClick={handleSignOut} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white rounded-xl px-5 py-3 shadow-sm transition-colors">
               <LogOut size={16} />
               Déconnexion
             </button>
