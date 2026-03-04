@@ -669,7 +669,7 @@ export const ClientTimesheets = () => {
                   type="date"
                   value={tsForm.date}
                   onChange={(e) => setTsForm({ ...tsForm, date: e.target.value })}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${tsErrors.date ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`w-full px-3 py-2 h-12 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${tsErrors.date ? 'border-red-500' : 'border-gray-300'}`}
                 />
                 {tsErrors.date && <p className="text-xs text-red-600 mt-1">{tsErrors.date}</p>}
               </div>
@@ -687,45 +687,29 @@ export const ClientTimesheets = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {(['startTime', 'endTime'] as const).map((field) => {
                   const label = field === 'startTime' ? 'Début *' : 'Fin *';
                   const disabled = tsForm.isForfait !== 'none';
-                  const timeVal = disabled ? '00:00' : tsForm[field];
-                  const { h, m } = parseTime(timeVal);
                   const err = tsErrors[field];
                   return (
                     <div key={field}>
                       <label className={`block text-sm font-medium mb-1.5 ${disabled ? 'text-gray-400' : 'text-gray-700'}`}>{label}</label>
-                      <div className={`flex items-center gap-2 px-3 py-2 border rounded-lg ${disabled ? 'bg-gray-100 border-gray-200' : err ? 'border-red-500 bg-white' : 'border-gray-300 bg-white'}`}>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          min={0}
-                          max={23}
-                          value={disabled ? 0 : h}
-                          disabled={disabled}
-                          onChange={(e) => { const val = Math.min(23, Math.max(0, parseInt(e.target.value) || 0)); setTsForm({ ...tsForm, [field]: buildTime(val, m) }); }}
-                          className={`w-12 text-center text-sm font-mono border-0 focus:outline-none focus:ring-0 p-0 bg-transparent ${disabled ? 'text-gray-400' : 'text-gray-900'}`}
-                        />
-                        <span className={`text-sm font-mono ${disabled ? 'text-gray-400' : 'text-gray-600'}`}>h</span>
-                        <div className="flex rounded overflow-hidden border border-gray-200 ml-1">
-                          {(['00', '30'] as const).map((min) => {
-                            const active = !disabled && String(m) === min;
-                            return (
-                              <button
-                                key={min}
-                                type="button"
-                                disabled={disabled}
-                                onClick={() => setTsForm({ ...tsForm, [field]: buildTime(h, parseInt(min)) })}
-                                className={`px-2 py-0.5 text-xs font-medium transition-colors ${disabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : active ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                              >
-                                :{min}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
+                      <input
+                        type="time"
+                        step="1800"
+                        value={disabled ? '00:00' : tsForm[field]}
+                        disabled={disabled}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (!raw) return;
+                          const [hh, mm] = raw.split(':').map(Number);
+                          const snapped = mm < 15 ? 0 : mm < 45 ? 30 : 0;
+                          const snappedH = mm >= 45 ? Math.min(23, hh + 1) : hh;
+                          setTsForm({ ...tsForm, [field]: buildTime(snappedH, snapped) });
+                        }}
+                        className={`w-full px-3 py-2 h-12 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${disabled ? 'bg-gray-100 border-gray-200 text-gray-400' : err ? 'border-red-500 bg-white' : 'border-gray-300 bg-white'}`}
+                      />
                       {err && <p className="text-xs text-red-600 mt-1">{err}</p>}
                     </div>
                   );
