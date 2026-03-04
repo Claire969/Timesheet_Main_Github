@@ -121,6 +121,16 @@ const formatForfait = (f: Forfait) => {
   return '—';
 };
 
+const getCashLevel = (total: number): number | null => {
+  if (total <= 0) return null;
+  if (total <= 250) return 1;
+  if (total <= 500) return 2;
+  if (total <= 1000) return 3;
+  if (total <= 1500) return 4;
+  if (total <= 2000) return 5;
+  return 6;
+};
+
 const groupByDate = (entries: Entry[], dateKey: 'pendingAt' | 'archivedAt') => {
   const map: Record<string, Entry[]> = {};
   for (const e of entries) {
@@ -487,15 +497,55 @@ export const ClientTimesheets = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-12 space-y-12">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-gray-900">Timesheets — {client.name}</h1>
-          <button
-            onClick={openNew}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-          >
-            <Plus size={18} />
-            Nouveau timesheet
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            {client.logoUrl && (
+              <img
+                src={client.logoUrl}
+                alt={client.name}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                className="h-9 w-9 object-contain rounded flex-shrink-0"
+              />
+            )}
+            <h1 className="text-3xl font-bold text-gray-900 truncate">Timesheets — {client.name}</h1>
+          </div>
+          <div className="flex items-center gap-4 flex-shrink-0">
+            {(() => {
+              const unbilledTotal = unbilledEntries.reduce((acc, e) => acc + e.total, 0);
+              const level = getCashLevel(unbilledTotal);
+              const fmtUnbilled = Number.isInteger(unbilledTotal) ? `${unbilledTotal} €` : `${unbilledTotal.toFixed(2)} €`;
+              const urgent = unbilledTotal >= 2000;
+              return (
+                <div
+                  aria-label="Indicateur de facturation"
+                  className={`flex flex-col items-center justify-center px-3 py-2 rounded-xl border ${urgent ? 'border-red-400 shadow-[0_0_12px_2px_rgba(239,68,68,0.25)]' : 'border-gray-200'} bg-white min-w-[80px]`}
+                >
+                  {level ? (
+                    <>
+                      <img
+                        src={`/images/cash/cash-${level}.png`}
+                        alt={`Niveau ${level}`}
+                        className="h-[56px] sm:h-[90px] w-auto object-contain"
+                      />
+                      <span className={`text-xs font-semibold mt-1 ${urgent ? 'text-red-600' : 'text-gray-600'}`}>
+                        {urgent && <span className="inline-block mr-1 px-1 py-0.5 text-[9px] font-bold bg-red-100 text-red-700 rounded uppercase tracking-wide">Urgent</span>}
+                        À facturer: {fmtUnbilled}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-gray-400 py-2">0 €</span>
+                  )}
+                </div>
+              );
+            })()}
+            <button
+              onClick={openNew}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            >
+              <Plus size={18} />
+              Nouveau timesheet
+            </button>
+          </div>
         </div>
 
         {(!supabaseEnabled || selectedProjectId) && (
