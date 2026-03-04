@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, Navigate } from 'react-router-dom';
-import { ArrowLeft, Plus, X, Edit2 } from 'lucide-react';
+import { ArrowLeft, Plus, X, CreditCard as Edit2 } from 'lucide-react';
 import { useAppState } from '../App';
 import type { Forfait } from '../App';
 import { supabase, supabaseEnabled } from '../lib/supabaseClient';
