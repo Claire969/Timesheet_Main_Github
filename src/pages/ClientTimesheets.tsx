@@ -486,13 +486,13 @@ export const ClientTimesheets = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="border-b border-gray-200">
+      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <button onClick={() => navigate('/')} className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors">
+          <button onClick={() => navigate('/')} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors text-sm font-medium">
             <ArrowLeft size={16} />
             Retour
           </button>
-          <div className="text-sm text-gray-500">Clear_Computing</div>
+          <img src="/images/ui/logo-clear-computing.png" alt="Clear_Computing" className="h-8 w-auto" />
         </div>
       </header>
 

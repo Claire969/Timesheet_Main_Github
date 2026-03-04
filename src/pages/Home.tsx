@@ -1,15 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, supabaseEnabled } from '../lib/supabaseClient';
-import { LogOut, Plus, X, Users, CreditCard as Edit2, Archive, ArchiveRestore } from 'lucide-react';
+import { LogOut, Plus, X, Users, CreditCard as Edit2, Archive, ArchiveRestore, LayoutGrid, List } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppState } from '../App';
 import type { Client } from '../App';
 
+const fmtEur = (n: number) => Number.isInteger(n) ? `${n} €` : `${n.toFixed(2)} €`;
+
 export const Home = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { clients, setClients } = useAppState();
+  const { clients, setClients, clientTimesheets } = useAppState();
+  const [clientsView, setClientsView] = useState<'grid' | 'list'>('grid');
 
   const [isClientsModalOpen, setIsClientsModalOpen] = useState(false);
   const [showArchivedClients, setShowArchivedClients] = useState(false);
@@ -254,7 +257,7 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="border-b border-gray-200">
+      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <img src="/images/ui/logo-clear-computing.png" alt="Clear Computing" className="h-6 w-auto" />
           <div className="flex items-center gap-3">
@@ -285,7 +288,25 @@ useEffect(() => {
         )}
 
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">Clients</h2>
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-2xl font-bold text-gray-900">Clients</h2>
+            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+              <button
+                onClick={() => setClientsView('grid')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${clientsView === 'grid' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                <LayoutGrid size={14} />
+                Grille
+              </button>
+              <button
+                onClick={() => setClientsView('list')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${clientsView === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                <List size={14} />
+                Liste
+              </button>
+            </div>
+          </div>
           {isLoading ? (
             <div className="bg-white/70 backdrop-blur-sm rounded-xl p-16 text-center border border-gray-200">
               <p className="text-gray-400 text-sm">Chargement...</p>
@@ -297,7 +318,7 @@ useEffect(() => {
                 Créer un client
               </button>
             </div>
-          ) : (
+          ) : clientsView === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {activeClients.map((client) => (
                 <div key={client.id} className="bg-gradient-to-br from-blue-400 via-blue-200 to-white p-[2px] rounded-3xl shadow-sm hover:shadow-xl transition-all duration-200 hover:-translate-y-0.5">
@@ -334,6 +355,41 @@ useEffect(() => {
                 </button>
                 </div>
               ))}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {activeClients.map((client) => {
+                const entries = clientTimesheets[client.id] ?? [];
+                const unbilledSum = entries.filter(e => e.billingStatus === 'unbilled').reduce((a, e) => a + e.total, 0);
+                const pendingSum = entries.filter(e => e.billingStatus === 'pending').reduce((a, e) => a + e.total, 0);
+                return (
+                  <button
+                    key={client.id}
+                    onClick={() => navigate(`/client/${client.id}`)}
+                    className="w-full flex items-center justify-between gap-4 p-4 rounded-xl bg-white/70 border border-gray-200 hover:shadow-md hover:border-blue-200 transition text-left"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {client.logoUrl ? (
+                          <img
+                            src={client.logoUrl}
+                            alt={client.name}
+                            className="w-full h-full object-contain"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        ) : (
+                          <span className="text-xs text-gray-400">Logo</span>
+                        )}
+                      </div>
+                      <span className="font-bold text-gray-900 truncate">{client.name}</span>
+                    </div>
+                    <div className="flex flex-col items-end flex-shrink-0">
+                      <span className="font-bold text-gray-900 text-sm">{fmtEur(unbilledSum)}</span>
+                      <span className="text-xs text-gray-500">{fmtEur(pendingSum)} en attente</span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
