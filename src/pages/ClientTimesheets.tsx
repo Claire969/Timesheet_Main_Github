@@ -107,13 +107,24 @@ const emptyForm = () => ({
   isEvent: false,
 });
 
-const parseTime = (t: string) => {
-  const [h, m] = t.split(':').map(Number);
-  return { h: isNaN(h) ? 0 : h, m: isNaN(m) ? 0 : m === 30 ? 30 : 0 };
-};
 
-const buildTime = (h: number, m: number) =>
-  `${String(Math.min(23, Math.max(0, h))).padStart(2, '0')}:${m === 30 ? '30' : '00'}`;
+const TIME_START = 6 * 60;
+const TIME_END = 22 * 60;
+const TIME_STEP = 30;
+const TIME_OPTIONS: string[] = (() => {
+  const opts: string[] = [];
+  for (let t = TIME_START; t <= TIME_END; t += TIME_STEP) {
+    opts.push(`${String(Math.floor(t / 60)).padStart(2, '0')}:${t % 60 === 0 ? '00' : '30'}`);
+  }
+  return opts;
+})();
+
+const fmtDateFR = (iso: string): string => {
+  if (!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('fr-BE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+};
 
 const formatForfait = (f: Forfait) => {
   if (f === 'halfDay') return 'Demi-journée';
@@ -699,11 +710,11 @@ export const ClientTimesheets = () => {
 
       {/* Entry modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-5 border-b border-gray-200">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center justify-center md:p-4 z-50">
+          <div className="bg-white rounded-t-2xl md:rounded-xl shadow-2xl w-full md:max-w-lg max-h-[92vh] md:max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">{editingEntry ? 'Modifier le timesheet' : 'Nouveau timesheet'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-1 transition-colors"><X size={20} /></button>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-2 transition-colors"><X size={20} /></button>
             </div>
 
             {editingEntry?.billingStatus === 'archived' && (
@@ -712,15 +723,16 @@ export const ClientTimesheets = () => {
               </div>
             )}
 
-            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-5 space-y-4">
+            <form onSubmit={handleSave} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Date *</label>
                 <input
                   type="date"
                   value={tsForm.date}
                   onChange={(e) => setTsForm({ ...tsForm, date: e.target.value })}
-                  className={`w-full px-3 py-2 h-12 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${tsErrors.date ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`w-full px-3 py-3 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${tsErrors.date ? 'border-red-500' : 'border-gray-300'}`}
                 />
+                {tsForm.date && <p className="text-xs text-gray-400 mt-1">{fmtDateFR(tsForm.date)}</p>}
                 {tsErrors.date && <p className="text-xs text-red-600 mt-1">{tsErrors.date}</p>}
               </div>
 
@@ -729,7 +741,7 @@ export const ClientTimesheets = () => {
                 <select
                   value={tsForm.isForfait}
                   onChange={(e) => setTsForm({ ...tsForm, isForfait: e.target.value as Forfait })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="none">Aucun (heures)</option>
                   <option value="halfDay">Demi-journée</option>
@@ -737,7 +749,7 @@ export const ClientTimesheets = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {(['startTime', 'endTime'] as const).map((field) => {
                   const label = field === 'startTime' ? 'Début *' : 'Fin *';
                   const disabled = tsForm.isForfait !== 'none';
@@ -745,21 +757,17 @@ export const ClientTimesheets = () => {
                   return (
                     <div key={field}>
                       <label className={`block text-sm font-medium mb-1.5 ${disabled ? 'text-gray-400' : 'text-gray-700'}`}>{label}</label>
-                      <input
-                        type="time"
-                        step="1800"
-                        value={disabled ? '00:00' : tsForm[field]}
-                        disabled={disabled}
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          if (!raw) return;
-                          const [hh, mm] = raw.split(':').map(Number);
-                          const snapped = mm < 15 ? 0 : mm < 45 ? 30 : 0;
-                          const snappedH = mm >= 45 ? Math.min(23, hh + 1) : hh;
-                          setTsForm({ ...tsForm, [field]: buildTime(snappedH, snapped) });
-                        }}
-                        className={`w-full px-3 py-2 h-12 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${disabled ? 'bg-gray-100 border-gray-200 text-gray-400' : err ? 'border-red-500 bg-white' : 'border-gray-300 bg-white'}`}
-                      />
+                      {disabled ? (
+                        <div className="w-full px-3 py-3 text-base border border-gray-200 rounded-lg bg-gray-100 text-gray-400">—</div>
+                      ) : (
+                        <select
+                          value={TIME_OPTIONS.includes(tsForm[field]) ? tsForm[field] : TIME_OPTIONS[0]}
+                          onChange={(e) => setTsForm({ ...tsForm, [field]: e.target.value })}
+                          className={`w-full px-3 py-3 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white ${err ? 'border-red-500' : 'border-gray-300'}`}
+                        >
+                          {TIME_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                      )}
                       {err && <p className="text-xs text-red-600 mt-1">{err}</p>}
                     </div>
                   );
@@ -772,7 +780,7 @@ export const ClientTimesheets = () => {
                   type="text"
                   value={tsForm.caller}
                   onChange={(e) => setTsForm({ ...tsForm, caller: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Nom de l'appelant"
                 />
               </div>
@@ -782,16 +790,21 @@ export const ClientTimesheets = () => {
                 <textarea
                   value={tsForm.description}
                   onChange={(e) => setTsForm({ ...tsForm, description: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  rows={4}
+                  className="w-full px-3 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   placeholder="Description de l'intervention"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Déplacement — {tsForm.travelUnits} unité{tsForm.travelUnits !== 1 ? 's' : ''} (×30 min)
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Déplacement (×30 min)
+                  </label>
+                  <span className="inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full">
+                    {tsForm.travelUnits}
+                  </span>
+                </div>
                 <input
                   type="range"
                   min={0}
@@ -799,20 +812,20 @@ export const ClientTimesheets = () => {
                   step={1}
                   value={tsForm.travelUnits}
                   onChange={(e) => setTsForm({ ...tsForm, travelUnits: parseInt(e.target.value) })}
-                  className="w-full accent-blue-600"
+                  className="w-full h-3 accent-blue-600 cursor-pointer"
                 />
                 <div className="flex justify-between text-xs text-gray-400 mt-1">
                   {[0,1,2,3,4,5].map(n => <span key={n}>{n}</span>)}
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 py-1">
                 <input
                   type="checkbox"
                   id="isEvent"
                   checked={tsForm.isEvent}
                   onChange={(e) => setTsForm({ ...tsForm, isEvent: e.target.checked })}
-                  className="accent-amber-500 w-4 h-4 cursor-pointer"
+                  className="accent-amber-500 w-5 h-5 cursor-pointer"
                 />
                 <label htmlFor="isEvent" className="text-sm font-medium text-gray-700 cursor-pointer select-none">Événement</label>
               </div>
@@ -823,27 +836,27 @@ export const ClientTimesheets = () => {
               </div>
 
               {editingEntry ? (
-                <div className="flex gap-3 pt-2">
+                <div className="flex flex-col md:flex-row gap-3 pt-2 pb-2">
                   {deleteConfirm ? (
-                    <div className="flex-1 flex gap-2">
-                      <button type="button" onClick={handleDelete} disabled={saving} className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors">
+                    <>
+                      <button type="button" onClick={handleDelete} disabled={saving} className="flex-1 min-h-[48px] px-4 py-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors">
                         Confirmer suppression
                       </button>
-                      <button type="button" onClick={() => setDeleteConfirm(false)} className="px-4 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">Annuler</button>
-                    </div>
+                      <button type="button" onClick={() => setDeleteConfirm(false)} className="min-h-[48px] px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">Annuler</button>
+                    </>
                   ) : (
                     <>
-                      <button type="button" onClick={() => setDeleteConfirm(true)} className="px-4 py-2.5 border border-red-300 text-red-600 font-medium rounded-lg hover:bg-red-50 transition-colors">Supprimer</button>
-                      <button type="submit" disabled={saving} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors">
+                      <button type="button" onClick={() => setDeleteConfirm(true)} className="min-h-[48px] px-4 py-3 border border-red-300 text-red-600 font-medium rounded-lg hover:bg-red-50 transition-colors">Supprimer</button>
+                      <button type="submit" disabled={saving} className="flex-1 min-h-[48px] px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors">
                         {saving ? 'Enregistrement…' : 'Enregistrer'}
                       </button>
                     </>
                   )}
                 </div>
               ) : (
-                <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">Annuler</button>
-                  <button type="submit" disabled={saving} className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors">
+                <div className="flex flex-col md:flex-row gap-3 pt-2 pb-2">
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 min-h-[48px] px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">Annuler</button>
+                  <button type="submit" disabled={saving} className="flex-1 min-h-[48px] px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors">
                     {saving ? 'Création…' : 'Créer'}
                   </button>
                 </div>
