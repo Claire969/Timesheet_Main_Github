@@ -1,12 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, supabaseEnabled } from '../lib/supabaseClient';
-import { LogOut, Plus, X, Users, CreditCard as Edit2, Archive, ArchiveRestore, LayoutGrid, List } from 'lucide-react';
+import { LogOut, Plus, X, Users, CreditCard as Edit2, Archive, ArchiveRestore, LayoutGrid, List, FileSpreadsheet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppState } from '../App';
 import type { Client } from '../App';
+import * as XLSX from 'xlsx';
 
 const fmtEur = (n: number) => Number.isInteger(n) ? `${n} €` : `${n.toFixed(2)} €`;
+
+const fmtDate = (iso: string) => {
+  const [y, m, d] = iso.split('-');
+  return `${d}-${m}-${y.slice(2)}`;
+};
 
 export const Home = () => {
   const { user } = useAuth();
@@ -103,6 +109,55 @@ useEffect(() => {
     rates: { halfHour: 35, hour: 70, travelHalfHour: 25, halfDay: 200, fullDay: 400 }
   }]);
 }, []);
+
+  const handleExportExcel = () => {
+    const wb = XLSX.utils.book_new();
+    const COLS = ['Date', 'Début de l\'intervention', 'Fin de l\'intervention', 'Caller', 'Description', 'Déplacement', 'Client', 'Total (Hors TVA)', 'Commentaire Prix'];
+    const COL_WIDTHS = [10, 14, 14, 14, 60, 13, 14, 14, 60];
+    const SECTIONS: Array<{ label: string; status: string }> = [
+      { label: 'Pas encore facturé', status: 'unbilled' },
+      { label: 'Pending', status: 'pending' },
+      { label: 'Archivé', status: 'archived' },
+    ];
+
+    for (const client of clients.filter(c => !c.archived)) {
+      const allEntries = clientTimesheets[client.id] ?? [];
+      const aoa: (string | number)[][] = [];
+
+      let grandTotal = 0;
+
+      SECTIONS.forEach(({ label, status }, si) => {
+        if (si > 0) aoa.push([]);
+        const group = allEntries
+          .filter(e => e.billingStatus === status)
+          .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+
+        aoa.push([label]);
+        aoa.push(COLS);
+
+        let sectionTotal = 0;
+        for (const e of group) {
+          const start = e.isForfait ? '00:00' : e.startTime;
+          const end = e.isForfait ? '00:00' : e.endTime;
+          aoa.push([fmtDate(e.date), start, end, e.caller, e.description, e.travelUnits, client.name, fmtEur(e.total), '']);
+          sectionTotal += e.total;
+        }
+        aoa.push(['Total', '', '', '', '', '', '', fmtEur(sectionTotal), '']);
+        grandTotal += sectionTotal;
+      });
+
+      aoa.push([]);
+      aoa.push(['TOTAL GÉNÉRAL', '', '', '', '', '', '', fmtEur(grandTotal), '']);
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = COL_WIDTHS.map(w => ({ wch: w }));
+      const sheetName = client.name.replace(/[\\/*?[\]:]/g, '_').slice(0, 31);
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `timesheet-backup-${today}.xlsx`);
+  };
 
   const handleSignOut = async () => {
     try {
@@ -261,6 +316,10 @@ useEffect(() => {
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <img src="/images/ui/logo-clear-computing.png" alt="Clear Computing" className="h-6 w-auto" />
           <div className="flex items-center gap-3">
+            <button onClick={handleExportExcel} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-3 shadow-sm transition-colors">
+              <FileSpreadsheet size={16} />
+              Exporter Excel
+            </button>
             <button onClick={() => setIsClientsModalOpen(true)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-3 shadow-sm transition-colors">
               <Users size={16} />
               Gestion clients
