@@ -133,12 +133,12 @@ const formatForfait = (f: Forfait) => {
 };
 
 const getCashLevel = (total: number): number | null => {
-  if (total <= 0) return null;
-  if (total <= 250) return 1;
-  if (total <= 500) return 2;
-  if (total <= 1000) return 3;
-  if (total <= 1500) return 4;
-  if (total <= 2000) return 5;
+  if (total < 250) return null;
+  if (total < 500) return 1;
+  if (total < 1000) return 2;
+  if (total < 1500) return 3;
+  if (total < 2000) return 4;
+  if (total < 3000) return 5;
   return 6;
 };
 
@@ -524,30 +524,13 @@ export const ClientTimesheets = () => {
             {(() => {
               const unbilledTotal = unbilledEntries.reduce((acc, e) => acc + e.total, 0);
               const level = getCashLevel(unbilledTotal);
-              const fmtUnbilled = Number.isInteger(unbilledTotal) ? `${unbilledTotal} €` : `${unbilledTotal.toFixed(2)} €`;
-              const urgent = unbilledTotal >= 2000;
-              return (
-                <div
-                  aria-label="Indicateur de facturation"
-                  className={`flex flex-col items-center justify-center px-3 py-2 rounded-xl border ${urgent ? 'border-red-400 shadow-[0_0_12px_2px_rgba(239,68,68,0.25)]' : 'border-gray-200'} bg-white min-w-[80px]`}
-                >
-                  {level ? (
-                    <>
-                      <img
-                        src={`/images/cash/cash-${level}.png`}
-                        alt={`Niveau ${level}`}
-                        className="h-[56px] sm:h-[90px] w-auto object-contain"
-                      />
-                      <span className={`text-xs font-semibold mt-1 ${urgent ? 'text-red-600' : 'text-gray-600'}`}>
-                        {urgent && <span className="inline-block mr-1 px-1 py-0.5 text-[9px] font-bold bg-red-100 text-red-700 rounded uppercase tracking-wide">Urgent</span>}
-                        À facturer: {fmtUnbilled}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-xs text-gray-400 py-2">0 €</span>
-                  )}
-                </div>
-              );
+              return level ? (
+                <img
+                  src={`/images/ui/cash-${level}.png`}
+                  alt={`Niveau ${level}`}
+                  className="block w-[120px] sm:w-[170px] h-auto select-none object-contain"
+                />
+              ) : null;
             })()}
             <button
               onClick={openNew}

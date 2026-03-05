@@ -18,7 +18,11 @@ export const Home = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { clients, setClients, clientTimesheets } = useAppState();
-  const [clientsView, setClientsView] = useState<'grid' | 'list'>('grid');
+  const [clientsView, setClientsView] = useState<'grid' | 'list'>(() => {
+    const stored = localStorage.getItem('ts_clients_view');
+    return (stored === 'grid' || stored === 'list') ? stored : 'list';
+  });
+  const [clientTotals, setClientTotals] = useState<Record<string, { toInvoice: number; pending: number }>>({});
 
   const [isClientsModalOpen, setIsClientsModalOpen] = useState(false);
   const [showArchivedClients, setShowArchivedClients] = useState(false);
@@ -95,6 +99,29 @@ const fetchClients = useCallback(async () => {
 useEffect(() => {
   void fetchClients();
 }, [fetchClients]);
+
+useEffect(() => {
+  if (!supabaseEnabled || clients.length === 0) return;
+  const fetchTotals = async () => {
+    const { data, error } = await supabase
+      .schema('timesheet')
+      .from('entries')
+      .select('total, billing_status, project:projects!inner(client_id)');
+    if (error || !data) return;
+    const map: Record<string, { toInvoice: number; pending: number }> = {};
+    for (const row of data as Array<{ total: unknown; billing_status: unknown; project: { client_id: string } }>) {
+      const clientId = row.project?.client_id;
+      if (!clientId) continue;
+      if (!map[clientId]) map[clientId] = { toInvoice: 0, pending: 0 };
+      const total = parseFloat(String(row.total ?? 0));
+      const status = (row.billing_status as string) || 'unbilled';
+      if (status === 'unbilled') map[clientId].toInvoice += total;
+      else if (status === 'pending') map[clientId].pending += total;
+    }
+    setClientTotals(map);
+  };
+  void fetchTotals();
+}, [clients, supabaseEnabled]);
 
 const isBypass = sessionStorage.getItem('ts_auth_bypass') === '1';
 
@@ -351,14 +378,14 @@ useEffect(() => {
             <h2 className="text-2xl font-bold text-gray-900">Clients</h2>
             <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
               <button
-                onClick={() => setClientsView('grid')}
+                onClick={() => { setClientsView('grid'); localStorage.setItem('ts_clients_view', 'grid'); }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${clientsView === 'grid' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
               >
                 <LayoutGrid size={14} />
                 Grille
               </button>
               <button
-                onClick={() => setClientsView('list')}
+                onClick={() => { setClientsView('list'); localStorage.setItem('ts_clients_view', 'list'); }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${clientsView === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
               >
                 <List size={14} />
@@ -418,9 +445,9 @@ useEffect(() => {
           ) : (
             <div className="space-y-3">
               {activeClients.map((client) => {
-                const entries = clientTimesheets[client.id] ?? [];
-                const unbilledSum = entries.filter(e => e.billingStatus === 'unbilled').reduce((a, e) => a + e.total, 0);
-                const pendingSum = entries.filter(e => e.billingStatus === 'pending').reduce((a, e) => a + e.total, 0);
+                const totals = clientTotals[client.id] ?? { toInvoice: 0, pending: 0 };
+                const unbilledSum = totals.toInvoice;
+                const pendingSum = totals.pending;
                 return (
                   <button
                     key={client.id}
