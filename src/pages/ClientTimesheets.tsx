@@ -470,6 +470,37 @@ export const ClientTimesheets = () => {
     </tr>
   );
 
+  const renderMobileCard = (entry: Entry, checked: boolean, onCheck: () => void) => (
+    <div key={entry.id} className="rounded-2xl border border-gray-200 bg-white/70 backdrop-blur p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-2 min-w-0">
+          <input type="checkbox" checked={checked} onChange={onCheck} className="accent-blue-600 w-4 h-4 cursor-pointer mt-0.5 flex-shrink-0" />
+          <div className="min-w-0">
+            <div className="font-semibold text-sm text-gray-900 flex items-center gap-1.5">
+              {fmtDateFR(entry.date)}
+              {entry.isEvent && <span className="inline-block px-1 py-0.5 text-[9px] font-semibold bg-amber-100 text-amber-700 rounded">Év.</span>}
+            </div>
+            <div className="text-sm text-slate-500 mt-0.5">
+              {entry.isForfait !== 'none' ? formatForfait(entry.isForfait) : `${entry.startTime} → ${entry.endTime}`}
+            </div>
+          </div>
+        </div>
+        <div className="text-right flex-shrink-0">
+          <div className="font-semibold text-sm text-gray-900">{entry.total} €</div>
+          <button onClick={() => openEdit(entry)} className="mt-1 inline-flex items-center justify-center rounded-xl border border-blue-200 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 transition-colors">
+            <Edit2 size={12} className="mr-1" />
+            Éditer
+          </button>
+        </div>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-1 text-sm">
+        <div className="truncate"><span className="text-slate-500">Appelant:</span> {entry.caller || '—'}</div>
+        <div className="truncate text-right"><span className="text-slate-500">Dépl.:</span> {entry.travelUnits}</div>
+        {entry.description && <div className="col-span-2 text-slate-700 break-words text-xs mt-0.5">{entry.description}</div>}
+      </div>
+    </div>
+  );
+
   const renderRow = (entry: Entry, checked: boolean, onCheck: () => void, editLabel?: string) => (
     <tr key={entry.id} className="hover:bg-gray-50 transition-colors">
       <td className="px-2 py-2 text-center">
@@ -498,17 +529,17 @@ export const ClientTimesheets = () => {
   return (
     <div className="min-h-screen bg-white">
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <button onClick={() => navigate('/')} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors text-sm font-medium">
-            <ArrowLeft size={16} />
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-2">
+          <button onClick={() => navigate('/')} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors text-sm font-medium w-auto">
+            <ArrowLeft size={15} />
             Retour
           </button>
-          <img src="/images/ui/logo-clear-computing.png" alt="Clear_Computing" className="h-8 w-auto" />
+          <img src="/images/ui/logo-clear-computing.png" alt="Clear_Computing" className="h-7 w-auto" />
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-12 space-y-12">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-10 sm:space-y-12">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="flex items-center gap-3 min-w-0">
             {client.logoUrl && (
               <img
@@ -518,9 +549,9 @@ export const ClientTimesheets = () => {
                 className="h-9 w-9 object-contain rounded flex-shrink-0"
               />
             )}
-            <h1 className="text-3xl font-bold text-gray-900 truncate">Timesheets — {client.name}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 truncate">Timesheets — {client.name}</h1>
           </div>
-          <div className="flex items-center gap-4 flex-shrink-0">
+          <div className="flex items-center gap-3 flex-shrink-0">
             {(() => {
               const unbilledTotal = unbilledEntries.reduce((acc, e) => acc + e.total, 0);
               const level = getCashLevel(unbilledTotal);
@@ -528,16 +559,17 @@ export const ClientTimesheets = () => {
                 <img
                   src={`/images/ui/cash-${level}.png`}
                   alt={`Niveau ${level}`}
-                  className="block w-[120px] sm:w-[170px] h-auto select-none object-contain"
+                  className="block w-[100px] sm:w-[170px] h-auto select-none object-contain"
                 />
               ) : null;
             })()}
             <button
               onClick={openNew}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 py-2 sm:px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm"
             >
-              <Plus size={18} />
-              Nouveau timesheet
+              <Plus size={16} />
+              <span className="hidden xs:inline sm:inline">Nouveau timesheet</span>
+              <span className="sm:hidden">Nouveau</span>
             </button>
           </div>
         </div>
@@ -556,7 +588,7 @@ export const ClientTimesheets = () => {
 
             {/* Section A: Unbilled */}
             <section>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <h2 className="text-lg font-semibold text-gray-800">Pas encore facturé</h2>
                   {unbilledEntries.length > 0 && <span className="text-sm font-medium text-gray-500">Total: {fmtTotal(unbilledEntries)}</span>}
@@ -574,27 +606,32 @@ export const ClientTimesheets = () => {
                   <p className="text-gray-500 text-sm">Aucune entrée non facturée.</p>
                 </div>
               ) : (
-                <div className="rounded-xl border border-gray-200 overflow-hidden">
-                  <table className="w-full table-fixed text-xs">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      {colHeaders(<input type="checkbox" checked={unbilledEntries.length > 0 && unbilledEntries.every(e => selectedUnbilled.has(e.id))} onChange={() => toggleAll(unbilledEntries, selectedUnbilled, setSelectedUnbilled)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {unbilledEntries.map(entry => renderRow(entry, selectedUnbilled.has(entry.id), () => toggleSelect(selectedUnbilled, setSelectedUnbilled, entry.id)))}
-                    </tbody>
-                  </table>
-                </div>
+                <>
+                  <div className="sm:hidden space-y-3">
+                    {unbilledEntries.map(entry => renderMobileCard(entry, selectedUnbilled.has(entry.id), () => toggleSelect(selectedUnbilled, setSelectedUnbilled, entry.id)))}
+                  </div>
+                  <div className="hidden sm:block rounded-xl border border-gray-200 overflow-hidden">
+                    <table className="w-full table-fixed text-xs">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        {colHeaders(<input type="checkbox" checked={unbilledEntries.length > 0 && unbilledEntries.every(e => selectedUnbilled.has(e.id))} onChange={() => toggleAll(unbilledEntries, selectedUnbilled, setSelectedUnbilled)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {unbilledEntries.map(entry => renderRow(entry, selectedUnbilled.has(entry.id), () => toggleSelect(selectedUnbilled, setSelectedUnbilled, entry.id)))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </section>
 
             {/* Section B: Pending */}
             <section>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <h2 className="text-lg font-semibold text-gray-800">Pending</h2>
                   {pendingEntries.length > 0 && <span className="text-sm font-medium text-gray-500">Total: {fmtTotal(pendingEntries)}</span>}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button onClick={handlePendingToUnbilled} disabled={selectedPending.size === 0} className="px-3 py-2 text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 rounded-lg transition-colors">
                     Remettre en non facturé ({selectedPending.size})
                   </button>
@@ -611,31 +648,43 @@ export const ClientTimesheets = () => {
                   <p className="text-gray-500 text-sm">Aucune entrée en pending.</p>
                 </div>
               ) : (
-                <div className="rounded-xl border border-gray-200 overflow-hidden">
-                  <table className="w-full table-fixed text-xs">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      {colHeaders(<input type="checkbox" checked={pendingEntries.length > 0 && pendingEntries.every(e => selectedPending.has(e.id))} onChange={() => toggleAll(pendingEntries, selectedPending, setSelectedPending)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {groupByDate(pendingEntries, 'pendingAt').map(([date, group]) => (
-                        <>
-                          <tr key={`divider-${date}`}>
-                            <td colSpan={10} className="px-4 py-2 bg-blue-50 text-xs font-medium text-blue-700 border-y border-blue-100">Mis en pending le {date}</td>
-                          </tr>
-                          {group.map(entry => renderRow(entry, selectedPending.has(entry.id), () => toggleSelect(selectedPending, setSelectedPending, entry.id)))}
-                        </>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <>
+                  <div className="sm:hidden space-y-3">
+                    {groupByDate(pendingEntries, 'pendingAt').map(([date, group]) => (
+                      <div key={`mob-pend-${date}`}>
+                        <div className="px-3 py-1.5 bg-blue-50 text-xs font-medium text-blue-700 rounded-lg mb-2">Mis en pending le {date}</div>
+                        <div className="space-y-3">
+                          {group.map(entry => renderMobileCard(entry, selectedPending.has(entry.id), () => toggleSelect(selectedPending, setSelectedPending, entry.id)))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="hidden sm:block rounded-xl border border-gray-200 overflow-hidden">
+                    <table className="w-full table-fixed text-xs">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        {colHeaders(<input type="checkbox" checked={pendingEntries.length > 0 && pendingEntries.every(e => selectedPending.has(e.id))} onChange={() => toggleAll(pendingEntries, selectedPending, setSelectedPending)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {groupByDate(pendingEntries, 'pendingAt').map(([date, group]) => (
+                          <>
+                            <tr key={`divider-${date}`}>
+                              <td colSpan={10} className="px-4 py-2 bg-blue-50 text-xs font-medium text-blue-700 border-y border-blue-100">Mis en pending le {date}</td>
+                            </tr>
+                            {group.map(entry => renderRow(entry, selectedPending.has(entry.id), () => toggleSelect(selectedPending, setSelectedPending, entry.id)))}
+                          </>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </section>
 
             {/* Section C: Archived */}
             <section>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
                 <h2 className="text-lg font-semibold text-gray-800">Archivé</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button onClick={handleArchivedToUnbilled} disabled={selectedArchived.size === 0} className="px-3 py-2 text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 rounded-lg transition-colors">
                     Remettre en non facturé ({selectedArchived.size})
                   </button>
@@ -649,23 +698,35 @@ export const ClientTimesheets = () => {
                   <p className="text-gray-500 text-sm">Aucune entrée archivée.</p>
                 </div>
               ) : (
-                <div className="rounded-xl border border-gray-200 overflow-hidden">
-                  <table className="w-full table-fixed text-xs">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      {colHeaders(<input type="checkbox" checked={archivedEntries.length > 0 && archivedEntries.every(e => selectedArchived.has(e.id))} onChange={() => toggleAll(archivedEntries, selectedArchived, setSelectedArchived)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {groupByDate(archivedEntries, 'archivedAt').map(([date, group]) => (
-                        <>
-                          <tr key={`divider-${date}`}>
-                            <td colSpan={10} className="px-4 py-2 bg-gray-100 text-xs font-medium text-gray-500 border-y border-gray-200">Archivé le {date}</td>
-                          </tr>
-                          {group.map(entry => renderRow(entry, selectedArchived.has(entry.id), () => toggleSelect(selectedArchived, setSelectedArchived, entry.id), 'Éditer (→ Pending)'))}
-                        </>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <>
+                  <div className="sm:hidden space-y-3">
+                    {groupByDate(archivedEntries, 'archivedAt').map(([date, group]) => (
+                      <div key={`mob-arch-${date}`}>
+                        <div className="px-3 py-1.5 bg-gray-100 text-xs font-medium text-gray-500 rounded-lg mb-2">Archivé le {date}</div>
+                        <div className="space-y-3">
+                          {group.map(entry => renderMobileCard(entry, selectedArchived.has(entry.id), () => toggleSelect(selectedArchived, setSelectedArchived, entry.id)))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="hidden sm:block rounded-xl border border-gray-200 overflow-hidden">
+                    <table className="w-full table-fixed text-xs">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        {colHeaders(<input type="checkbox" checked={archivedEntries.length > 0 && archivedEntries.every(e => selectedArchived.has(e.id))} onChange={() => toggleAll(archivedEntries, selectedArchived, setSelectedArchived)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {groupByDate(archivedEntries, 'archivedAt').map(([date, group]) => (
+                          <>
+                            <tr key={`divider-${date}`}>
+                              <td colSpan={10} className="px-4 py-2 bg-gray-100 text-xs font-medium text-gray-500 border-y border-gray-200">Archivé le {date}</td>
+                            </tr>
+                            {group.map(entry => renderRow(entry, selectedArchived.has(entry.id), () => toggleSelect(selectedArchived, setSelectedArchived, entry.id), 'Éditer (→ Pending)'))}
+                          </>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </section>
           </>
