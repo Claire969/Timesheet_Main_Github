@@ -527,7 +527,19 @@ export const ClientTimesheets = () => {
   );
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="relative min-h-screen bg-white">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10"
+        style={{
+          backgroundImage: "url('/images/ui/eva-walk.png')",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "right top",
+          backgroundSize: "clamp(260px, 40vw, 520px)",
+          opacity: 0.12,
+          transform: "translateY(32px)"
+        }}
+      />
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-2">
           <button onClick={() => navigate('/')} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors text-sm font-medium w-auto">

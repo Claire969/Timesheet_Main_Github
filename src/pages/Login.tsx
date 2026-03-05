@@ -46,11 +46,13 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center justify-center p-4">
-      <img
-        src="/images/ui/logo-clear-computing.png"
-        alt="Clear Computing"
-        className="h-20 sm:h-24 w-auto mx-auto mb-6 drop-shadow-sm"
-      />
+      <div className="flex flex-col items-center gap-3 w-full max-w-[260px] mb-6 min-w-0">
+        <img
+          src="/images/ui/logo-clear-computing.png"
+          alt="Clear Computing"
+          className="mx-auto block w-full max-w-[260px] h-auto object-contain drop-shadow-sm"
+        />
+      </div>
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Timesheet</h1>
