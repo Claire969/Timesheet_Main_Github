@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabaseEnabled } from '../lib/supabaseClient';
 
-const bypassAllowed = import.meta.env.DEV && !window.location.hostname.endsWith('clearcomputing.be');
+const isBypass = import.meta.env.DEV && sessionStorage.getItem('ts_auth_bypass') === '1';
 
 export const RequireAuth = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -11,9 +11,7 @@ export const RequireAuth = ({ children }: { children: React.ReactNode }) => {
     return <>{children}</>;
   }
 
-  if (bypassAllowed && sessionStorage.getItem('ts_auth_bypass') === '1') {
-    return <>{children}</>;
-  }
+  if (isBypass) return <>{children}</>;
 
   if (loading) {
     return (

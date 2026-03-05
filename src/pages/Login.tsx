@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { LogIn } from 'lucide-react';
 
-const bypassAllowed = import.meta.env.DEV && !window.location.hostname.endsWith('clearcomputing.be');
+const bypassAllowed = import.meta.env.DEV;
 
 const Login = () => {
   const { user } = useAuth();
@@ -76,7 +76,7 @@ const Login = () => {
           <button
             onClick={() => {
               sessionStorage.setItem('ts_auth_bypass', '1');
-              navigate('/');
+              navigate('/', { replace: true });
             }}
             className="mt-3 w-full border border-slate-300 hover:bg-slate-50 text-slate-600 font-medium py-3 px-4 rounded-lg transition-colors"
           >
