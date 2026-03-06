@@ -178,6 +178,7 @@ export const ClientTimesheets = () => {
   const [selectedPending, setSelectedPending] = useState<Set<string>>(new Set());
   const [selectedArchived, setSelectedArchived] = useState<Set<string>>(new Set());
   const [pdfToast, setPdfToast] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     ensureDefaultProject(client.id).then(id => { if (id) setSelectedProjectId(id); });
@@ -199,9 +200,34 @@ export const ClientTimesheets = () => {
 
   useEffect(() => { fetchEntries(); setSelectedUnbilled(new Set()); setSelectedPending(new Set()); setSelectedArchived(new Set()); }, [fetchEntries]);
 
-  const unbilledEntries = entries.filter(e => e.billingStatus === 'unbilled');
-  const pendingEntries = entries.filter(e => e.billingStatus === 'pending');
-  const archivedEntries = entries.filter(e => e.billingStatus === 'archived');
+  const sortEntries = (list: Entry[]) =>
+    [...list].sort((a, b) => {
+      const dc = b.date.localeCompare(a.date);
+      if (dc !== 0) return dc;
+      return (b.startTime || '00:00').localeCompare(a.startTime || '00:00');
+    });
+
+  const matchesSearch = (entry: Entry): boolean => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    const timeLabel = entry.isForfait !== 'none'
+      ? formatForfait(entry.isForfait).toLowerCase()
+      : `${entry.startTime} ${entry.endTime}`;
+    return (
+      entry.date.toLowerCase().includes(term) ||
+      entry.caller.toLowerCase().includes(term) ||
+      entry.description.toLowerCase().includes(term) ||
+      timeLabel.includes(term)
+    );
+  };
+
+  const unbilledEntries = sortEntries(entries.filter(e => e.billingStatus === 'unbilled'));
+  const pendingEntries = sortEntries(entries.filter(e => e.billingStatus === 'pending'));
+  const archivedEntries = sortEntries(entries.filter(e => e.billingStatus === 'archived'));
+
+  const filteredUnbilled = unbilledEntries.filter(matchesSearch);
+  const filteredPending = pendingEntries.filter(matchesSearch);
+  const filteredArchived = archivedEntries.filter(matchesSearch);
 
   const fmtTotal = (list: Entry[]) => {
     const sum = list.reduce((acc, e) => acc + e.total, 0);
@@ -586,6 +612,16 @@ export const ClientTimesheets = () => {
           </div>
         </div>
 
+        <div className="mb-6">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Rechercher un timesheet..."
+            className="w-full sm:max-w-md rounded-xl border border-gray-200 bg-white/70 backdrop-blur px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+          />
+        </div>
+
         {(!supabaseEnabled || selectedProjectId) && (
           <>
             {entriesLoading && (
@@ -603,7 +639,7 @@ export const ClientTimesheets = () => {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <h2 className="text-lg font-semibold text-gray-800">Pas encore facturé</h2>
-                  {unbilledEntries.length > 0 && <span className="text-sm font-medium text-gray-500">Total: {fmtTotal(unbilledEntries)}</span>}
+                  {filteredUnbilled.length > 0 && <span className="text-sm font-medium text-gray-500">Total: {fmtTotal(filteredUnbilled)}</span>}
                 </div>
                 <button
                   onClick={handleExportPending}
@@ -613,22 +649,22 @@ export const ClientTimesheets = () => {
                   Exporter pour la facturation ({selectedUnbilled.size})
                 </button>
               </div>
-              {unbilledEntries.length === 0 ? (
+              {filteredUnbilled.length === 0 ? (
                 <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
                   <p className="text-gray-500 text-sm">Aucune entrée non facturée.</p>
                 </div>
               ) : (
                 <>
                   <div className="sm:hidden space-y-3">
-                    {unbilledEntries.map(entry => renderMobileCard(entry, selectedUnbilled.has(entry.id), () => toggleSelect(selectedUnbilled, setSelectedUnbilled, entry.id)))}
+                    {filteredUnbilled.map(entry => renderMobileCard(entry, selectedUnbilled.has(entry.id), () => toggleSelect(selectedUnbilled, setSelectedUnbilled, entry.id)))}
                   </div>
                   <div className="hidden sm:block rounded-xl border border-gray-200 overflow-hidden">
                     <table className="w-full table-fixed text-xs">
                       <thead className="bg-gray-50 border-b border-gray-200">
-                        {colHeaders(<input type="checkbox" checked={unbilledEntries.length > 0 && unbilledEntries.every(e => selectedUnbilled.has(e.id))} onChange={() => toggleAll(unbilledEntries, selectedUnbilled, setSelectedUnbilled)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
+                        {colHeaders(<input type="checkbox" checked={filteredUnbilled.length > 0 && filteredUnbilled.every(e => selectedUnbilled.has(e.id))} onChange={() => toggleAll(filteredUnbilled, selectedUnbilled, setSelectedUnbilled)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {unbilledEntries.map(entry => renderRow(entry, selectedUnbilled.has(entry.id), () => toggleSelect(selectedUnbilled, setSelectedUnbilled, entry.id)))}
+                        {filteredUnbilled.map(entry => renderRow(entry, selectedUnbilled.has(entry.id), () => toggleSelect(selectedUnbilled, setSelectedUnbilled, entry.id)))}
                       </tbody>
                     </table>
                   </div>
@@ -641,7 +677,7 @@ export const ClientTimesheets = () => {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <h2 className="text-lg font-semibold text-gray-800">Pending</h2>
-                  {pendingEntries.length > 0 && <span className="text-sm font-medium text-gray-500">Total: {fmtTotal(pendingEntries)}</span>}
+                  {filteredPending.length > 0 && <span className="text-sm font-medium text-gray-500">Total: {fmtTotal(filteredPending)}</span>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <button onClick={handlePendingToUnbilled} disabled={selectedPending.size === 0} className="px-3 py-2 text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 rounded-lg transition-colors">
@@ -655,14 +691,14 @@ export const ClientTimesheets = () => {
                   </button>
                 </div>
               </div>
-              {pendingEntries.length === 0 ? (
+              {filteredPending.length === 0 ? (
                 <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
                   <p className="text-gray-500 text-sm">Aucune entrée en pending.</p>
                 </div>
               ) : (
                 <>
                   <div className="sm:hidden space-y-3">
-                    {groupByDate(pendingEntries, 'pendingAt').map(([date, group]) => (
+                    {groupByDate(filteredPending, 'pendingAt').map(([date, group]) => (
                       <div key={`mob-pend-${date}`}>
                         <div className="px-3 py-1.5 bg-blue-50 text-xs font-medium text-blue-700 rounded-lg mb-2">Mis en pending le {date}</div>
                         <div className="space-y-3">
@@ -674,10 +710,10 @@ export const ClientTimesheets = () => {
                   <div className="hidden sm:block rounded-xl border border-gray-200 overflow-hidden">
                     <table className="w-full table-fixed text-xs">
                       <thead className="bg-gray-50 border-b border-gray-200">
-                        {colHeaders(<input type="checkbox" checked={pendingEntries.length > 0 && pendingEntries.every(e => selectedPending.has(e.id))} onChange={() => toggleAll(pendingEntries, selectedPending, setSelectedPending)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
+                        {colHeaders(<input type="checkbox" checked={filteredPending.length > 0 && filteredPending.every(e => selectedPending.has(e.id))} onChange={() => toggleAll(filteredPending, selectedPending, setSelectedPending)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {groupByDate(pendingEntries, 'pendingAt').map(([date, group]) => (
+                        {groupByDate(filteredPending, 'pendingAt').map(([date, group]) => (
                           <>
                             <tr key={`divider-${date}`}>
                               <td colSpan={10} className="px-4 py-2 bg-blue-50 text-xs font-medium text-blue-700 border-y border-blue-100">Mis en pending le {date}</td>
@@ -705,14 +741,14 @@ export const ClientTimesheets = () => {
                   </button>
                 </div>
               </div>
-              {archivedEntries.length === 0 ? (
+              {filteredArchived.length === 0 ? (
                 <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
                   <p className="text-gray-500 text-sm">Aucune entrée archivée.</p>
                 </div>
               ) : (
                 <>
                   <div className="sm:hidden space-y-3">
-                    {groupByDate(archivedEntries, 'archivedAt').map(([date, group]) => (
+                    {groupByDate(filteredArchived, 'archivedAt').map(([date, group]) => (
                       <div key={`mob-arch-${date}`}>
                         <div className="px-3 py-1.5 bg-gray-100 text-xs font-medium text-gray-500 rounded-lg mb-2">Archivé le {date}</div>
                         <div className="space-y-3">
@@ -724,10 +760,10 @@ export const ClientTimesheets = () => {
                   <div className="hidden sm:block rounded-xl border border-gray-200 overflow-hidden">
                     <table className="w-full table-fixed text-xs">
                       <thead className="bg-gray-50 border-b border-gray-200">
-                        {colHeaders(<input type="checkbox" checked={archivedEntries.length > 0 && archivedEntries.every(e => selectedArchived.has(e.id))} onChange={() => toggleAll(archivedEntries, selectedArchived, setSelectedArchived)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
+                        {colHeaders(<input type="checkbox" checked={filteredArchived.length > 0 && filteredArchived.every(e => selectedArchived.has(e.id))} onChange={() => toggleAll(filteredArchived, selectedArchived, setSelectedArchived)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {groupByDate(archivedEntries, 'archivedAt').map(([date, group]) => (
+                        {groupByDate(filteredArchived, 'archivedAt').map(([date, group]) => (
                           <>
                             <tr key={`divider-${date}`}>
                               <td colSpan={10} className="px-4 py-2 bg-gray-100 text-xs font-medium text-gray-500 border-y border-gray-200">Archivé le {date}</td>

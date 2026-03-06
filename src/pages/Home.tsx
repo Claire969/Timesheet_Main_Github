@@ -340,21 +340,27 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-white">
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <img src="/images/ui/logo-clear-computing.png" alt="Clear Computing" className="h-6 w-auto" />
-          <div className="flex items-center gap-3">
-            <button onClick={handleExportExcel} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-3 shadow-sm transition-colors">
-              <FileSpreadsheet size={16} />
+        <div className="max-w-5xl mx-auto grid grid-cols-[1fr_auto] gap-3 items-center px-4 py-3 sm:flex sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <img src="/images/ui/logo-clear-computing.png" alt="Clear Computing" className="h-8 w-auto max-w-[180px] object-contain" />
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button onClick={handleExportExcel} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs px-2.5 py-2 sm:text-sm sm:px-4 sm:py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
+              <FileSpreadsheet size={14} />
               Exporter Excel
             </button>
-            <button onClick={() => setIsClientsModalOpen(true)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-3 shadow-sm transition-colors">
-              <Users size={16} />
+            <button onClick={() => setIsClientsModalOpen(true)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs px-2.5 py-2 sm:text-sm sm:px-4 sm:py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
+              <Users size={14} />
               Gestion clients
             </button>
-            <button onClick={handleSignOut} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white rounded-xl px-5 py-3 shadow-sm transition-colors">
-              <LogOut size={16} />
+            <button onClick={handleSignOut} className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs px-2.5 py-2 sm:text-sm sm:px-4 sm:py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
+              <LogOut size={14} />
               Déconnexion
             </button>
+          </div>
+          <div className="col-span-2 text-center mt-2 sm:hidden">
+            <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-gray-900">Timesheet</h1>
+            <p className="text-base sm:text-2xl text-slate-500">{user?.email || 'Mode preview'}</p>
           </div>
         </div>
       </header>
@@ -362,10 +368,11 @@ useEffect(() => {
       <main className="max-w-5xl mx-auto px-6 py-16 relative" style={{ backgroundImage: "url('/images/ui/clients-bg.png')", backgroundRepeat: "no-repeat", backgroundPosition: "right 40px", backgroundSize: "750px auto", backgroundBlendMode: "multiply" }}>
         <div className="pointer-events-none absolute inset-0 bg-white/80" />
         <div className="relative z-10">
-        <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-gray-900 mb-4">Timesheet</h1>
-          <p className="text-lg text-gray-500">{user?.email || 'Mode preview'}</p>
+        <div className="hidden sm:block text-center mb-12">
+          <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-gray-900 mb-4">Timesheet</h1>
+          <p className="text-base sm:text-2xl text-slate-500">{user?.email || 'Mode preview'}</p>
         </div>
+        <div className="sm:hidden mb-12" />
 
         {fetchError && (
           <div className="mb-6 px-4 py-3 bg-red-50/70 backdrop-blur-sm border border-red-200 rounded-lg text-sm text-red-700">
