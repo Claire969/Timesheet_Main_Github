@@ -179,6 +179,11 @@ export const ClientTimesheets = () => {
   const [selectedArchived, setSelectedArchived] = useState<Set<string>>(new Set());
   const [pdfToast, setPdfToast] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [unbilledPage, setUnbilledPage] = useState(1);
+  const [pendingPage, setPendingPage] = useState(1);
+  const [archivedPage, setArchivedPage] = useState(1);
+
+  const PAGE_SIZE = 50;
 
   useEffect(() => {
     ensureDefaultProject(client.id).then(id => { if (id) setSelectedProjectId(id); });
@@ -207,18 +212,27 @@ export const ClientTimesheets = () => {
       return (b.startTime || '00:00').localeCompare(a.startTime || '00:00');
     });
 
+  const normalizeText = (value: unknown): string => {
+    if (value === undefined || value === null) return '';
+    return String(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  };
+
+  const getSearchableText = (entry: Entry): string => {
+    const timeLabel = entry.isForfait !== 'none'
+      ? formatForfait(entry.isForfait)
+      : `${entry.startTime} ${entry.endTime}`;
+    const billingLabel = entry.billingStatus === 'unbilled' ? 'non facturé' : entry.billingStatus === 'pending' ? 'pending' : 'archivé';
+    const eventLabel = entry.isEvent ? 'événement ev' : '';
+    return normalizeText([entry.date, entry.caller, entry.description, timeLabel, billingLabel, eventLabel].join(' '));
+  };
+
   const matchesSearch = (entry: Entry): boolean => {
     if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    const timeLabel = entry.isForfait !== 'none'
-      ? formatForfait(entry.isForfait).toLowerCase()
-      : `${entry.startTime} ${entry.endTime}`;
-    return (
-      entry.date.toLowerCase().includes(term) ||
-      entry.caller.toLowerCase().includes(term) ||
-      entry.description.toLowerCase().includes(term) ||
-      timeLabel.includes(term)
-    );
+    const term = normalizeText(searchTerm);
+    return getSearchableText(entry).includes(term);
   };
 
   const unbilledEntries = sortEntries(entries.filter(e => e.billingStatus === 'unbilled'));
@@ -228,6 +242,14 @@ export const ClientTimesheets = () => {
   const filteredUnbilled = unbilledEntries.filter(matchesSearch);
   const filteredPending = pendingEntries.filter(matchesSearch);
   const filteredArchived = archivedEntries.filter(matchesSearch);
+
+  const unbilledTotalPages = Math.max(1, Math.ceil(filteredUnbilled.length / PAGE_SIZE));
+  const pendingTotalPages = Math.max(1, Math.ceil(filteredPending.length / PAGE_SIZE));
+  const archivedTotalPages = Math.max(1, Math.ceil(filteredArchived.length / PAGE_SIZE));
+
+  const pagedUnbilled = filteredUnbilled.slice((unbilledPage - 1) * PAGE_SIZE, unbilledPage * PAGE_SIZE);
+  const pagedPending = filteredPending.slice((pendingPage - 1) * PAGE_SIZE, pendingPage * PAGE_SIZE);
+  const pagedArchived = filteredArchived.slice((archivedPage - 1) * PAGE_SIZE, archivedPage * PAGE_SIZE);
 
   const fmtTotal = (list: Entry[]) => {
     const sum = list.reduce((acc, e) => acc + e.total, 0);
@@ -616,8 +638,8 @@ export const ClientTimesheets = () => {
           <input
             type="text"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Rechercher un timesheet..."
+            onChange={(e) => { setSearchTerm(e.target.value); setUnbilledPage(1); setPendingPage(1); setArchivedPage(1); }}
+            placeholder="Rechercher par date, appelant, description, événement..."
             className="w-full sm:max-w-md rounded-xl border border-gray-200 bg-white/70 backdrop-blur px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200"
           />
         </div>
@@ -656,7 +678,7 @@ export const ClientTimesheets = () => {
               ) : (
                 <>
                   <div className="sm:hidden space-y-3">
-                    {filteredUnbilled.map(entry => renderMobileCard(entry, selectedUnbilled.has(entry.id), () => toggleSelect(selectedUnbilled, setSelectedUnbilled, entry.id)))}
+                    {pagedUnbilled.map(entry => renderMobileCard(entry, selectedUnbilled.has(entry.id), () => toggleSelect(selectedUnbilled, setSelectedUnbilled, entry.id)))}
                   </div>
                   <div className="hidden sm:block rounded-xl border border-gray-200 overflow-hidden">
                     <table className="w-full table-fixed text-xs">
@@ -664,10 +686,17 @@ export const ClientTimesheets = () => {
                         {colHeaders(<input type="checkbox" checked={filteredUnbilled.length > 0 && filteredUnbilled.every(e => selectedUnbilled.has(e.id))} onChange={() => toggleAll(filteredUnbilled, selectedUnbilled, setSelectedUnbilled)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {filteredUnbilled.map(entry => renderRow(entry, selectedUnbilled.has(entry.id), () => toggleSelect(selectedUnbilled, setSelectedUnbilled, entry.id)))}
+                        {pagedUnbilled.map(entry => renderRow(entry, selectedUnbilled.has(entry.id), () => toggleSelect(selectedUnbilled, setSelectedUnbilled, entry.id)))}
                       </tbody>
                     </table>
                   </div>
+                  {unbilledTotalPages > 1 && (
+                    <div className="flex items-center justify-center gap-3 mt-3">
+                      <button onClick={() => setUnbilledPage(p => Math.max(1, p - 1))} disabled={unbilledPage === 1} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors">Précédent</button>
+                      <span className="text-sm text-gray-600">Page {unbilledPage} / {unbilledTotalPages}</span>
+                      <button onClick={() => setUnbilledPage(p => Math.min(unbilledTotalPages, p + 1))} disabled={unbilledPage === unbilledTotalPages} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors">Suivant</button>
+                    </div>
+                  )}
                 </>
               )}
             </section>
@@ -698,7 +727,7 @@ export const ClientTimesheets = () => {
               ) : (
                 <>
                   <div className="sm:hidden space-y-3">
-                    {groupByDate(filteredPending, 'pendingAt').map(([date, group]) => (
+                    {groupByDate(pagedPending, 'pendingAt').map(([date, group]) => (
                       <div key={`mob-pend-${date}`}>
                         <div className="px-3 py-1.5 bg-blue-50 text-xs font-medium text-blue-700 rounded-lg mb-2">Mis en pending le {date}</div>
                         <div className="space-y-3">
@@ -713,7 +742,7 @@ export const ClientTimesheets = () => {
                         {colHeaders(<input type="checkbox" checked={filteredPending.length > 0 && filteredPending.every(e => selectedPending.has(e.id))} onChange={() => toggleAll(filteredPending, selectedPending, setSelectedPending)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {groupByDate(filteredPending, 'pendingAt').map(([date, group]) => (
+                        {groupByDate(pagedPending, 'pendingAt').map(([date, group]) => (
                           <>
                             <tr key={`divider-${date}`}>
                               <td colSpan={10} className="px-4 py-2 bg-blue-50 text-xs font-medium text-blue-700 border-y border-blue-100">Mis en pending le {date}</td>
@@ -724,6 +753,13 @@ export const ClientTimesheets = () => {
                       </tbody>
                     </table>
                   </div>
+                  {pendingTotalPages > 1 && (
+                    <div className="flex items-center justify-center gap-3 mt-3">
+                      <button onClick={() => setPendingPage(p => Math.max(1, p - 1))} disabled={pendingPage === 1} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors">Précédent</button>
+                      <span className="text-sm text-gray-600">Page {pendingPage} / {pendingTotalPages}</span>
+                      <button onClick={() => setPendingPage(p => Math.min(pendingTotalPages, p + 1))} disabled={pendingPage === pendingTotalPages} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors">Suivant</button>
+                    </div>
+                  )}
                 </>
               )}
             </section>
@@ -748,7 +784,7 @@ export const ClientTimesheets = () => {
               ) : (
                 <>
                   <div className="sm:hidden space-y-3">
-                    {groupByDate(filteredArchived, 'archivedAt').map(([date, group]) => (
+                    {groupByDate(pagedArchived, 'archivedAt').map(([date, group]) => (
                       <div key={`mob-arch-${date}`}>
                         <div className="px-3 py-1.5 bg-gray-100 text-xs font-medium text-gray-500 rounded-lg mb-2">Archivé le {date}</div>
                         <div className="space-y-3">
@@ -763,7 +799,7 @@ export const ClientTimesheets = () => {
                         {colHeaders(<input type="checkbox" checked={filteredArchived.length > 0 && filteredArchived.every(e => selectedArchived.has(e.id))} onChange={() => toggleAll(filteredArchived, selectedArchived, setSelectedArchived)} className="accent-blue-600 w-4 h-4 cursor-pointer" />)}
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {groupByDate(filteredArchived, 'archivedAt').map(([date, group]) => (
+                        {groupByDate(pagedArchived, 'archivedAt').map(([date, group]) => (
                           <>
                             <tr key={`divider-${date}`}>
                               <td colSpan={10} className="px-4 py-2 bg-gray-100 text-xs font-medium text-gray-500 border-y border-gray-200">Archivé le {date}</td>
@@ -774,6 +810,13 @@ export const ClientTimesheets = () => {
                       </tbody>
                     </table>
                   </div>
+                  {archivedTotalPages > 1 && (
+                    <div className="flex items-center justify-center gap-3 mt-3">
+                      <button onClick={() => setArchivedPage(p => Math.max(1, p - 1))} disabled={archivedPage === 1} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors">Précédent</button>
+                      <span className="text-sm text-gray-600">Page {archivedPage} / {archivedTotalPages}</span>
+                      <button onClick={() => setArchivedPage(p => Math.min(archivedTotalPages, p + 1))} disabled={archivedPage === archivedTotalPages} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors">Suivant</button>
+                    </div>
+                  )}
                 </>
               )}
             </section>
