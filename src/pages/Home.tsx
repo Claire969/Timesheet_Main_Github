@@ -343,37 +343,35 @@ useEffect(() => {
         <div className="max-w-5xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <img src="/images/ui/logo-clear-computing.png" alt="Clear Computing" className="h-8 w-auto max-w-[180px] object-contain" />
-            <div className="hidden sm:flex items-center gap-2">
-              <button onClick={handleExportExcel} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl sm:text-sm sm:px-4 sm:py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
-                <FileSpreadsheet size={14} />
-                Exporter Excel
-              </button>
-              <button onClick={() => setIsClientsModalOpen(true)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl sm:text-sm sm:px-4 sm:py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
-                <Users size={14} />
-                Gestion clients
-              </button>
-              <button onClick={handleSignOut} className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl sm:text-sm sm:px-4 sm:py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2">
+                <button onClick={handleExportExcel} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm px-4 py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
+                  <FileSpreadsheet size={14} />
+                  Exporter Excel
+                </button>
+                <button onClick={() => setIsClientsModalOpen(true)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm px-4 py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
+                  <Users size={14} />
+                  Gestion clients
+                </button>
+              </div>
+              <button onClick={handleSignOut} className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs px-3 py-2 sm:text-sm sm:px-4 sm:py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
                 <LogOut size={14} />
                 Déconnexion
               </button>
             </div>
           </div>
-          <div className="sm:hidden mt-4 text-center">
+          <div className="sm:hidden mt-3 text-center">
             <h1 className="text-4xl font-black tracking-tight text-gray-900">Timesheet</h1>
             <p className="mt-1 text-base text-slate-500">{user?.email || 'Mode preview'}</p>
           </div>
-          <div className="sm:hidden mt-4 flex flex-nowrap items-center justify-center gap-2 overflow-x-auto pb-1">
-            <button onClick={handleExportExcel} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shrink-0 text-xs px-3 py-2 whitespace-nowrap shadow-sm transition-colors">
+          <div className="sm:hidden mt-4 flex items-center justify-center gap-2">
+            <button onClick={handleExportExcel} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs px-3 py-2 whitespace-nowrap shrink-0 shadow-sm transition-colors">
               <FileSpreadsheet size={13} />
               Exporter Excel
             </button>
-            <button onClick={() => setIsClientsModalOpen(true)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shrink-0 text-xs px-3 py-2 whitespace-nowrap shadow-sm transition-colors">
+            <button onClick={() => setIsClientsModalOpen(true)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs px-3 py-2 whitespace-nowrap shrink-0 shadow-sm transition-colors">
               <Users size={13} />
               Gestion clients
-            </button>
-            <button onClick={handleSignOut} className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl shrink-0 text-xs px-3 py-2 whitespace-nowrap shadow-sm transition-colors">
-              <LogOut size={13} />
-              Déconnexion
             </button>
           </div>
         </div>
