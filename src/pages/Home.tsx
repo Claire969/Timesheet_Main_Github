@@ -338,7 +338,29 @@ useEffect(() => {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="relative min-h-screen bg-white">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10"
+        style={{
+          backgroundImage: "url('/images/ui/eva-walk.png')",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "center 120px",
+          backgroundSize: "clamp(320px, 55vw, 700px)",
+          opacity: 0.14,
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 hidden sm:block"
+        style={{
+          backgroundImage: "url('/images/ui/eva-walk.png')",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "right center",
+          backgroundSize: "clamp(320px, 55vw, 700px)",
+          opacity: 0.14,
+        }}
+      />
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
