@@ -212,27 +212,24 @@ export const ClientTimesheets = () => {
       return (b.startTime || '00:00').localeCompare(a.startTime || '00:00');
     });
 
-  const normalizeText = (value: unknown): string => {
+  const normalize = (value: unknown): string => {
     if (value === undefined || value === null) return '';
-    return String(value)
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-  };
-
-  const getSearchableText = (entry: Entry): string => {
-    const timeLabel = entry.isForfait !== 'none'
-      ? formatForfait(entry.isForfait)
-      : `${entry.startTime} ${entry.endTime}`;
-    const billingLabel = entry.billingStatus === 'unbilled' ? 'non facturé' : entry.billingStatus === 'pending' ? 'pending' : 'archivé';
-    const eventLabel = entry.isEvent ? 'événement ev' : '';
-    return normalizeText([entry.date, entry.caller, entry.description, timeLabel, billingLabel, eventLabel].join(' '));
+    return String(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   };
 
   const matchesSearch = (entry: Entry): boolean => {
     if (!searchTerm) return true;
-    const term = normalizeText(searchTerm);
-    return getSearchableText(entry).includes(term);
+    const t = normalize(searchTerm);
+    return [
+      entry.date,
+      entry.caller,
+      entry.description,
+      entry.startTime,
+      entry.endTime,
+      entry.isForfait !== 'none' ? formatForfait(entry.isForfait) : '',
+      entry.travelUnits,
+      entry.total,
+    ].some(v => normalize(v).includes(t));
   };
 
   const unbilledEntries = sortEntries(entries.filter(e => e.billingStatus === 'unbilled'));
