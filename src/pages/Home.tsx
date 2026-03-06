@@ -340,39 +340,74 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-white">
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-200">
-        <div className="max-w-5xl mx-auto grid grid-cols-[1fr_auto] gap-3 items-center px-4 py-3 sm:flex sm:items-center sm:justify-between">
-          <div className="min-w-0">
+        <div className="max-w-5xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
             <img src="/images/ui/logo-clear-computing.png" alt="Clear Computing" className="h-8 w-auto max-w-[180px] object-contain" />
+            <div className="hidden sm:flex items-center gap-2">
+              <button onClick={handleExportExcel} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl sm:text-sm sm:px-4 sm:py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
+                <FileSpreadsheet size={14} />
+                Exporter Excel
+              </button>
+              <button onClick={() => setIsClientsModalOpen(true)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl sm:text-sm sm:px-4 sm:py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
+                <Users size={14} />
+                Gestion clients
+              </button>
+              <button onClick={handleSignOut} className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl sm:text-sm sm:px-4 sm:py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
+                <LogOut size={14} />
+                Déconnexion
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            <button onClick={handleExportExcel} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs px-2.5 py-2 sm:text-sm sm:px-4 sm:py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
-              <FileSpreadsheet size={14} />
+          <div className="sm:hidden mt-4 text-center">
+            <h1 className="text-4xl font-black tracking-tight text-gray-900">Timesheet</h1>
+            <p className="mt-1 text-base text-slate-500">{user?.email || 'Mode preview'}</p>
+          </div>
+          <div className="sm:hidden mt-4 flex flex-nowrap items-center justify-center gap-2 overflow-x-auto pb-1">
+            <button onClick={handleExportExcel} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shrink-0 text-xs px-3 py-2 whitespace-nowrap shadow-sm transition-colors">
+              <FileSpreadsheet size={13} />
               Exporter Excel
             </button>
-            <button onClick={() => setIsClientsModalOpen(true)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs px-2.5 py-2 sm:text-sm sm:px-4 sm:py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
-              <Users size={14} />
+            <button onClick={() => setIsClientsModalOpen(true)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shrink-0 text-xs px-3 py-2 whitespace-nowrap shadow-sm transition-colors">
+              <Users size={13} />
               Gestion clients
             </button>
-            <button onClick={handleSignOut} className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs px-2.5 py-2 sm:text-sm sm:px-4 sm:py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
-              <LogOut size={14} />
+            <button onClick={handleSignOut} className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl shrink-0 text-xs px-3 py-2 whitespace-nowrap shadow-sm transition-colors">
+              <LogOut size={13} />
               Déconnexion
             </button>
-          </div>
-          <div className="col-span-2 text-center mt-2 sm:hidden">
-            <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-gray-900">Timesheet</h1>
-            <p className="text-base sm:text-2xl text-slate-500">{user?.email || 'Mode preview'}</p>
           </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-16 relative" style={{ backgroundImage: "url('/images/ui/clients-bg.png')", backgroundRepeat: "no-repeat", backgroundPosition: "right 40px", backgroundSize: "750px auto", backgroundBlendMode: "multiply" }}>
-        <div className="pointer-events-none absolute inset-0 bg-white/80" />
+      <main className="max-w-5xl mx-auto px-6 py-16 relative">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10"
+          style={{
+            backgroundImage: "url('/images/ui/clients-bg.png')",
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "center 140px",
+            backgroundSize: "clamp(260px, 75vw, 420px)",
+            opacity: 0.14,
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10 hidden sm:block"
+          style={{
+            backgroundImage: "url('/images/ui/clients-bg.png')",
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "right center",
+            backgroundSize: "clamp(420px, 42vw, 760px)",
+            opacity: 0.12,
+          }}
+        />
         <div className="relative z-10">
         <div className="hidden sm:block text-center mb-12">
           <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-gray-900 mb-4">Timesheet</h1>
-          <p className="text-base sm:text-2xl text-slate-500">{user?.email || 'Mode preview'}</p>
+          <p className="mt-1 text-base sm:text-2xl text-slate-500">{user?.email || 'Mode preview'}</p>
         </div>
-        <div className="sm:hidden mb-12" />
+        <div className="sm:hidden mb-8" />
 
         {fetchError && (
           <div className="mb-6 px-4 py-3 bg-red-50/70 backdrop-blur-sm border border-red-200 rounded-lg text-sm text-red-700">
