@@ -1,0 +1,17 @@
+{
+  "name": "Timesheet",
+  "short_name": "Timesheet",
+  "description": "Timesheet management app",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e293b",
+  "theme_color": "#1e293b",
+  "icons": [
+    {
+      "src": "/images/ui/icon-timesheet.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
