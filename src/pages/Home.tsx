@@ -178,6 +178,7 @@ useEffect(() => {
 
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       ws['!cols'] = COL_WIDTHS.map(w => ({ wch: w }));
+
       const sheetName = client.name.replace(/[\\/*?[\]:]/g, '_').slice(0, 31);
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
     }
@@ -399,27 +400,16 @@ useEffect(() => {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-16 relative">
+      <main className="max-w-5xl mx-auto px-6 py-16 pb-28 relative min-h-[clamp(780px,110vh,1200px)]">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10"
+          className="pointer-events-none absolute inset-0 z-0"
           style={{
             backgroundImage: "url('/images/ui/clients-bg.png')",
             backgroundRepeat: "no-repeat",
             backgroundPosition: "center 140px",
-            backgroundSize: "clamp(260px, 75vw, 420px)",
+            backgroundSize: "clamp(420px, 88vw, 980px)",
             opacity: 0.14,
-          }}
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10 hidden sm:block"
-          style={{
-            backgroundImage: "url('/images/ui/clients-bg.png')",
-            backgroundRepeat: "no-repeat",
-            backgroundPosition: "right center",
-            backgroundSize: "clamp(420px, 42vw, 760px)",
-            opacity: 0.12,
           }}
         />
         <div className="relative z-10">
