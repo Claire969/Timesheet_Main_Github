@@ -58,84 +58,84 @@ export const Home = () => {
       },
     }));
 
-const fetchClients = useCallback(async () => {
-  if (!supabaseEnabled) return;
+  const fetchClients = useCallback(async () => {
+    if (!supabaseEnabled) return;
 
-  setIsLoading(true);
-  setFetchError(null);
+    setIsLoading(true);
+    setFetchError(null);
 
-  try {
-    const { data, error } = await supabase
-      .schema('timesheet')
-      .from('clients')
-      .select('id,name,logo_url,half_hour,hour,travel_half_hour,half_day,full_day,created_at')
-      .order('created_at', { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .schema('timesheet')
+        .from('clients')
+        .select('id,name,logo_url,half_hour,hour,travel_half_hour,half_day,full_day,created_at')
+        .order('created_at', { ascending: true });
 
-    if (error) throw error;
+      if (error) throw error;
 
-    setClients(
-      (data ?? []).map((r: any) => ({
-        id: r.id,
-        name: r.name,
-        logoUrl: r.logo_url ?? undefined,
-        isArchived: false,
-        rates: {
-          halfHour: Number(r.half_hour) || 0,
-          hour: Number(r.hour) || 0,
-          travelHalfHour: Number(r.travel_half_hour) || 0,
-          halfDay: Number(r.half_day) || 0,
-          fullDay: Number(r.full_day) || 0,
-        },
-      }))
-    );
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Erreur lors du chargement des clients';
-    setFetchError(msg);
-  } finally {
-    setIsLoading(false);
-  }
-}, [supabaseEnabled, setClients]);
-
-useEffect(() => {
-  void fetchClients();
-}, [fetchClients]);
-
-useEffect(() => {
-  if (!supabaseEnabled || clients.length === 0) return;
-  const fetchTotals = async () => {
-    const { data, error } = await supabase
-      .schema('timesheet')
-      .from('entries')
-      .select('total, billing_status, project:projects!inner(client_id)');
-    if (error || !data) return;
-    const map: Record<string, { toInvoice: number; pending: number }> = {};
-    for (const row of data as Array<{ total: unknown; billing_status: unknown; project: { client_id: string } }>) {
-      const clientId = row.project?.client_id;
-      if (!clientId) continue;
-      if (!map[clientId]) map[clientId] = { toInvoice: 0, pending: 0 };
-      const total = parseFloat(String(row.total ?? 0));
-      const status = (row.billing_status as string) || 'unbilled';
-      if (status === 'unbilled') map[clientId].toInvoice += total;
-      else if (status === 'pending') map[clientId].pending += total;
+      setClients(
+        (data ?? []).map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          logoUrl: r.logo_url ?? undefined,
+          isArchived: false,
+          rates: {
+            halfHour: Number(r.half_hour) || 0,
+            hour: Number(r.hour) || 0,
+            travelHalfHour: Number(r.travel_half_hour) || 0,
+            halfDay: Number(r.half_day) || 0,
+            fullDay: Number(r.full_day) || 0,
+          },
+        }))
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erreur lors du chargement des clients';
+      setFetchError(msg);
+    } finally {
+      setIsLoading(false);
     }
-    setClientTotals(map);
-  };
-  void fetchTotals();
-}, [clients, supabaseEnabled]);
+  }, [supabaseEnabled, setClients]);
 
-const isBypass = sessionStorage.getItem('ts_auth_bypass') === '1';
+  useEffect(() => {
+    void fetchClients();
+  }, [fetchClients]);
 
-useEffect(() => {
-  if (!isBypass) return;
-  if (clients.length > 0) return;
-  setClients([{
-    id: 'demo',
-    name: 'Demo Client',
-    logoUrl: '/images/ui/logo-clear-computing.png',
-    isArchived: false,
-    rates: { halfHour: 35, hour: 70, travelHalfHour: 25, halfDay: 200, fullDay: 400 }
-  }]);
-}, []);
+  useEffect(() => {
+    if (!supabaseEnabled || clients.length === 0) return;
+    const fetchTotals = async () => {
+      const { data, error } = await supabase
+        .schema('timesheet')
+        .from('entries')
+        .select('total, billing_status, project:projects!inner(client_id)');
+      if (error || !data) return;
+      const map: Record<string, { toInvoice: number; pending: number }> = {};
+      for (const row of data as Array<{ total: unknown; billing_status: unknown; project: { client_id: string } }>) {
+        const clientId = row.project?.client_id;
+        if (!clientId) continue;
+        if (!map[clientId]) map[clientId] = { toInvoice: 0, pending: 0 };
+        const total = parseFloat(String(row.total ?? 0));
+        const status = (row.billing_status as string) || 'unbilled';
+        if (status === 'unbilled') map[clientId].toInvoice += total;
+        else if (status === 'pending') map[clientId].pending += total;
+      }
+      setClientTotals(map);
+    };
+    void fetchTotals();
+  }, [clients, supabaseEnabled]);
+
+  const isBypass = sessionStorage.getItem('ts_auth_bypass') === '1';
+
+  useEffect(() => {
+    if (!isBypass) return;
+    if (clients.length > 0) return;
+    setClients([{
+      id: 'demo',
+      name: 'Demo Client',
+      logoUrl: '/images/ui/logo-clear-computing.png',
+      isArchived: false,
+      rates: { halfHour: 35, hour: 70, travelHalfHour: 25, halfDay: 200, fullDay: 400 }
+    }]);
+  }, [isBypass, clients.length, setClients]);
 
   const handleExportExcel = () => {
     const wb = XLSX.utils.book_new();
@@ -156,8 +156,8 @@ useEffect(() => {
       SECTIONS.forEach(({ label, status }, si) => {
         if (si > 0) aoa.push([]);
         const group = allEntries
-          .filter(e => e.billingStatus === status)
-          .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+          .filter((e: any) => e.billingStatus === status)
+          .sort((a: any, b: any) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
 
         aoa.push([label]);
         aoa.push(COLS);
@@ -341,7 +341,7 @@ useEffect(() => {
     <div className="relative min-h-screen bg-white">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10"
+        className="pointer-events-none absolute inset-0 z-0"
         style={{
           backgroundImage: "url('/images/ui/eva-walk.png')",
           backgroundRepeat: "no-repeat",
@@ -352,7 +352,7 @@ useEffect(() => {
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 hidden sm:block"
+        className="pointer-events-none absolute inset-0 z-0 hidden sm:block"
         style={{
           backgroundImage: "url('/images/ui/eva-walk.png')",
           backgroundRepeat: "no-repeat",
@@ -361,6 +361,7 @@ useEffect(() => {
           opacity: 0.14,
         }}
       />
+
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
@@ -382,10 +383,12 @@ useEffect(() => {
               </button>
             </div>
           </div>
+
           <div className="sm:hidden mt-3 text-center">
             <h1 className="text-4xl font-black tracking-tight text-gray-900">Timesheet</h1>
             <p className="mt-1 text-base text-slate-500">{user?.email || 'Mode preview'}</p>
           </div>
+
           <div className="sm:hidden mt-4 flex items-center justify-center gap-2">
             <button onClick={handleExportExcel} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs px-3 py-2 whitespace-nowrap shrink-0 shadow-sm transition-colors">
               <FileSpreadsheet size={13} />
@@ -399,10 +402,10 @@ useEffect(() => {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-16 relative">
+      <main className="relative z-10 max-w-5xl mx-auto px-6 py-16">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10"
+          className="pointer-events-none absolute inset-0 z-0"
           style={{
             backgroundImage: "url('/images/ui/clients-bg.png')",
             backgroundRepeat: "no-repeat",
@@ -413,7 +416,7 @@ useEffect(() => {
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10 hidden sm:block"
+          className="pointer-events-none absolute inset-0 z-0 hidden sm:block"
           style={{
             backgroundImage: "url('/images/ui/clients-bg.png')",
             backgroundRepeat: "no-repeat",
@@ -422,125 +425,127 @@ useEffect(() => {
             opacity: 0.12,
           }}
         />
+
         <div className="relative z-10">
-        <div className="hidden sm:block text-center mb-12">
-          <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-gray-900 mb-4">Timesheet</h1>
-          <p className="mt-1 text-base sm:text-2xl text-slate-500">{user?.email || 'Mode preview'}</p>
-        </div>
-        <div className="sm:hidden mb-8" />
-
-        {fetchError && (
-          <div className="mb-6 px-4 py-3 bg-red-50/70 backdrop-blur-sm border border-red-200 rounded-lg text-sm text-red-700">
-            {fetchError}
+          <div className="hidden sm:block text-center mb-12">
+            <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-gray-900 mb-4">Timesheet</h1>
+            <p className="mt-1 text-base sm:text-2xl text-slate-500">{user?.email || 'Mode preview'}</p>
           </div>
-        )}
+          <div className="sm:hidden mb-8" />
 
-        <div>
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold text-gray-900">Clients</h2>
-            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
-              <button
-                onClick={() => { setClientsView('grid'); localStorage.setItem('ts_clients_view', 'grid'); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${clientsView === 'grid' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
-              >
-                <LayoutGrid size={14} />
-                Grille
-              </button>
-              <button
-                onClick={() => { setClientsView('list'); localStorage.setItem('ts_clients_view', 'list'); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${clientsView === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
-              >
-                <List size={14} />
-                Liste
-              </button>
-            </div>
-          </div>
-          {isLoading ? (
-            <div className="bg-white/70 backdrop-blur-sm rounded-xl p-16 text-center border border-gray-200">
-              <p className="text-gray-400 text-sm">Chargement...</p>
-            </div>
-          ) : activeClients.length === 0 ? (
-            <div className="bg-white/70 backdrop-blur-sm rounded-xl p-16 text-center border border-gray-200">
-              <p className="text-gray-600 mb-4">Aucun client pour le moment</p>
-              <button onClick={handleOpenNewClientFromMain} className="text-blue-600 hover:text-blue-700 font-medium">
-                Créer un client
-              </button>
-            </div>
-          ) : clientsView === 'grid' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {activeClients.map((client) => (
-                <div key={client.id} className="bg-gradient-to-br from-blue-400 via-blue-200 to-white p-[2px] rounded-3xl shadow-sm hover:shadow-xl transition-all duration-200 hover:-translate-y-0.5">
-                <button
-                  onClick={() => navigate(`/client/${client.id}`)}
-                  className="aspect-square w-full bg-white/80 backdrop-blur-sm rounded-[22px] flex flex-col items-center justify-between p-6"
-                >
-                  <span className="text-2xl font-extrabold text-slate-900 text-center truncate w-full">
-                    {client.name}
-                  </span>
-                  <div className="flex-1 flex items-center justify-center w-full">
-                    <div className="bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl p-4 flex items-center justify-center w-56 h-56">
-                      {client.logoUrl ? (
-                        <img
-                          src={client.logoUrl}
-                          alt={client.name}
-                          className="w-full h-full object-contain"
-                          onError={(e) => {
-                            const target = e.currentTarget;
-                            target.style.display = 'none';
-                            const fallback = target.nextElementSibling as HTMLElement | null;
-                            if (fallback) fallback.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
-                      <span
-                        className={`text-sm text-gray-400 font-medium items-center justify-center ${client.logoUrl ? 'hidden' : 'flex'}`}
-                      >
-                        Logo
-                      </span>
-                    </div>
-                  </div>
-                  <div className="w-full" />
-                </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {activeClients.map((client) => {
-                const totals = clientTotals[client.id] ?? { toInvoice: 0, pending: 0 };
-                const unbilledSum = totals.toInvoice;
-                const pendingSum = totals.pending;
-                return (
-                  <button
-                    key={client.id}
-                    onClick={() => navigate(`/client/${client.id}`)}
-                    className="w-full flex items-center justify-between gap-4 p-4 rounded-xl bg-white/70 border border-gray-200 hover:shadow-md hover:border-blue-200 transition text-left"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                        {client.logoUrl ? (
-                          <img
-                            src={client.logoUrl}
-                            alt={client.name}
-                            className="w-full h-full object-contain"
-                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                          />
-                        ) : (
-                          <span className="text-xs text-gray-400">Logo</span>
-                        )}
-                      </div>
-                      <span className="font-bold text-gray-900 truncate">{client.name}</span>
-                    </div>
-                    <div className="flex flex-col items-end flex-shrink-0">
-                      <span className="font-bold text-gray-900 text-sm">{fmtEur(unbilledSum)}</span>
-                      <span className="text-xs text-gray-500">{fmtEur(pendingSum)} en attente</span>
-                    </div>
-                  </button>
-                );
-              })}
+          {fetchError && (
+            <div className="mb-6 px-4 py-3 bg-red-50/70 backdrop-blur-sm border border-red-200 rounded-lg text-sm text-red-700">
+              {fetchError}
             </div>
           )}
-        </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold text-gray-900">Clients</h2>
+              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+                <button
+                  onClick={() => { setClientsView('grid'); localStorage.setItem('ts_clients_view', 'grid'); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${clientsView === 'grid' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                >
+                  <LayoutGrid size={14} />
+                  Grille
+                </button>
+                <button
+                  onClick={() => { setClientsView('list'); localStorage.setItem('ts_clients_view', 'list'); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${clientsView === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                >
+                  <List size={14} />
+                  Liste
+                </button>
+              </div>
+            </div>
+
+            {isLoading ? (
+              <div className="bg-white/70 backdrop-blur-sm rounded-xl p-16 text-center border border-gray-200">
+                <p className="text-gray-400 text-sm">Chargement...</p>
+              </div>
+            ) : activeClients.length === 0 ? (
+              <div className="bg-white/70 backdrop-blur-sm rounded-xl p-16 text-center border border-gray-200">
+                <p className="text-gray-600 mb-4">Aucun client pour le moment</p>
+                <button onClick={handleOpenNewClientFromMain} className="text-blue-600 hover:text-blue-700 font-medium">
+                  Créer un client
+                </button>
+              </div>
+            ) : clientsView === 'grid' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {activeClients.map((client) => (
+                  <div key={client.id} className="bg-gradient-to-br from-blue-400 via-blue-200 to-white p-[2px] rounded-3xl shadow-sm hover:shadow-xl transition-all duration-200 hover:-translate-y-0.5">
+                    <button
+                      onClick={() => navigate(`/client/${client.id}`)}
+                      className="aspect-square w-full bg-white/80 backdrop-blur-sm rounded-[22px] flex flex-col items-center justify-between p-6"
+                    >
+                      <span className="text-2xl font-extrabold text-slate-900 text-center truncate w-full">
+                        {client.name}
+                      </span>
+                      <div className="flex-1 flex items-center justify-center w-full">
+                        <div className="bg-white/50 backdrop-blur-sm border border-white/60 rounded-xl p-4 flex items-center justify-center w-56 h-56">
+                          {client.logoUrl ? (
+                            <img
+                              src={client.logoUrl}
+                              alt={client.name}
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                const target = e.currentTarget;
+                                target.style.display = 'none';
+                                const fallback = target.nextElementSibling as HTMLElement | null;
+                                if (fallback) fallback.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <span
+                            className={`text-sm text-gray-400 font-medium items-center justify-center ${client.logoUrl ? 'hidden' : 'flex'}`}
+                          >
+                            Logo
+                          </span>
+                        </div>
+                      </div>
+                      <div className="w-full" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {activeClients.map((client) => {
+                  const totals = clientTotals[client.id] ?? { toInvoice: 0, pending: 0 };
+                  const unbilledSum = totals.toInvoice;
+                  const pendingSum = totals.pending;
+                  return (
+                    <button
+                      key={client.id}
+                      onClick={() => navigate(`/client/${client.id}`)}
+                      className="w-full flex items-center justify-between gap-4 p-4 rounded-xl bg-white/70 border border-gray-200 hover:shadow-md hover:border-blue-200 transition text-left"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                          {client.logoUrl ? (
+                            <img
+                              src={client.logoUrl}
+                              alt={client.name}
+                              className="w-full h-full object-contain"
+                              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          ) : (
+                            <span className="text-xs text-gray-400">Logo</span>
+                          )}
+                        </div>
+                        <span className="font-bold text-gray-900 truncate">{client.name}</span>
+                      </div>
+                      <div className="flex flex-col items-end flex-shrink-0">
+                        <span className="font-bold text-gray-900 text-sm">{fmtEur(unbilledSum)}</span>
+                        <span className="text-xs text-gray-500">{fmtEur(pendingSum)} en attente</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </main>
 
@@ -689,9 +694,10 @@ useEffect(() => {
           </div>
         </div>
       )}
+
       <div className="fixed bottom-3 right-3 z-[9999] text-xs font-semibold text-slate-700 bg-white/90 backdrop-blur px-2 py-1 rounded-lg border border-slate-200 shadow">
-  v{import.meta.env.VITE_BUILD_ID}
-</div>
+        v{import.meta.env.VITE_BUILD_ID}
+      </div>
     </div>
   );
 };
