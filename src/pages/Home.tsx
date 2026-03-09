@@ -137,8 +137,7 @@ useEffect(() => {
   }]);
 }, []);
 
-  const handleExportExcel = () => {
-    const wb = XLSX.utils.book_new();
+  const handleExportExcel = async () => {
     const COLS = ['Date', 'Début de l\'intervention', 'Fin de l\'intervention', 'Caller', 'Description', 'Déplacement', 'Client', 'Total (Hors TVA)', 'Commentaire Prix'];
     const COL_WIDTHS = [10, 14, 14, 14, 60, 13, 14, 14, 60];
     const SECTIONS: Array<{ label: string; status: string }> = [
@@ -147,8 +146,60 @@ useEffect(() => {
       { label: 'Archivé', status: 'archived' },
     ];
 
-    for (const client of clients.filter(c => !c.archived)) {
-      const allEntries = clientTimesheets[client.id] ?? [];
+    const activeClients = clients.filter(c => !c.isArchived);
+
+    const { data: projectRows } = await supabase
+      .schema('timesheet')
+      .from('projects')
+      .select('id,client_id')
+      .in('client_id', activeClients.map(c => c.id));
+
+    const projectToClient: Record<string, string> = {};
+    for (const p of projectRows ?? []) {
+      projectToClient[p.id as string] = p.client_id as string;
+    }
+
+    const projectIds = Object.keys(projectToClient);
+
+    const { data: entryRows } = projectIds.length > 0
+      ? await supabase
+          .schema('timesheet')
+          .from('entries')
+          .select('id,project_id,work_date,start_time,end_time,is_forfait,caller,description,travel_units,total,billing_status')
+          .in('project_id', projectIds)
+          .order('work_date', { ascending: true })
+          .order('created_at', { ascending: true })
+      : { data: [] };
+
+    const stripSeconds = (t: string) => (t ? t.slice(0, 5) : '00:00');
+
+    const entriesByClient: Record<string, Array<{
+      date: string; startTime: string; endTime: string;
+      isForfait: string; caller: string; description: string;
+      travelUnits: number; total: number; billingStatus: string;
+    }>> = {};
+
+    for (const r of entryRows ?? []) {
+      const clientId = projectToClient[r.project_id as string];
+      if (!clientId) continue;
+      if (!entriesByClient[clientId]) entriesByClient[clientId] = [];
+      entriesByClient[clientId].push({
+        date: r.work_date as string,
+        startTime: r.start_time ? stripSeconds(r.start_time as string) : '00:00',
+        endTime: r.end_time ? stripSeconds(r.end_time as string) : '00:00',
+        isForfait: (r.is_forfait as string) || 'none',
+        caller: (r.caller as string) || '',
+        description: (r.description as string) || '',
+        travelUnits: (r.travel_units as number) || 0,
+        total: parseFloat(String(r.total ?? 0)),
+        billingStatus: (r.billing_status as string) || 'unbilled',
+      });
+    }
+
+    const wb = XLSX.utils.book_new();
+
+    for (const client of activeClients) {
+      const allEntries = entriesByClient[client.id] ?? [];
       const aoa: (string | number)[][] = [];
 
       let grandTotal = 0;
@@ -164,8 +215,8 @@ useEffect(() => {
 
         let sectionTotal = 0;
         for (const e of group) {
-          const start = e.isForfait ? '00:00' : e.startTime;
-          const end = e.isForfait ? '00:00' : e.endTime;
+          const start = e.isForfait !== 'none' ? '00:00' : e.startTime;
+          const end = e.isForfait !== 'none' ? '00:00' : e.endTime;
           aoa.push([fmtDate(e.date), start, end, e.caller, e.description, e.travelUnits, client.name, fmtEur(e.total), '']);
           sectionTotal += e.total;
         }
