@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, supabaseEnabled } from '../lib/supabaseClient';
-import { LogOut, Plus, X, Users, CreditCard as Edit2, Archive, ArchiveRestore, LayoutGrid, List, FileSpreadsheet } from 'lucide-react';
+import { LogOut, Plus, X, Users, CreditCard as Edit2, Archive, ArchiveRestore, LayoutGrid, List, FileSpreadsheet, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppState } from '../App';
 import type { Client } from '../App';
@@ -18,6 +18,20 @@ export const Home = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { clients, setClients, clientTimesheets } = useAppState();
+  const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e); };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    (installPrompt as any).prompt();
+    await (installPrompt as any).userChoice;
+    setInstallPrompt(null);
+  };
   const [clientsView, setClientsView] = useState<'grid' | 'list'>(() => {
     const stored = localStorage.getItem('ts_clients_view');
     return (stored === 'grid' || stored === 'list') ? stored : 'list';
@@ -419,6 +433,12 @@ useEffect(() => {
             <img src="/images/ui/logo-clear-computing.png" alt="Clear Computing" className="h-8 w-auto max-w-[180px] object-contain" />
             <div className="flex items-center gap-2">
               <div className="hidden sm:flex items-center gap-2">
+                {installPrompt && (
+                  <button onClick={handleInstall} className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm px-4 py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
+                    <Download size={14} />
+                    Installer l'app
+                  </button>
+                )}
                 <button onClick={handleExportExcel} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm px-4 py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
                   <FileSpreadsheet size={14} />
                   Exporter Excel
@@ -438,7 +458,13 @@ useEffect(() => {
             <h1 className="text-4xl font-black tracking-tight text-gray-900">Timesheet</h1>
             <p className="mt-1 text-base text-slate-500">{user?.email || 'Mode preview'}</p>
           </div>
-          <div className="sm:hidden mt-4 flex items-center justify-center gap-2">
+          <div className="sm:hidden mt-4 flex items-center justify-center gap-2 flex-wrap">
+            {installPrompt && (
+              <button onClick={handleInstall} className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs px-3 py-2 whitespace-nowrap shrink-0 shadow-sm transition-colors">
+                <Download size={13} />
+                Installer l'app
+              </button>
+            )}
             <button onClick={handleExportExcel} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs px-3 py-2 whitespace-nowrap shrink-0 shadow-sm transition-colors">
               <FileSpreadsheet size={13} />
               Exporter Excel
