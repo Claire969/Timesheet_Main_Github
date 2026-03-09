@@ -21,7 +21,7 @@ export const Home = () => {
   const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
 
   useEffect(() => {
-    const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e); };
+    const handler = (e: Event) => { setInstallPrompt(e); };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
