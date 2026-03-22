@@ -18,6 +18,7 @@ export type EventReport = {
   current_day: number;
   status: 'draft' | 'in_progress' | 'completed';
   language: 'fr' | 'en';
+  is_archived: boolean;
   created_at: string;
 };
 
