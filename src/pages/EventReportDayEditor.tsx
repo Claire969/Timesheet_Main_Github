@@ -434,16 +434,19 @@ export const EventReportDayEditor = () => {
             {successMsg && (
               <span className="text-xs text-green-600 font-medium">{successMsg}</span>
             )}
-            {!isValidated && (
-              <button
-                onClick={handleSaveDay}
-                disabled={isSaving}
-                className="flex items-center gap-1.5 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-xl text-sm px-3 py-2 transition-colors"
-              >
-                <Save size={14} />
-                {isSaving ? '...' : 'Sauvegarder'}
-              </button>
+            {isValidated && (
+              <span className="text-xs px-2.5 py-1.5 bg-green-100 text-green-700 rounded-full font-medium">
+                Validé
+              </span>
             )}
+            <button
+              onClick={handleSaveDay}
+              disabled={isSaving}
+              className="flex items-center gap-1.5 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-xl text-sm px-3 py-2 transition-colors"
+            >
+              <Save size={14} />
+              {isSaving ? '...' : 'Sauvegarder'}
+            </button>
             {!isValidated && (
               <button
                 onClick={handleValidate}
@@ -453,11 +456,6 @@ export const EventReportDayEditor = () => {
                 <CheckCircle size={14} />
                 {isValidating ? '...' : 'Valider'}
               </button>
-            )}
-            {isValidated && (
-              <span className="text-xs px-2.5 py-1.5 bg-green-100 text-green-700 rounded-full font-medium">
-                Validé
-              </span>
             )}
           </div>
         </div>
@@ -480,7 +478,7 @@ export const EventReportDayEditor = () => {
                 type="date"
                 value={dayForm.report_date}
                 onChange={(e) => setDayForm({ ...dayForm, report_date: e.target.value })}
-                disabled={isValidated}
+
                 className={inputCls}
               />
             </div>
@@ -491,7 +489,7 @@ export const EventReportDayEditor = () => {
               <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
                 <button
                   type="button"
-                  disabled={isValidated}
+  
                   onClick={() => setDayForm({ ...dayForm, is_setup_day: false })}
                   className={`flex-1 py-1.5 font-medium transition-colors ${
                     !dayForm.is_setup_day
@@ -503,7 +501,7 @@ export const EventReportDayEditor = () => {
                 </button>
                 <button
                   type="button"
-                  disabled={isValidated}
+  
                   onClick={() => setDayForm({ ...dayForm, is_setup_day: true })}
                   className={`flex-1 py-1.5 font-medium transition-colors border-l border-gray-300 ${
                     dayForm.is_setup_day
@@ -523,7 +521,7 @@ export const EventReportDayEditor = () => {
             <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm w-32">
               <button
                 type="button"
-                disabled={isValidated}
+
                 onClick={() => setReportLanguage('fr')}
                 className={`flex-1 py-1.5 font-medium transition-colors ${
                   reportLanguage === 'fr'
@@ -535,7 +533,7 @@ export const EventReportDayEditor = () => {
               </button>
               <button
                 type="button"
-                disabled={isValidated}
+
                 onClick={() => setReportLanguage('en')}
                 className={`flex-1 py-1.5 font-medium transition-colors border-l border-gray-300 ${
                   reportLanguage === 'en'
@@ -550,37 +548,16 @@ export const EventReportDayEditor = () => {
 
           {day?.day_number === 1 ? (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description de l'événement</label>
-              <textarea
-                value={reportDescription}
-                onChange={(e) => setReportDescription(e.target.value)}
-                disabled={isValidated}
-                rows={4}
-                className={`${inputCls} resize-none`}
-                placeholder="Description générale de l'événement..."
-              />
-            </div>
-          ) : report?.description ? (
-            <div>
-              <label className="block text-sm font-medium text-gray-500 mb-1 text-xs">Description de l'événement (saisie au jour 1)</label>
-              <p className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200 whitespace-pre-wrap">{report.description}</p>
-            </div>
-          ) : null}
-
-          {day?.day_number === 1 ? (
-            <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-sm font-medium text-gray-700">Étapes de mise en place</label>
-                {!isValidated && (
-                  <button
-                    type="button"
-                    onClick={handleAddSetupStep}
-                    className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium"
-                  >
-                    <Plus size={14} />
-                    Ajouter
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleAddSetupStep}
+                  className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                >
+                  <Plus size={14} />
+                  Ajouter
+                </button>
               </div>
               {setupSteps.length === 0 ? (
                 <p className="text-sm text-gray-400 py-3 text-center border border-dashed border-gray-200 rounded-lg">
@@ -595,54 +572,23 @@ export const EventReportDayEditor = () => {
                         type="text"
                         value={step.text}
                         onChange={(e) => handleUpdateSetupStep(step, e.target.value)}
-                        disabled={isValidated}
+        
                         className={`${inputCls} flex-1`}
                         placeholder="Décrivez l'étape..."
                       />
-                      {!isValidated && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteSetupStep(step.id)}
-                          className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSetupStep(step.id)}
+                        className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-          ) : (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Résumé du jour</label>
-              <textarea
-                value={dayForm.summary}
-                onChange={(e) => setDayForm({ ...dayForm, summary: e.target.value })}
-                disabled={isValidated}
-                rows={3}
-                className={`${inputCls} resize-none`}
-                placeholder="Notes spécifiques à ce jour..."
-              />
-              {!isValidated && (
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <Sparkles size={12} className="text-gray-400 shrink-0" />
-                  {AI_ENABLED ? (
-                    <button
-                      type="button"
-                      onClick={handleAiCorrectSummary}
-                      disabled={aiSummaryLoading || !dayForm.summary.trim()}
-                      className="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
-                    >
-                      {aiSummaryLoading ? '...' : 'Corriger'}
-                    </button>
-                  ) : (
-                    <span className="text-xs text-gray-400 italic">Assistant IA non configuré sur le serveur</span>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+          ) : null}
         </section>
 
         {day?.day_number === 1 && (
@@ -650,7 +596,7 @@ export const EventReportDayEditor = () => {
             reportId={reportId!}
             networks={wifiNetworks}
             onNetworksChange={setWifiNetworks}
-            disabled={isValidated}
+            disabled={false}
             onError={setError}
           />
         )}
@@ -659,20 +605,17 @@ export const EventReportDayEditor = () => {
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-bold text-gray-900">Suivi horaire réseau</h2>
-            {!isValidated && (
-              <button
-                onClick={handleAddHourlyRow}
-                className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium"
-              >
-                <Plus size={15} />
-                Ligne manuelle
-              </button>
-            )}
+            <button
+              onClick={handleAddHourlyRow}
+              className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium"
+            >
+              <Plus size={15} />
+              Ligne manuelle
+            </button>
           </div>
 
           {/* Auto-generate rows */}
-          {!isValidated && (
-            <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
               <span className="text-xs text-gray-500">Générer de</span>
               <select
                 value={hourlyGenStart}
@@ -699,8 +642,7 @@ export const EventReportDayEditor = () => {
               >
                 Générer
               </button>
-            </div>
-          )}
+          </div>
 
           {hourlyRows.length === 0 ? (
             <p className="text-sm text-gray-400 py-4 text-center">Aucune donnée horaire</p>
@@ -714,7 +656,7 @@ export const EventReportDayEditor = () => {
                     <th className="px-3 py-2 text-left font-medium">BW entrant (Mbps)</th>
                     <th className="px-3 py-2 text-left font-medium">BW sortant (Mbps)</th>
                     <th className="px-3 py-2 text-left font-medium">Notes</th>
-                    {!isValidated && <th className="px-3 py-2" />}
+                    <th className="px-3 py-2" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -725,7 +667,7 @@ export const EventReportDayEditor = () => {
                           type="text"
                           value={row.hour_label}
                           onChange={(e) => handleUpdateHourlyRow(row, 'hour_label', e.target.value)}
-                          disabled={isValidated}
+          
                           className={inputCls}
                           placeholder="08:00"
                         />
@@ -736,7 +678,7 @@ export const EventReportDayEditor = () => {
                           min={0}
                           value={row.wifi_users}
                           onChange={(e) => handleUpdateHourlyRow(row, 'wifi_users', parseInt(e.target.value) || 0)}
-                          disabled={isValidated}
+          
                           className={inputCls}
                         />
                       </td>
@@ -747,7 +689,7 @@ export const EventReportDayEditor = () => {
                           step={0.1}
                           value={row.bandwidth_in}
                           onChange={(e) => handleUpdateHourlyRow(row, 'bandwidth_in', parseFloat(e.target.value) || 0)}
-                          disabled={isValidated}
+          
                           className={inputCls}
                         />
                       </td>
@@ -758,7 +700,7 @@ export const EventReportDayEditor = () => {
                           step={0.1}
                           value={row.bandwidth_out}
                           onChange={(e) => handleUpdateHourlyRow(row, 'bandwidth_out', parseFloat(e.target.value) || 0)}
-                          disabled={isValidated}
+          
                           className={inputCls}
                         />
                       </td>
@@ -767,18 +709,16 @@ export const EventReportDayEditor = () => {
                           type="text"
                           value={row.notes}
                           onChange={(e) => handleUpdateHourlyRow(row, 'notes', e.target.value)}
-                          disabled={isValidated}
+          
                           className={inputCls}
                           placeholder="..."
                         />
                       </td>
-                      {!isValidated && (
-                        <td className="px-3 py-2">
-                          <button onClick={() => handleDeleteHourlyRow(row.id)} className="text-gray-400 hover:text-red-500 transition-colors">
-                            <Trash2 size={15} />
-                          </button>
-                        </td>
-                      )}
+                      <td className="px-3 py-2">
+                        <button onClick={() => handleDeleteHourlyRow(row.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+                          <Trash2 size={15} />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -792,32 +732,30 @@ export const EventReportDayEditor = () => {
           <h2 className="text-base font-bold text-gray-900 mb-3">Incidents</h2>
 
           {/* New incident form */}
-          {!isValidated && (
-            <div className="flex items-center gap-2 mb-4 flex-wrap">
-              <input
-                type="time"
-                value={newIncidentForm.incident_time}
-                onChange={(e) => setNewIncidentForm({ ...newIncidentForm, incident_time: e.target.value })}
-                className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-28"
-              />
-              <input
-                type="text"
-                value={newIncidentForm.title}
-                onChange={(e) => setNewIncidentForm({ ...newIncidentForm, title: e.target.value })}
-                onKeyDown={(e) => { if (e.key === 'Enter') void handleCreateIncident(); }}
-                className="flex-1 min-w-40 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Titre de l'incident..."
-              />
-              <button
-                onClick={handleCreateIncident}
-                disabled={!newIncidentForm.title.trim()}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                <Plus size={14} />
-                Ajouter
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <input
+              type="time"
+              value={newIncidentForm.incident_time}
+              onChange={(e) => setNewIncidentForm({ ...newIncidentForm, incident_time: e.target.value })}
+              className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-28"
+            />
+            <input
+              type="text"
+              value={newIncidentForm.title}
+              onChange={(e) => setNewIncidentForm({ ...newIncidentForm, title: e.target.value })}
+              onKeyDown={(e) => { if (e.key === 'Enter') void handleCreateIncident(); }}
+              className="flex-1 min-w-40 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Titre de l'incident..."
+            />
+            <button
+              onClick={handleCreateIncident}
+              disabled={!newIncidentForm.title.trim()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              <Plus size={14} />
+              Ajouter
+            </button>
+          </div>
 
           {incidents.length === 0 ? (
             <p className="text-sm text-gray-400 py-4 text-center">Aucun incident</p>
@@ -841,14 +779,12 @@ export const EventReportDayEditor = () => {
                       {inc.network_impact && (
                         <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium shrink-0">Réseau</span>
                       )}
-                      {!isValidated && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); void handleDeleteIncident(inc.id); }}
-                          className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); void handleDeleteIncident(inc.id); }}
+                        className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                       {isExpanded ? <ChevronUp size={14} className="text-gray-400 shrink-0" /> : <ChevronDown size={14} className="text-gray-400 shrink-0" />}
                     </div>
 
@@ -862,7 +798,7 @@ export const EventReportDayEditor = () => {
                               type="time"
                               value={inc.incident_time ?? ''}
                               onChange={(e) => handleUpdateIncident(inc, 'incident_time', e.target.value || null as any)}
-                              disabled={isValidated}
+              
                               className={inputCls}
                             />
                           </div>
@@ -872,7 +808,7 @@ export const EventReportDayEditor = () => {
                               type="text"
                               value={inc.title}
                               onChange={(e) => handleUpdateIncident(inc, 'title', e.target.value)}
-                              disabled={isValidated}
+              
                               className={inputCls}
                               placeholder="Titre de l'incident"
                             />
@@ -883,13 +819,12 @@ export const EventReportDayEditor = () => {
                           <textarea
                             value={inc.description}
                             onChange={(e) => handleUpdateIncident(inc, 'description', e.target.value)}
-                            disabled={isValidated}
+            
                             rows={2}
                             className={`${inputCls} resize-none`}
                             placeholder="Description..."
                           />
-                          {!isValidated && (
-                            <div className="flex items-center gap-1.5 mt-1.5">
+                          <div className="flex items-center gap-1.5 mt-1.5">
                               <Sparkles size={12} className="text-gray-400 shrink-0" />
                               {AI_ENABLED ? (
                                 (['correct_fr', 'rewrite_fr', 'translate_en'] as AiAction[]).map((action) => {
@@ -910,15 +845,14 @@ export const EventReportDayEditor = () => {
                               ) : (
                                 <span className="text-xs text-gray-400 italic">Assistant IA non configuré sur le serveur</span>
                               )}
-                            </div>
-                          )}
+                          </div>
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Résolution</label>
                           <textarea
                             value={inc.resolution}
                             onChange={(e) => handleUpdateIncident(inc, 'resolution', e.target.value)}
-                            disabled={isValidated}
+            
                             rows={2}
                             className={`${inputCls} resize-none`}
                             placeholder="Résolution..."
@@ -930,7 +864,7 @@ export const EventReportDayEditor = () => {
                               type="checkbox"
                               checked={inc.network_impact}
                               onChange={(e) => handleToggleNetworkImpact(inc, e.target.checked)}
-                              disabled={isValidated}
+              
                               className="rounded w-4 h-4"
                             />
                             Impact réseau
@@ -939,7 +873,7 @@ export const EventReportDayEditor = () => {
                             <textarea
                               value={inc.network_impact_text ?? ''}
                               onChange={(e) => handleUpdateIncident(inc, 'network_impact_text', e.target.value || null)}
-                              disabled={isValidated}
+              
                               rows={2}
                               className={`${inputCls} resize-none`}
                               placeholder="Décrire l'impact réseau..."
@@ -959,43 +893,39 @@ export const EventReportDayEditor = () => {
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-bold text-gray-900">Images</h2>
-            {!isValidated && (
-              <button
-                onClick={handleAddImage}
-                className="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 text-sm"
-              >
-                <Link size={14} />
-                URL manuelle
-              </button>
-            )}
+            <button
+              onClick={handleAddImage}
+              className="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 text-sm"
+            >
+              <Link size={14} />
+              URL manuelle
+            </button>
           </div>
 
           {/* Paste drop zone */}
-          {!isValidated && (
-            <div
-              ref={imageDropzoneRef}
-              className="mb-4 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 py-6 text-center cursor-default"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={async (e) => {
-                e.preventDefault();
-                const file = e.dataTransfer.files?.[0];
-                if (file && file.type.startsWith('image/')) await handleUploadBlob(file);
-              }}
-            >
-              {uploadingImage ? (
-                <p className="text-sm text-blue-500 font-medium">Upload en cours...</p>
-              ) : (
-                <>
-                  <ClipboardPaste size={20} className="text-gray-400" />
-                  <p className="text-sm text-gray-500">
-                    Coller une capture d'écran <kbd className="px-1 py-0.5 bg-gray-200 rounded text-xs font-mono">Ctrl+V</kbd>
-                    <span className="mx-1 text-gray-300">·</span>
-                    ou glisser-déposer une image ici
-                  </p>
-                </>
-              )}
-            </div>
-          )}
+          <div
+            ref={imageDropzoneRef}
+            className="mb-4 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 py-6 text-center cursor-default"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={async (e) => {
+              e.preventDefault();
+              const file = e.dataTransfer.files?.[0];
+              if (file && file.type.startsWith('image/')) await handleUploadBlob(file);
+            }}
+          >
+            {uploadingImage ? (
+              <p className="text-sm text-blue-500 font-medium">Upload en cours...</p>
+            ) : (
+              <>
+                <ClipboardPaste size={20} className="text-gray-400" />
+                <p className="text-sm text-gray-500">
+                  Coller une capture d'écran <kbd className="px-1 py-0.5 bg-gray-200 rounded text-xs font-mono">Ctrl+V</kbd>
+                  <span className="mx-1 text-gray-300">·</span>
+                  ou glisser-déposer une image ici
+                </p>
+              </>
+            )}
+          </div>
 
           {images.length === 0 ? (
             <p className="text-sm text-gray-400 py-2 text-center">Aucune image</p>
@@ -1013,14 +943,12 @@ export const EventReportDayEditor = () => {
                   ) : (
                     <div className="w-full h-36 flex items-center justify-center text-gray-300 text-xs">Aucune image</div>
                   )}
-                  {!isValidated && (
-                    <button
-                      onClick={() => handleDeleteImage(img.id)}
-                      className="absolute top-1.5 right-1.5 p-1 bg-white/80 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleDeleteImage(img.id)}
+                    className="absolute top-1.5 right-1.5 p-1 bg-white/80 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                   <div className="px-2 py-1.5">
                     {manualUrlImgId === img.id && !img.file_url ? (
                       <input
@@ -1037,7 +965,7 @@ export const EventReportDayEditor = () => {
                       type="text"
                       value={img.caption}
                       onChange={(e) => handleUpdateImage(img, 'caption', e.target.value)}
-                      disabled={isValidated}
+      
                       className="w-full text-xs px-1.5 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-transparent"
                       placeholder="Légende..."
                     />

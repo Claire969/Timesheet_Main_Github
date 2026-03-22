@@ -145,9 +145,6 @@ export const EventReportDetail = () => {
             )}
           </div>
 
-          {report.description && (
-            <p className="text-sm text-gray-600 pt-1 whitespace-pre-wrap">{report.description}</p>
-          )}
         </div>
 
         <div>
@@ -194,9 +191,6 @@ export const EventReportDetail = () => {
                       {DAY_STATUS_LABELS[day.status]}
                     </span>
                   </div>
-                  {day.summary && (
-                    <p className="mt-2 text-xs text-gray-500 line-clamp-2">{day.summary}</p>
-                  )}
                 </button>
               );
             })}
