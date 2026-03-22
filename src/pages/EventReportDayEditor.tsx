@@ -14,6 +14,8 @@ import type {
   EventReportWifiNetwork,
 } from '../lib/eventReportTypes';
 
+const AI_ENABLED = false;
+
 const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
@@ -519,14 +521,18 @@ export const EventReportDayEditor = () => {
             {!isValidated && (
               <div className="flex items-center gap-1.5 mt-1.5">
                 <Sparkles size={12} className="text-gray-400 shrink-0" />
-                <button
-                  type="button"
-                  onClick={handleAiCorrectSummary}
-                  disabled={aiSummaryLoading || !dayForm.summary.trim()}
-                  className="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
-                >
-                  {aiSummaryLoading ? '...' : 'Corriger'}
-                </button>
+                {AI_ENABLED ? (
+                  <button
+                    type="button"
+                    onClick={handleAiCorrectSummary}
+                    disabled={aiSummaryLoading || !dayForm.summary.trim()}
+                    className="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
+                  >
+                    {aiSummaryLoading ? '...' : 'Corriger'}
+                  </button>
+                ) : (
+                  <span className="text-xs text-gray-400 italic">Assistant IA non configuré sur le serveur</span>
+                )}
               </div>
             )}
           </div>
@@ -778,21 +784,25 @@ export const EventReportDayEditor = () => {
                           {!isValidated && (
                             <div className="flex items-center gap-1.5 mt-1.5">
                               <Sparkles size={12} className="text-gray-400 shrink-0" />
-                              {(['correct_fr', 'rewrite_fr', 'translate_en'] as AiAction[]).map((action) => {
-                                const labels: Record<AiAction, string> = { correct_fr: 'Corriger', rewrite_fr: 'Reformuler', translate_en: 'Traduire EN' };
-                                const busy = aiLoading?.incId === inc.id && aiLoading.action === action;
-                                return (
-                                  <button
-                                    key={action}
-                                    type="button"
-                                    onClick={() => handleAiAssist(inc, action)}
-                                    disabled={aiLoading !== null}
-                                    className="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
-                                  >
-                                    {busy ? '...' : labels[action]}
-                                  </button>
-                                );
-                              })}
+                              {AI_ENABLED ? (
+                                (['correct_fr', 'rewrite_fr', 'translate_en'] as AiAction[]).map((action) => {
+                                  const labels: Record<AiAction, string> = { correct_fr: 'Corriger', rewrite_fr: 'Reformuler', translate_en: 'Traduire EN' };
+                                  const busy = aiLoading?.incId === inc.id && aiLoading.action === action;
+                                  return (
+                                    <button
+                                      key={action}
+                                      type="button"
+                                      onClick={() => handleAiAssist(inc, action)}
+                                      disabled={aiLoading !== null}
+                                      className="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
+                                    >
+                                      {busy ? '...' : labels[action]}
+                                    </button>
+                                  );
+                                })
+                              ) : (
+                                <span className="text-xs text-gray-400 italic">Assistant IA non configuré sur le serveur</span>
+                              )}
                             </div>
                           )}
                         </div>
