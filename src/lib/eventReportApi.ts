@@ -91,7 +91,7 @@ export const reportApi = {
     if (error) throw error;
   },
 
-  async update(id: string, payload: Partial<Pick<EventReport, 'event_name' | 'venue_client_id' | 'final_client_name' | 'start_date' | 'total_days' | 'current_day' | 'status' | 'language'>>): Promise<void> {
+  async update(id: string, payload: Partial<Pick<EventReport, 'event_name' | 'venue_client_id' | 'final_client_name' | 'description' | 'start_date' | 'total_days' | 'current_day' | 'status' | 'language'>>): Promise<void> {
     const { error } = await supabase
       .schema(SCHEMA)
       .from('event_reports')

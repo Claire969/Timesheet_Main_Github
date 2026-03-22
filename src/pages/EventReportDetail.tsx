@@ -144,6 +144,10 @@ export const EventReportDetail = () => {
               </span>
             )}
           </div>
+
+          {report.description && (
+            <p className="text-sm text-gray-600 pt-1 whitespace-pre-wrap">{report.description}</p>
+          )}
         </div>
 
         <div>

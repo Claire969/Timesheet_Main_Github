@@ -37,6 +37,7 @@ export const EventReportDayEditor = () => {
 
   const [dayForm, setDayForm] = useState({ report_date: '', summary: '', is_setup_day: false });
   const [reportLanguage, setReportLanguage] = useState<'fr' | 'en'>('fr');
+  const [reportDescription, setReportDescription] = useState('');
 
   const [hourlyGenStart, setHourlyGenStart] = useState('08');
   const [hourlyGenEnd, setHourlyGenEnd] = useState('18');
@@ -92,6 +93,7 @@ export const EventReportDayEditor = () => {
       setImages(img);
       setDayForm({ report_date: d.report_date ?? '', summary: d.summary ?? '', is_setup_day: d.is_setup_day ?? false });
       setReportLanguage((r as EventReport).language ?? 'fr');
+      setReportDescription((r as EventReport).description ?? '');
       if (d.day_number === 1) {
         const wifi = await wifiApi.listForReport(reportId);
         setWifiNetworks(wifi);
@@ -133,7 +135,7 @@ export const EventReportDayEditor = () => {
           summary: dayForm.summary,
           is_setup_day: dayForm.is_setup_day,
         }),
-        reportApi.update(reportId, { language: reportLanguage }),
+        reportApi.update(reportId, { language: reportLanguage, description: reportDescription }),
       ]);
       showSuccess('Sauvegardé');
     } catch (e) {
@@ -150,7 +152,7 @@ export const EventReportDayEditor = () => {
     try {
       await Promise.all([
         dayApi.update(dayId!, { report_date: dayForm.report_date || null, summary: dayForm.summary, is_setup_day: dayForm.is_setup_day }),
-        reportApi.update(report.id, { language: reportLanguage }),
+        reportApi.update(report.id, { language: reportLanguage, description: reportDescription }),
       ]);
       await dayApi.validate(day, report);
       showSuccess('Jour validé !');
@@ -508,15 +510,34 @@ export const EventReportDayEditor = () => {
             </div>
           </div>
 
+          {day?.day_number === 1 ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description de l'événement</label>
+              <textarea
+                value={reportDescription}
+                onChange={(e) => setReportDescription(e.target.value)}
+                disabled={isValidated}
+                rows={4}
+                className={`${inputCls} resize-none`}
+                placeholder="Description générale de l'événement..."
+              />
+            </div>
+          ) : report?.description ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-500 mb-1 text-xs">Description de l'événement (saisie au jour 1)</label>
+              <p className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200 whitespace-pre-wrap">{report.description}</p>
+            </div>
+          ) : null}
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Résumé</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Résumé du jour</label>
             <textarea
               value={dayForm.summary}
               onChange={(e) => setDayForm({ ...dayForm, summary: e.target.value })}
               disabled={isValidated}
               rows={3}
               className={`${inputCls} resize-none`}
-              placeholder="Résumé de la journée..."
+              placeholder="Notes spécifiques à ce jour..."
             />
             {!isValidated && (
               <div className="flex items-center gap-1.5 mt-1.5">

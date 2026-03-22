@@ -13,6 +13,7 @@ export type EventReport = {
   venue_client_id: string | null;
   final_client_name: string;
   event_name: string;
+  description: string;
   start_date: string | null;
   total_days: number;
   current_day: number;
