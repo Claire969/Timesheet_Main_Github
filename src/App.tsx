@@ -6,6 +6,10 @@ import Login from './pages/Login';
 import { AuthCallback } from './pages/AuthCallback';
 import { Home } from './pages/Home';
 import { ClientTimesheets } from './pages/ClientTimesheets';
+import { EventReports } from './pages/EventReports';
+import { EventReportForm } from './pages/EventReportForm';
+import { EventReportDetail } from './pages/EventReportDetail';
+import { EventReportDayEditor } from './pages/EventReportDayEditor';
 
 export type Forfait = 'none' | 'halfDay' | 'fullDay';
 
@@ -81,6 +85,46 @@ function App() {
             element={
               <RequireAuth>
                 <ClientTimesheets />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/event-reports"
+            element={
+              <RequireAuth>
+                <EventReports />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/event-reports/new"
+            element={
+              <RequireAuth>
+                <EventReportForm />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/event-reports/:id/edit"
+            element={
+              <RequireAuth>
+                <EventReportForm />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/event-reports/:id"
+            element={
+              <RequireAuth>
+                <EventReportDetail />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/event-reports/:reportId/days/:dayId"
+            element={
+              <RequireAuth>
+                <EventReportDayEditor />
               </RequireAuth>
             }
           />

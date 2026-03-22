@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, supabaseEnabled } from '../lib/supabaseClient';
-import { LogOut, Plus, X, Users, CreditCard as Edit2, Archive, ArchiveRestore, LayoutGrid, List, FileSpreadsheet, Download } from 'lucide-react';
+import { LogOut, Plus, X, Users, CreditCard as Edit2, Archive, ArchiveRestore, LayoutGrid, List, FileSpreadsheet, Download, ClipboardList } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppState } from '../App';
 import type { Client } from '../App';
@@ -447,6 +447,10 @@ useEffect(() => {
                   <Users size={14} />
                   Gestion clients
                 </button>
+                <button onClick={() => navigate('/event-reports')} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm px-4 py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
+                  <ClipboardList size={14} />
+                  Rapports événement
+                </button>
               </div>
               <button onClick={handleSignOut} className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs px-3 py-2 sm:text-sm sm:px-4 sm:py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
                 <LogOut size={14} />
@@ -472,6 +476,10 @@ useEffect(() => {
             <button onClick={() => setIsClientsModalOpen(true)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs px-3 py-2 whitespace-nowrap shrink-0 shadow-sm transition-colors">
               <Users size={13} />
               Gestion clients
+            </button>
+            <button onClick={() => navigate('/event-reports')} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs px-3 py-2 whitespace-nowrap shrink-0 shadow-sm transition-colors">
+              <ClipboardList size={13} />
+              Rapports événement
             </button>
           </div>
         </div>
