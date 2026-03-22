@@ -25,6 +25,7 @@ export type EventReportDay = {
   report_id: string;
   day_number: number;
   report_date: string | null;
+  is_setup_day: boolean;
   status: 'open' | 'validated';
   summary: string;
   created_at: string;
@@ -48,6 +49,7 @@ export type EventReportIncident = {
   description: string;
   resolution: string;
   network_impact: boolean;
+  network_impact_text: string | null;
   created_at: string;
 };
 

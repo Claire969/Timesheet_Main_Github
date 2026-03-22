@@ -63,12 +63,15 @@ export const reportApi = {
     if (error) throw error;
     const report = data as EventReport;
 
-    const days = Array.from({ length: payload.total_days }, (_, i) => ({
-      report_id: report.id,
-      day_number: i + 1,
-      status: 'open',
-      summary: '',
-    }));
+    const days = Array.from({ length: payload.total_days }, (_, i) => {
+      let report_date: string | null = null;
+      if (payload.start_date) {
+        const d = new Date(payload.start_date);
+        d.setDate(d.getDate() + i);
+        report_date = d.toISOString().slice(0, 10);
+      }
+      return { report_id: report.id, day_number: i + 1, status: 'open', summary: '', is_setup_day: false, report_date };
+    });
     const { error: daysError } = await supabase
       .schema(SCHEMA)
       .from('event_report_days')
@@ -112,7 +115,7 @@ export const dayApi = {
     return data;
   },
 
-  async update(id: string, payload: Partial<Pick<EventReportDay, 'report_date' | 'summary' | 'status'>>): Promise<void> {
+  async update(id: string, payload: Partial<Pick<EventReportDay, 'report_date' | 'summary' | 'status' | 'is_setup_day'>>): Promise<void> {
     const { error } = await supabase
       .schema(SCHEMA)
       .from('event_report_days')
@@ -186,7 +189,7 @@ export const incidentApi = {
     return data;
   },
 
-  async update(id: string, payload: Partial<Omit<EventReportIncident, 'id' | 'day_id' | 'created_at'>>): Promise<void> {
+  async update(id: string, payload: Partial<Omit<EventReportIncident, 'id' | 'day_id' | 'created_at'>> & { network_impact_text?: string | null }): Promise<void> {
     const { error } = await supabase
       .schema(SCHEMA)
       .from('event_report_incidents')

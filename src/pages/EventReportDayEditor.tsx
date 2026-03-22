@@ -27,7 +27,7 @@ export const EventReportDayEditor = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const [dayForm, setDayForm] = useState({ report_date: '', summary: '' });
+  const [dayForm, setDayForm] = useState({ report_date: '', summary: '', is_setup_day: false });
 
   const load = useCallback(async () => {
     if (!reportId || !dayId) return;
@@ -44,7 +44,7 @@ export const EventReportDayEditor = () => {
       setHourlyRows(hr);
       setIncidents(inc);
       setImages(img);
-      setDayForm({ report_date: d.report_date ?? '', summary: d.summary ?? '' });
+      setDayForm({ report_date: d.report_date ?? '', summary: d.summary ?? '', is_setup_day: d.is_setup_day ?? false });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur de chargement');
     } finally {
@@ -66,6 +66,7 @@ export const EventReportDayEditor = () => {
       await dayApi.update(dayId, {
         report_date: dayForm.report_date || null,
         summary: dayForm.summary,
+        is_setup_day: dayForm.is_setup_day,
       });
       showSuccess('Sauvegardé');
     } catch (e) {
@@ -80,7 +81,7 @@ export const EventReportDayEditor = () => {
     if (day.status === 'validated') return;
     setIsValidating(true);
     try {
-      await dayApi.update(dayId!, { report_date: dayForm.report_date || null, summary: dayForm.summary });
+      await dayApi.update(dayId!, { report_date: dayForm.report_date || null, summary: dayForm.summary, is_setup_day: dayForm.is_setup_day });
       await dayApi.validate(day, report);
       showSuccess('Jour validé !');
       setTimeout(() => navigate(`/event-reports/${reportId}`), 1200);
@@ -137,6 +138,7 @@ export const EventReportDayEditor = () => {
         description: '',
         resolution: '',
         network_impact: false,
+        network_impact_text: null,
       });
       setIncidents((prev) => [...prev, inc]);
     } catch (e) {
@@ -144,11 +146,21 @@ export const EventReportDayEditor = () => {
     }
   };
 
-  const handleUpdateIncident = async (inc: EventReportIncident, field: keyof EventReportIncident, value: string | boolean) => {
+  const handleUpdateIncident = async (inc: EventReportIncident, field: keyof EventReportIncident, value: string | boolean | null) => {
     const updated = { ...inc, [field]: value };
     setIncidents((prev) => prev.map((i) => (i.id === inc.id ? updated : i)));
     try {
       await incidentApi.update(inc.id, { [field]: value });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur');
+    }
+  };
+
+  const handleToggleNetworkImpact = async (inc: EventReportIncident, checked: boolean) => {
+    const updated = { ...inc, network_impact: checked, network_impact_text: checked ? (inc.network_impact_text ?? '') : null };
+    setIncidents((prev) => prev.map((i) => (i.id === inc.id ? updated : i)));
+    try {
+      await incidentApi.update(inc.id, { network_impact: checked, network_impact_text: checked ? (inc.network_impact_text ?? '') : null });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
     }
@@ -276,6 +288,22 @@ export const EventReportDayEditor = () => {
                 disabled={isValidated}
                 className={inputCls}
               />
+            </div>
+            <div className="flex items-end pb-1">
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={dayForm.is_setup_day}
+                  onChange={(e) => setDayForm({ ...dayForm, is_setup_day: e.target.checked })}
+                  disabled={isValidated}
+                  className="rounded w-4 h-4"
+                />
+                <span>
+                  {dayForm.is_setup_day
+                    ? <strong>Journée de montage</strong>
+                    : <span className="text-gray-500">Journée d'événement</span>}
+                </span>
+              </label>
             </div>
           </div>
           <div>
@@ -460,16 +488,28 @@ export const EventReportDayEditor = () => {
                       placeholder="Résolution..."
                     />
                   </div>
-                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={inc.network_impact}
-                      onChange={(e) => handleUpdateIncident(inc, 'network_impact', e.target.checked)}
-                      disabled={isValidated}
-                      className="rounded"
-                    />
-                    Impact réseau
-                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={inc.network_impact}
+                        onChange={(e) => handleToggleNetworkImpact(inc, e.target.checked)}
+                        disabled={isValidated}
+                        className="rounded w-4 h-4"
+                      />
+                      Impact réseau
+                    </label>
+                    {inc.network_impact && (
+                      <textarea
+                        value={inc.network_impact_text ?? ''}
+                        onChange={(e) => handleUpdateIncident(inc, 'network_impact_text', e.target.value || null)}
+                        disabled={isValidated}
+                        rows={2}
+                        className={`${inputCls} resize-none`}
+                        placeholder="Décrire l'impact réseau..."
+                      />
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
