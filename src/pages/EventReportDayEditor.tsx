@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, CheckCircle, Save, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, CheckCircle, Save, Sparkles, ChevronDown, ChevronUp, ClipboardPaste, Link } from 'lucide-react';
 import { dayApi, hourlyApi, incidentApi, imageApi, reportApi } from '../lib/eventReportApi';
 import { aiAssistIncident, type AiAction } from '../lib/aiIncidentApi';
+import { uploadImageBlob, deleteStorageImage } from '../lib/imageStorageApi';
 import type {
   EventReportDay,
   EventReportHourlyRow,
@@ -39,6 +40,9 @@ export const EventReportDayEditor = () => {
   const [newIncidentForm, setNewIncidentForm] = useState({ incident_time: '', title: '' });
   const [expandedIncidentId, setExpandedIncidentId] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState<{ incId: string; action: AiAction } | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [manualUrlImgId, setManualUrlImgId] = useState<string | null>(null);
+  const imageDropzoneRef = useRef<HTMLDivElement>(null);
 
   const handleAiAssist = async (inc: EventReportIncident, action: AiAction) => {
     const sourceText = action === 'translate_en'
@@ -258,6 +262,44 @@ export const EventReportDayEditor = () => {
     }
   };
 
+  const handleUploadBlob = async (blob: Blob) => {
+    if (!dayId || !reportId || !day) return;
+    setUploadingImage(true);
+    try {
+      const url = await uploadImageBlob(blob, reportId, day.day_number);
+      const img = await imageApi.create({
+        day_id: dayId,
+        file_url: url,
+        caption: '',
+        sort_order: images.length,
+      });
+      setImages((prev) => [...prev, img]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur d'upload");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handlePaste = useCallback(async (e: ClipboardEvent) => {
+    if (day?.status === 'validated') return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const blob = item.getAsFile();
+        if (blob) await handleUploadBlob(blob);
+        break;
+      }
+    }
+  }, [isValidated, dayId, reportId, day, images.length]);
+
+  useEffect(() => {
+    document.addEventListener('paste', handlePaste as EventListener);
+    return () => document.removeEventListener('paste', handlePaste as EventListener);
+  }, [handlePaste]);
+
   const handleAddImage = async () => {
     if (!dayId) return;
     try {
@@ -268,6 +310,7 @@ export const EventReportDayEditor = () => {
         sort_order: images.length,
       });
       setImages((prev) => [...prev, img]);
+      setManualUrlImgId(img.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
     }
@@ -284,9 +327,12 @@ export const EventReportDayEditor = () => {
   };
 
   const handleDeleteImage = async (id: string) => {
+    const img = images.find((i) => i.id === id);
     setImages((prev) => prev.filter((i) => i.id !== id));
+    if (manualUrlImgId === id) setManualUrlImgId(null);
     try {
       await imageApi.delete(id);
+      if (img?.file_url) void deleteStorageImage(img.file_url);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
     }
@@ -755,58 +801,86 @@ export const EventReportDayEditor = () => {
             {!isValidated && (
               <button
                 onClick={handleAddImage}
-                className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                className="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 text-sm"
               >
-                <Plus size={15} />
-                Ajouter
+                <Link size={14} />
+                URL manuelle
               </button>
             )}
           </div>
+
+          {/* Paste drop zone */}
+          {!isValidated && (
+            <div
+              ref={imageDropzoneRef}
+              className="mb-4 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 py-6 text-center cursor-default"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={async (e) => {
+                e.preventDefault();
+                const file = e.dataTransfer.files?.[0];
+                if (file && file.type.startsWith('image/')) await handleUploadBlob(file);
+              }}
+            >
+              {uploadingImage ? (
+                <p className="text-sm text-blue-500 font-medium">Upload en cours...</p>
+              ) : (
+                <>
+                  <ClipboardPaste size={20} className="text-gray-400" />
+                  <p className="text-sm text-gray-500">
+                    Coller une capture d'écran <kbd className="px-1 py-0.5 bg-gray-200 rounded text-xs font-mono">Ctrl+V</kbd>
+                    <span className="mx-1 text-gray-300">·</span>
+                    ou glisser-déposer une image ici
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
           {images.length === 0 ? (
-            <p className="text-sm text-gray-400 py-4 text-center">Aucune image</p>
+            <p className="text-sm text-gray-400 py-2 text-center">Aucune image</p>
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {images.map((img) => (
-                <div key={img.id} className="p-4 rounded-xl border border-gray-200 space-y-3">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 space-y-2">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">URL de l'image</label>
-                        <input
-                          type="text"
-                          value={img.file_url}
-                          onChange={(e) => handleUpdateImage(img, 'file_url', e.target.value)}
-                          disabled={isValidated}
-                          className={inputCls}
-                          placeholder="https://..."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Légende</label>
-                        <input
-                          type="text"
-                          value={img.caption}
-                          onChange={(e) => handleUpdateImage(img, 'caption', e.target.value)}
-                          disabled={isValidated}
-                          className={inputCls}
-                          placeholder="Légende..."
-                        />
-                      </div>
-                    </div>
-                    {!isValidated && (
-                      <button onClick={() => handleDeleteImage(img.id)} className="text-gray-400 hover:text-red-500 transition-colors mt-6">
-                        <Trash2 size={15} />
-                      </button>
-                    )}
-                  </div>
-                  {img.file_url && (
+                <div key={img.id} className="rounded-xl border border-gray-200 overflow-hidden bg-gray-50 group relative">
+                  {img.file_url ? (
                     <img
                       src={img.file_url}
                       alt={img.caption || 'Image'}
-                      className="max-h-48 rounded-lg border border-gray-200 object-contain"
+                      className="w-full h-36 object-cover"
                       onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                     />
+                  ) : (
+                    <div className="w-full h-36 flex items-center justify-center text-gray-300 text-xs">Aucune image</div>
                   )}
+                  {!isValidated && (
+                    <button
+                      onClick={() => handleDeleteImage(img.id)}
+                      className="absolute top-1.5 right-1.5 p-1 bg-white/80 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                  <div className="px-2 py-1.5">
+                    {manualUrlImgId === img.id && !img.file_url ? (
+                      <input
+                        type="text"
+                        value={img.file_url}
+                        onChange={(e) => handleUpdateImage(img, 'file_url', e.target.value)}
+                        onBlur={() => setManualUrlImgId(null)}
+                        autoFocus
+                        className="w-full text-xs px-1.5 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 mb-1"
+                        placeholder="https://..."
+                      />
+                    ) : null}
+                    <input
+                      type="text"
+                      value={img.caption}
+                      onChange={(e) => handleUpdateImage(img, 'caption', e.target.value)}
+                      disabled={isValidated}
+                      className="w-full text-xs px-1.5 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-transparent"
+                      placeholder="Légende..."
+                    />
+                  </div>
                 </div>
               ))}
             </div>
