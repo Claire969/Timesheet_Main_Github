@@ -63,6 +63,7 @@ export const WifiNetworksSection = ({ reportId, networks, onNetworksChange, disa
         </div>
         {!disabled && (
           <button
+            type="button"
             onClick={() => setAdding(true)}
             className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium"
           >
@@ -105,7 +106,7 @@ export const WifiNetworksSection = ({ reportId, networks, onNetworksChange, disa
                 className={inputCls}
               />
               {!disabled && (
-                <button onClick={() => handleDelete(net.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1">
+                <button type="button" onClick={() => handleDelete(net.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1">
                   <Trash2 size={14} />
                 </button>
               )}
@@ -131,7 +132,7 @@ export const WifiNetworksSection = ({ reportId, networks, onNetworksChange, disa
                 type="text"
                 value={newForm.ssid}
                 onChange={(e) => setNewForm({ ...newForm, ssid: e.target.value })}
-                onKeyDown={(e) => { if (e.key === 'Enter') void handleAdd(); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleAdd(); } }}
                 autoFocus
                 className={inputCls}
                 placeholder="NomDuRéseau"
@@ -143,7 +144,7 @@ export const WifiNetworksSection = ({ reportId, networks, onNetworksChange, disa
                 type="text"
                 value={newForm.password}
                 onChange={(e) => setNewForm({ ...newForm, password: e.target.value })}
-                onKeyDown={(e) => { if (e.key === 'Enter') void handleAdd(); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleAdd(); } }}
                 className={inputCls}
                 placeholder="Optionnel"
               />
@@ -154,7 +155,7 @@ export const WifiNetworksSection = ({ reportId, networks, onNetworksChange, disa
                 type="text"
                 value={newForm.speed}
                 onChange={(e) => setNewForm({ ...newForm, speed: e.target.value })}
-                onKeyDown={(e) => { if (e.key === 'Enter') void handleAdd(); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleAdd(); } }}
                 className={inputCls}
                 placeholder="ex: 100 Mbps"
               />
@@ -162,12 +163,14 @@ export const WifiNetworksSection = ({ reportId, networks, onNetworksChange, disa
           </div>
           <div className="flex gap-2 justify-end">
             <button
+              type="button"
               onClick={() => { setAdding(false); setNewForm({ ssid: '', password: '', speed: '' }); }}
               className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg transition-colors"
             >
               Annuler
             </button>
             <button
+              type="button"
               onClick={handleAdd}
               disabled={!newForm.ssid.trim()}
               className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-lg font-medium transition-colors"
