@@ -4,7 +4,7 @@ import { Plus, ArrowLeft, Calendar, Building2 } from 'lucide-react';
 import { reportApi } from '../lib/eventReportApi';
 import type { EventReport } from '../lib/eventReportTypes';
 
-type ReportRow = EventReport & { client_name?: string; venue_name?: string };
+type ReportRow = EventReport & { venue_client_name?: string; venue_client_logo?: string };
 
 const STATUS_LABELS: Record<EventReport['status'], string> = {
   draft: 'Brouillon',
@@ -110,14 +110,14 @@ export const EventReports = () => {
                       </span>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-500 flex-wrap">
-                      {r.client_name && (
+                      {r.final_client_name && (
                         <span className="flex items-center gap-1">
                           <Building2 size={13} />
-                          {r.client_name}
+                          {r.final_client_name}
                         </span>
                       )}
-                      {r.venue_name && (
-                        <span className="text-gray-400">{r.venue_name}</span>
+                      {r.venue_client_name && (
+                        <span className="text-gray-400">{r.venue_client_name}</span>
                       )}
                       {r.start_date && (
                         <span className="flex items-center gap-1">

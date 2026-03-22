@@ -10,8 +10,8 @@ export type EventVenue = {
 export type EventReport = {
   id: string;
   user_id: string;
-  client_id: string;
-  venue_id: string | null;
+  venue_client_id: string | null;
+  final_client_name: string;
   event_name: string;
   start_date: string | null;
   total_days: number;

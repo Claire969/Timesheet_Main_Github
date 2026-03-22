@@ -1,6 +1,5 @@
 import { supabase } from './supabaseClient';
 import type {
-  EventVenue,
   EventReport,
   EventReportDay,
   EventReportHourlyRow,
@@ -16,60 +15,40 @@ async function getUser() {
   return user;
 }
 
-export const venueApi = {
-  async list(): Promise<EventVenue[]> {
-    const { data, error } = await supabase
-      .schema(SCHEMA)
-      .from('event_venues')
-      .select('*')
-      .order('name');
-    if (error) throw error;
-    return data ?? [];
-  },
-
-  async create(name: string, logo_url?: string, notes?: string): Promise<EventVenue> {
-    const user = await getUser();
-    const { data, error } = await supabase
-      .schema(SCHEMA)
-      .from('event_venues')
-      .insert({ user_id: user.id, name, logo_url: logo_url ?? null, notes: notes ?? null })
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  },
-};
-
 export const reportApi = {
-  async list(): Promise<(EventReport & { client_name?: string; venue_name?: string })[]> {
+  async list(): Promise<(EventReport & { venue_client_name?: string; venue_client_logo?: string })[]> {
     const { data, error } = await supabase
       .schema(SCHEMA)
       .from('event_reports')
-      .select('*, client:clients(name), venue:event_venues(name)')
+      .select('*, venue_client:clients(name, logo_url)')
       .order('created_at', { ascending: false });
     if (error) throw error;
     return (data ?? []).map((r: any) => ({
       ...r,
-      client_name: r.client?.name ?? '',
-      venue_name: r.venue?.name ?? '',
+      venue_client_name: r.venue_client?.name ?? '',
+      venue_client_logo: r.venue_client?.logo_url ?? null,
     }));
   },
 
-  async get(id: string): Promise<EventReport & { client_name?: string; venue_name?: string }> {
+  async get(id: string): Promise<EventReport & { venue_client_name?: string; venue_client_logo?: string }> {
     const { data, error } = await supabase
       .schema(SCHEMA)
       .from('event_reports')
-      .select('*, client:clients(name), venue:event_venues(name)')
+      .select('*, venue_client:clients(name, logo_url)')
       .eq('id', id)
       .maybeSingle();
     if (error) throw error;
     if (!data) throw new Error('Rapport introuvable');
-    return { ...data, client_name: data.client?.name ?? '', venue_name: data.venue?.name ?? '' };
+    return {
+      ...data,
+      venue_client_name: data.venue_client?.name ?? '',
+      venue_client_logo: data.venue_client?.logo_url ?? null,
+    };
   },
 
   async create(payload: {
-    client_id: string;
-    venue_id?: string | null;
+    venue_client_id?: string | null;
+    final_client_name: string;
     event_name: string;
     start_date?: string | null;
     total_days: number;
@@ -99,7 +78,7 @@ export const reportApi = {
     return report;
   },
 
-  async update(id: string, payload: Partial<Pick<EventReport, 'event_name' | 'client_id' | 'venue_id' | 'start_date' | 'total_days' | 'current_day' | 'status'>>): Promise<void> {
+  async update(id: string, payload: Partial<Pick<EventReport, 'event_name' | 'venue_client_id' | 'final_client_name' | 'start_date' | 'total_days' | 'current_day' | 'status'>>): Promise<void> {
     const { error } = await supabase
       .schema(SCHEMA)
       .from('event_reports')

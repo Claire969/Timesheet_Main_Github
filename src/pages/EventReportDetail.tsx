@@ -4,7 +4,7 @@ import { ArrowLeft, CreditCard as Edit, Calendar, Building2, MapPin } from 'luci
 import { reportApi, dayApi } from '../lib/eventReportApi';
 import type { EventReport, EventReportDay } from '../lib/eventReportTypes';
 
-type ReportRow = EventReport & { client_name?: string; venue_name?: string };
+type ReportRow = EventReport & { venue_client_name?: string; venue_client_logo?: string };
 
 const STATUS_LABELS: Record<EventReport['status'], string> = {
   draft: 'Brouillon',
@@ -33,7 +33,7 @@ export const EventReportDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
 
-  const [report, setReport] = useState<ReportRow | null>(null);
+  const [report, setReport] = useState<(EventReport & { venue_client_name?: string; venue_client_logo?: string | null }) | null>(null);
   const [days, setDays] = useState<EventReportDay[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -116,16 +116,25 @@ export const EventReportDetail = () => {
           </div>
 
           <div className="flex flex-wrap gap-4 text-sm text-gray-600 pt-1">
-            {report.client_name && (
+            {report.final_client_name && (
               <span className="flex items-center gap-1.5">
                 <Building2 size={14} className="text-gray-400" />
-                {report.client_name}
+                {report.final_client_name}
               </span>
             )}
-            {report.venue_name && (
+            {report.venue_client_name && (
               <span className="flex items-center gap-1.5">
-                <MapPin size={14} className="text-gray-400" />
-                {report.venue_name}
+                {report.venue_client_logo ? (
+                  <img
+                    src={report.venue_client_logo}
+                    alt={report.venue_client_name}
+                    className="w-4 h-4 object-contain rounded"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <MapPin size={14} className="text-gray-400" />
+                )}
+                {report.venue_client_name}
               </span>
             )}
             {report.start_date && (

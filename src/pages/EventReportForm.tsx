@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Plus } from 'lucide-react';
+import { ArrowLeft, Save } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { reportApi, venueApi } from '../lib/eventReportApi';
-import type { EventVenue } from '../lib/eventReportTypes';
+import { reportApi } from '../lib/eventReportApi';
 
-interface ClientRow { id: string; name: string; }
+interface ClientRow { id: string; name: string; logo_url: string | null; }
 
 export const EventReportForm = () => {
   const navigate = useNavigate();
@@ -13,40 +12,34 @@ export const EventReportForm = () => {
   const isEdit = Boolean(id);
 
   const [clients, setClients] = useState<ClientRow[]>([]);
-  const [venues, setVenues] = useState<EventVenue[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     event_name: '',
-    client_id: '',
-    venue_id: '',
+    final_client_name: '',
+    venue_client_id: '',
     start_date: '',
     total_days: 1,
   });
 
-  const [showVenueCreate, setShowVenueCreate] = useState(false);
-  const [newVenueName, setNewVenueName] = useState('');
-  const [newVenueLogoUrl, setNewVenueLogoUrl] = useState('');
-  const [isCreatingVenue, setIsCreatingVenue] = useState(false);
-
   useEffect(() => {
     const load = async () => {
       try {
-        const [{ data: clientRows }, venueRows] = await Promise.all([
-          supabase.schema('timesheet').from('clients').select('id,name').order('name'),
-          venueApi.list(),
-        ]);
+        const { data: clientRows } = await supabase
+          .schema('timesheet')
+          .from('clients')
+          .select('id,name,logo_url')
+          .order('name');
         setClients((clientRows ?? []) as ClientRow[]);
-        setVenues(venueRows);
 
         if (isEdit && id) {
           const report = await reportApi.get(id);
           setForm({
             event_name: report.event_name,
-            client_id: report.client_id,
-            venue_id: report.venue_id ?? '',
+            final_client_name: report.final_client_name,
+            venue_client_id: report.venue_client_id ?? '',
             start_date: report.start_date ?? '',
             total_days: report.total_days,
           });
@@ -60,35 +53,19 @@ export const EventReportForm = () => {
     void load();
   }, [id, isEdit]);
 
-  const handleCreateVenue = async () => {
-    if (!newVenueName.trim()) return;
-    setIsCreatingVenue(true);
-    try {
-      const venue = await venueApi.create(newVenueName.trim(), newVenueLogoUrl || undefined);
-      setVenues((prev) => [...prev, venue]);
-      setForm((prev) => ({ ...prev, venue_id: venue.id }));
-      setNewVenueName('');
-      setNewVenueLogoUrl('');
-      setShowVenueCreate(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erreur lors de la création du lieu');
-    } finally {
-      setIsCreatingVenue(false);
-    }
-  };
+  const selectedClient = clients.find((c) => c.id === form.venue_client_id) ?? null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.event_name.trim()) { setError("Le nom de l'événement est requis"); return; }
-    if (!form.client_id) { setError('Sélectionnez un client'); return; }
     if (form.total_days < 1) { setError('Le nombre de jours doit être >= 1'); return; }
     setError(null);
     setIsSaving(true);
     try {
       const payload = {
         event_name: form.event_name.trim(),
-        client_id: form.client_id,
-        venue_id: form.venue_id || null,
+        final_client_name: form.final_client_name.trim(),
+        venue_client_id: form.venue_client_id || null,
         start_date: form.start_date || null,
         total_days: form.total_days,
       };
@@ -154,76 +131,41 @@ export const EventReportForm = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Client *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Client final
+            </label>
+            <input
+              type="text"
+              value={form.final_client_name}
+              onChange={(e) => setForm({ ...form, final_client_name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Nom du client final (texte libre)"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Venue / Salle (client Timesheet)
+            </label>
             <select
-              value={form.client_id}
-              onChange={(e) => setForm({ ...form, client_id: e.target.value })}
+              value={form.venue_client_id}
+              onChange={(e) => setForm({ ...form, venue_client_id: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">-- Sélectionner un client --</option>
+              <option value="">-- Aucune venue --</option>
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Lieu</label>
-            <div className="flex gap-2">
-              <select
-                value={form.venue_id}
-                onChange={(e) => setForm({ ...form, venue_id: e.target.value })}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">-- Sélectionner un lieu --</option>
-                {venues.map((v) => (
-                  <option key={v.id} value={v.id}>{v.name}</option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => setShowVenueCreate(!showVenueCreate)}
-                className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-              >
-                <Plus size={15} />
-                Nouveau
-              </button>
-            </div>
-
-            {showVenueCreate && (
-              <div className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
-                <p className="text-sm font-medium text-gray-700">Créer un nouveau lieu</p>
-                <input
-                  type="text"
-                  value={newVenueName}
-                  onChange={(e) => setNewVenueName(e.target.value)}
-                  placeholder="Nom du lieu *"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            {selectedClient?.logo_url && (
+              <div className="mt-2 flex items-center gap-2">
+                <img
+                  src={selectedClient.logo_url}
+                  alt={selectedClient.name}
+                  className="w-10 h-10 object-contain rounded-lg border border-gray-200 bg-gray-50"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                 />
-                <input
-                  type="text"
-                  value={newVenueLogoUrl}
-                  onChange={(e) => setNewVenueLogoUrl(e.target.value)}
-                  placeholder="URL du logo (optionnel)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowVenueCreate(false)}
-                    className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCreateVenue}
-                    disabled={isCreatingVenue || !newVenueName.trim()}
-                    className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm transition-colors"
-                  >
-                    {isCreatingVenue ? 'Création...' : 'Créer le lieu'}
-                  </button>
-                </div>
+                <span className="text-sm text-gray-500">{selectedClient.name}</span>
               </div>
             )}
           </div>
