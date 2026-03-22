@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, ArrowLeft, Calendar, Building2 } from 'lucide-react';
+import { Plus, ArrowLeft, Calendar, Building2, Trash2 } from 'lucide-react';
 import { reportApi } from '../lib/eventReportApi';
 import type { EventReport } from '../lib/eventReportTypes';
 
@@ -29,6 +29,7 @@ export const EventReports = () => {
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -44,6 +45,20 @@ export const EventReports = () => {
     };
     void load();
   }, []);
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm('Supprimer ce rapport ? Cette action est irréversible.')) return;
+    setDeletingId(id);
+    try {
+      await reportApi.delete(id);
+      setReports((prev) => prev.filter((r) => r.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la suppression');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -96,47 +111,56 @@ export const EventReports = () => {
         {!isLoading && reports.length > 0 && (
           <div className="space-y-3">
             {reports.map((r) => (
-              <button
-                key={r.id}
-                onClick={() => navigate(`/event-reports/${r.id}`)}
-                className="w-full text-left p-4 rounded-xl bg-white border border-gray-200 hover:border-blue-200 hover:shadow-md transition-all"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="font-bold text-gray-900 truncate">{r.event_name}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[r.status]}`}>
-                        {STATUS_LABELS[r.status]}
-                      </span>
+              <div key={r.id} className="relative group">
+                <button
+                  onClick={() => navigate(`/event-reports/${r.id}`)}
+                  className="w-full text-left p-4 rounded-xl bg-white border border-gray-200 hover:border-blue-200 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="font-bold text-gray-900 truncate">{r.event_name}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[r.status]}`}>
+                          {STATUS_LABELS[r.status]}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-gray-500 flex-wrap">
+                        {r.final_client_name && (
+                          <span className="flex items-center gap-1">
+                            <Building2 size={13} />
+                            {r.final_client_name}
+                          </span>
+                        )}
+                        {r.venue_client_name && (
+                          <span className="text-gray-400">{r.venue_client_name}</span>
+                        )}
+                        {r.start_date && (
+                          <span className="flex items-center gap-1">
+                            <Calendar size={13} />
+                            {fmtDate(r.start_date)}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-500 flex-wrap">
-                      {r.final_client_name && (
-                        <span className="flex items-center gap-1">
-                          <Building2 size={13} />
-                          {r.final_client_name}
-                        </span>
-                      )}
-                      {r.venue_client_name && (
-                        <span className="text-gray-400">{r.venue_client_name}</span>
-                      )}
-                      {r.start_date && (
-                        <span className="flex items-center gap-1">
-                          <Calendar size={13} />
-                          {fmtDate(r.start_date)}
-                        </span>
-                      )}
+                    <div className="flex-shrink-0 text-right">
+                      <div className="text-sm font-semibold text-gray-700">
+                        Jour {r.current_day} / {r.total_days}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        {r.total_days} jour{r.total_days > 1 ? 's' : ''}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex-shrink-0 text-right">
-                    <div className="text-sm font-semibold text-gray-700">
-                      Jour {r.current_day} / {r.total_days}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-0.5">
-                      {r.total_days} jour{r.total_days > 1 ? 's' : ''}
-                    </div>
-                  </div>
-                </div>
-              </button>
+                </button>
+                <button
+                  onClick={(e) => handleDelete(e, r.id)}
+                  disabled={deletingId === r.id}
+                  className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Supprimer"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
             ))}
           </div>
         )}

@@ -293,7 +293,7 @@ export const EventReportDayEditor = () => {
         break;
       }
     }
-  }, [isValidated, dayId, reportId, day, images.length]);
+  }, [dayId, reportId, day, images.length]);
 
   useEffect(() => {
     document.addEventListener('paste', handlePaste as EventListener);

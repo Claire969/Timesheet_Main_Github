@@ -89,6 +89,15 @@ export const reportApi = {
       .eq('id', id);
     if (error) throw error;
   },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .schema(SCHEMA)
+      .from('event_reports')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
 };
 
 export const dayApi = {
