@@ -5,6 +5,7 @@ import type {
   EventReportHourlyRow,
   EventReportIncident,
   EventReportImage,
+  EventReportWifiNetwork,
 } from './eventReportTypes';
 
 const SCHEMA = 'timesheet';
@@ -262,6 +263,48 @@ export const imageApi = {
     const { error } = await supabase
       .schema(SCHEMA)
       .from('event_report_images')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+};
+
+export const wifiApi = {
+  async listForReport(report_id: string): Promise<EventReportWifiNetwork[]> {
+    const { data, error } = await supabase
+      .schema(SCHEMA)
+      .from('event_report_wifi_networks')
+      .select('*')
+      .eq('report_id', report_id)
+      .order('sort_order');
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  async create(payload: Omit<EventReportWifiNetwork, 'id' | 'created_at'>): Promise<EventReportWifiNetwork> {
+    const { data, error } = await supabase
+      .schema(SCHEMA)
+      .from('event_report_wifi_networks')
+      .insert(payload)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, payload: Partial<Pick<EventReportWifiNetwork, 'ssid' | 'password' | 'speed' | 'sort_order'>>): Promise<void> {
+    const { error } = await supabase
+      .schema(SCHEMA)
+      .from('event_report_wifi_networks')
+      .update(payload)
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .schema(SCHEMA)
+      .from('event_report_wifi_networks')
       .delete()
       .eq('id', id);
     if (error) throw error;

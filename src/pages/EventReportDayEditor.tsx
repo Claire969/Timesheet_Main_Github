@@ -1,15 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, CheckCircle, Save, Sparkles, ChevronDown, ChevronUp, ClipboardPaste, Link } from 'lucide-react';
-import { dayApi, hourlyApi, incidentApi, imageApi, reportApi } from '../lib/eventReportApi';
+import { dayApi, hourlyApi, incidentApi, imageApi, reportApi, wifiApi } from '../lib/eventReportApi';
 import { aiAssistIncident, type AiAction } from '../lib/aiIncidentApi';
 import { uploadImageBlob, deleteStorageImage } from '../lib/imageStorageApi';
+import { WifiNetworksSection } from '../components/WifiNetworksSection';
 import type {
   EventReportDay,
   EventReportHourlyRow,
   EventReportIncident,
   EventReportImage,
   EventReport,
+  EventReportWifiNetwork,
 } from '../lib/eventReportTypes';
 
 const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -37,9 +39,11 @@ export const EventReportDayEditor = () => {
   const [hourlyGenStart, setHourlyGenStart] = useState('08');
   const [hourlyGenEnd, setHourlyGenEnd] = useState('18');
 
+  const [wifiNetworks, setWifiNetworks] = useState<EventReportWifiNetwork[]>([]);
   const [newIncidentForm, setNewIncidentForm] = useState({ incident_time: '', title: '' });
   const [expandedIncidentId, setExpandedIncidentId] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState<{ incId: string; action: AiAction } | null>(null);
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [manualUrlImgId, setManualUrlImgId] = useState<string | null>(null);
   const imageDropzoneRef = useRef<HTMLDivElement>(null);
@@ -86,12 +90,29 @@ export const EventReportDayEditor = () => {
       setImages(img);
       setDayForm({ report_date: d.report_date ?? '', summary: d.summary ?? '', is_setup_day: d.is_setup_day ?? false });
       setReportLanguage((r as EventReport).language ?? 'fr');
+      if (d.day_number === 1) {
+        const wifi = await wifiApi.listForReport(reportId);
+        setWifiNetworks(wifi);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur de chargement');
     } finally {
       setIsLoading(false);
     }
   }, [reportId, dayId]);
+
+  const handleAiCorrectSummary = async () => {
+    if (!dayForm.summary.trim()) return;
+    setAiSummaryLoading(true);
+    try {
+      const result = await aiAssistIncident(dayForm.summary, 'correct_fr');
+      setDayForm((prev) => ({ ...prev, summary: result }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur IA');
+    } finally {
+      setAiSummaryLoading(false);
+    }
+  };
 
   useEffect(() => { void load(); }, [load]);
 
@@ -495,8 +516,31 @@ export const EventReportDayEditor = () => {
               className={`${inputCls} resize-none`}
               placeholder="Résumé de la journée..."
             />
+            {!isValidated && (
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <Sparkles size={12} className="text-gray-400 shrink-0" />
+                <button
+                  type="button"
+                  onClick={handleAiCorrectSummary}
+                  disabled={aiSummaryLoading || !dayForm.summary.trim()}
+                  className="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
+                >
+                  {aiSummaryLoading ? '...' : 'Corriger'}
+                </button>
+              </div>
+            )}
           </div>
         </section>
+
+        {day?.day_number === 1 && (
+          <WifiNetworksSection
+            reportId={reportId!}
+            networks={wifiNetworks}
+            onNetworksChange={setWifiNetworks}
+            disabled={isValidated}
+            onError={setError}
+          />
+        )}
 
         {/* Hourly rows */}
         <section>

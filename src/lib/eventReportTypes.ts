@@ -63,3 +63,13 @@ export type EventReportImage = {
   sort_order: number;
   created_at: string;
 };
+
+export type EventReportWifiNetwork = {
+  id: string;
+  report_id: string;
+  ssid: string;
+  password: string | null;
+  speed: string;
+  sort_order: number;
+  created_at: string;
+};
