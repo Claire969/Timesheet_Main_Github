@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, CheckCircle, Save, Sparkles } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, CheckCircle, Save, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { dayApi, hourlyApi, incidentApi, imageApi, reportApi } from '../lib/eventReportApi';
 import { aiAssistIncident, type AiAction } from '../lib/aiIncidentApi';
 import type {
@@ -12,6 +12,8 @@ import type {
 } from '../lib/eventReportTypes';
 
 const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+
+function pad(n: number) { return String(n).padStart(2, '0'); }
 
 export const EventReportDayEditor = () => {
   const navigate = useNavigate();
@@ -29,6 +31,13 @@ export const EventReportDayEditor = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const [dayForm, setDayForm] = useState({ report_date: '', summary: '', is_setup_day: false });
+  const [reportLanguage, setReportLanguage] = useState<'fr' | 'en'>('fr');
+
+  const [hourlyGenStart, setHourlyGenStart] = useState('08');
+  const [hourlyGenEnd, setHourlyGenEnd] = useState('18');
+
+  const [newIncidentForm, setNewIncidentForm] = useState({ incident_time: '', title: '' });
+  const [expandedIncidentId, setExpandedIncidentId] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState<{ incId: string; action: AiAction } | null>(null);
 
   const handleAiAssist = async (inc: EventReportIncident, action: AiAction) => {
@@ -72,6 +81,7 @@ export const EventReportDayEditor = () => {
       setIncidents(inc);
       setImages(img);
       setDayForm({ report_date: d.report_date ?? '', summary: d.summary ?? '', is_setup_day: d.is_setup_day ?? false });
+      setReportLanguage((r as EventReport).language ?? 'fr');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur de chargement');
     } finally {
@@ -87,14 +97,17 @@ export const EventReportDayEditor = () => {
   };
 
   const handleSaveDay = async () => {
-    if (!dayId) return;
+    if (!dayId || !reportId) return;
     setIsSaving(true);
     try {
-      await dayApi.update(dayId, {
-        report_date: dayForm.report_date || null,
-        summary: dayForm.summary,
-        is_setup_day: dayForm.is_setup_day,
-      });
+      await Promise.all([
+        dayApi.update(dayId, {
+          report_date: dayForm.report_date || null,
+          summary: dayForm.summary,
+          is_setup_day: dayForm.is_setup_day,
+        }),
+        reportApi.update(reportId, { language: reportLanguage }),
+      ]);
       showSuccess('Sauvegardé');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur de sauvegarde');
@@ -108,7 +121,10 @@ export const EventReportDayEditor = () => {
     if (day.status === 'validated') return;
     setIsValidating(true);
     try {
-      await dayApi.update(dayId!, { report_date: dayForm.report_date || null, summary: dayForm.summary, is_setup_day: dayForm.is_setup_day });
+      await Promise.all([
+        dayApi.update(dayId!, { report_date: dayForm.report_date || null, summary: dayForm.summary, is_setup_day: dayForm.is_setup_day }),
+        reportApi.update(report.id, { language: reportLanguage }),
+      ]);
       await dayApi.validate(day, report);
       showSuccess('Jour validé !');
       setTimeout(() => navigate(`/event-reports/${reportId}`), 1200);
@@ -116,6 +132,42 @@ export const EventReportDayEditor = () => {
       setError(e instanceof Error ? e.message : 'Erreur lors de la validation');
     } finally {
       setIsValidating(false);
+    }
+  };
+
+  const handleGenerateHourlyRows = async () => {
+    if (!dayId) return;
+    const start = parseInt(hourlyGenStart, 10);
+    const end = parseInt(hourlyGenEnd, 10);
+    if (isNaN(start) || isNaN(end) || start >= end) return;
+
+    const existingLabels = new Set(hourlyRows.map((r) => r.hour_label));
+    const toCreate: string[] = [];
+    for (let h = start; h <= end; h++) {
+      const label = `${pad(h)}:00`;
+      if (!existingLabels.has(label)) toCreate.push(label);
+    }
+    if (toCreate.length === 0) return;
+
+    try {
+      const created: EventReportHourlyRow[] = [];
+      for (const label of toCreate) {
+        const row = await hourlyApi.upsert({
+          day_id: dayId,
+          hour_label: label,
+          wifi_users: 0,
+          bandwidth_in: 0,
+          bandwidth_out: 0,
+          notes: '',
+        });
+        created.push(row);
+      }
+      setHourlyRows((prev) => {
+        const combined = [...prev, ...created];
+        return combined.sort((a, b) => a.hour_label.localeCompare(b.hour_label));
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur');
     }
   };
 
@@ -155,19 +207,22 @@ export const EventReportDayEditor = () => {
     }
   };
 
-  const handleAddIncident = async () => {
+  const handleCreateIncident = async () => {
     if (!dayId) return;
+    if (!newIncidentForm.title.trim()) return;
     try {
       const inc = await incidentApi.create({
         day_id: dayId,
-        incident_time: null,
-        title: '',
+        incident_time: newIncidentForm.incident_time || null,
+        title: newIncidentForm.title,
         description: '',
         resolution: '',
         network_impact: false,
         network_impact_text: null,
       });
       setIncidents((prev) => [...prev, inc]);
+      setNewIncidentForm({ incident_time: '', title: '' });
+      setExpandedIncidentId(inc.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
     }
@@ -195,6 +250,7 @@ export const EventReportDayEditor = () => {
 
   const handleDeleteIncident = async (id: string) => {
     setIncidents((prev) => prev.filter((i) => i.id !== id));
+    if (expandedIncidentId === id) setExpandedIncidentId(null);
     try {
       await incidentApi.delete(id);
     } catch (e) {
@@ -245,6 +301,8 @@ export const EventReportDayEditor = () => {
   }
 
   const isValidated = day?.status === 'validated';
+
+  const hours = Array.from({ length: 24 }, (_, i) => pad(i));
 
   return (
     <div className="min-h-screen bg-white">
@@ -303,6 +361,7 @@ export const EventReportDayEditor = () => {
           </div>
         )}
 
+        {/* Day info */}
         <section className="space-y-4">
           <h2 className="text-base font-bold text-gray-900">Informations du jour</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -316,23 +375,70 @@ export const EventReportDayEditor = () => {
                 className={inputCls}
               />
             </div>
-            <div className="flex items-end pb-1">
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={dayForm.is_setup_day}
-                  onChange={(e) => setDayForm({ ...dayForm, is_setup_day: e.target.checked })}
+
+            {/* Day type: clear button group replacing ambiguous checkbox */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Type de journée</label>
+              <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
+                <button
+                  type="button"
                   disabled={isValidated}
-                  className="rounded w-4 h-4"
-                />
-                <span>
-                  {dayForm.is_setup_day
-                    ? <strong>Journée de montage</strong>
-                    : <span className="text-gray-500">Journée d'événement</span>}
-                </span>
-              </label>
+                  onClick={() => setDayForm({ ...dayForm, is_setup_day: false })}
+                  className={`flex-1 py-1.5 font-medium transition-colors ${
+                    !dayForm.is_setup_day
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  } disabled:cursor-default`}
+                >
+                  Événement
+                </button>
+                <button
+                  type="button"
+                  disabled={isValidated}
+                  onClick={() => setDayForm({ ...dayForm, is_setup_day: true })}
+                  className={`flex-1 py-1.5 font-medium transition-colors border-l border-gray-300 ${
+                    dayForm.is_setup_day
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  } disabled:cursor-default`}
+                >
+                  Montage
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* Language selector */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Langue du rapport</label>
+            <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm w-32">
+              <button
+                type="button"
+                disabled={isValidated}
+                onClick={() => setReportLanguage('fr')}
+                className={`flex-1 py-1.5 font-medium transition-colors ${
+                  reportLanguage === 'fr'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                } disabled:cursor-default`}
+              >
+                FR
+              </button>
+              <button
+                type="button"
+                disabled={isValidated}
+                onClick={() => setReportLanguage('en')}
+                className={`flex-1 py-1.5 font-medium transition-colors border-l border-gray-300 ${
+                  reportLanguage === 'en'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                } disabled:cursor-default`}
+              >
+                EN
+              </button>
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Résumé</label>
             <textarea
@@ -346,6 +452,7 @@ export const EventReportDayEditor = () => {
           </div>
         </section>
 
+        {/* Hourly rows */}
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-bold text-gray-900">Suivi horaire réseau</h2>
@@ -355,10 +462,43 @@ export const EventReportDayEditor = () => {
                 className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium"
               >
                 <Plus size={15} />
-                Ajouter une ligne
+                Ligne manuelle
               </button>
             )}
           </div>
+
+          {/* Auto-generate rows */}
+          {!isValidated && (
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <span className="text-xs text-gray-500">Générer de</span>
+              <select
+                value={hourlyGenStart}
+                onChange={(e) => setHourlyGenStart(e.target.value)}
+                className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {hours.map((h) => (
+                  <option key={h} value={h}>{h}:00</option>
+                ))}
+              </select>
+              <span className="text-xs text-gray-500">à</span>
+              <select
+                value={hourlyGenEnd}
+                onChange={(e) => setHourlyGenEnd(e.target.value)}
+                className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {hours.map((h) => (
+                  <option key={h} value={h}>{h}:00</option>
+                ))}
+              </select>
+              <button
+                onClick={handleGenerateHourlyRows}
+                className="px-3 py-1 border border-blue-400 text-blue-600 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors"
+              >
+                Générer
+              </button>
+            </div>
+          )}
+
           {hourlyRows.length === 0 ? (
             <p className="text-sm text-gray-400 py-4 text-center">Aucune donnée horaire</p>
           ) : (
@@ -444,125 +584,171 @@ export const EventReportDayEditor = () => {
           )}
         </section>
 
+        {/* Incidents */}
         <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-bold text-gray-900">Incidents</h2>
-            {!isValidated && (
+          <h2 className="text-base font-bold text-gray-900 mb-3">Incidents</h2>
+
+          {/* New incident form */}
+          {!isValidated && (
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <input
+                type="time"
+                value={newIncidentForm.incident_time}
+                onChange={(e) => setNewIncidentForm({ ...newIncidentForm, incident_time: e.target.value })}
+                className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-28"
+              />
+              <input
+                type="text"
+                value={newIncidentForm.title}
+                onChange={(e) => setNewIncidentForm({ ...newIncidentForm, title: e.target.value })}
+                onKeyDown={(e) => { if (e.key === 'Enter') void handleCreateIncident(); }}
+                className="flex-1 min-w-40 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Titre de l'incident..."
+              />
               <button
-                onClick={handleAddIncident}
-                className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                onClick={handleCreateIncident}
+                disabled={!newIncidentForm.title.trim()}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium transition-colors"
               >
-                <Plus size={15} />
+                <Plus size={14} />
                 Ajouter
               </button>
-            )}
-          </div>
+            </div>
+          )}
+
           {incidents.length === 0 ? (
             <p className="text-sm text-gray-400 py-4 text-center">Aucun incident</p>
           ) : (
-            <div className="space-y-3">
-              {incidents.map((inc) => (
-                <div key={inc.id} className="p-4 rounded-xl border border-gray-200 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Heure</label>
-                        <input
-                          type="time"
-                          value={inc.incident_time ?? ''}
-                          onChange={(e) => handleUpdateIncident(inc, 'incident_time', e.target.value || null as any)}
-                          disabled={isValidated}
-                          className={inputCls}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Titre</label>
-                        <input
-                          type="text"
-                          value={inc.title}
-                          onChange={(e) => handleUpdateIncident(inc, 'title', e.target.value)}
-                          disabled={isValidated}
-                          className={inputCls}
-                          placeholder="Titre de l'incident"
-                        />
-                      </div>
+            <div className="rounded-xl border border-gray-200 divide-y divide-gray-100 overflow-hidden">
+              {incidents.map((inc) => {
+                const isExpanded = expandedIncidentId === inc.id;
+                return (
+                  <div key={inc.id}>
+                    {/* Compact row */}
+                    <div
+                      className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={() => setExpandedIncidentId(isExpanded ? null : inc.id)}
+                    >
+                      {inc.incident_time && (
+                        <span className="text-xs font-mono text-gray-500 shrink-0 w-12">{inc.incident_time.slice(0, 5)}</span>
+                      )}
+                      <span className="flex-1 text-sm text-gray-800 font-medium truncate">
+                        {inc.title || <span className="text-gray-400 italic">Sans titre</span>}
+                      </span>
+                      {inc.network_impact && (
+                        <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium shrink-0">Réseau</span>
+                      )}
+                      {!isValidated && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); void handleDeleteIncident(inc.id); }}
+                          className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                      {isExpanded ? <ChevronUp size={14} className="text-gray-400 shrink-0" /> : <ChevronDown size={14} className="text-gray-400 shrink-0" />}
                     </div>
-                    {!isValidated && (
-                      <button onClick={() => handleDeleteIncident(inc.id)} className="text-gray-400 hover:text-red-500 transition-colors mt-6">
-                        <Trash2 size={15} />
-                      </button>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
-                    <textarea
-                      value={inc.description}
-                      onChange={(e) => handleUpdateIncident(inc, 'description', e.target.value)}
-                      disabled={isValidated}
-                      rows={2}
-                      className={`${inputCls} resize-none`}
-                      placeholder="Description..."
-                    />
-                    {!isValidated && (
-                      <div className="flex items-center gap-1.5 mt-1.5">
-                        <Sparkles size={12} className="text-gray-400 shrink-0" />
-                        {(['correct_fr', 'rewrite_fr', 'translate_en'] as AiAction[]).map((action) => {
-                          const labels: Record<AiAction, string> = { correct_fr: 'Corriger', rewrite_fr: 'Reformuler', translate_en: 'Traduire EN' };
-                          const busy = aiLoading?.incId === inc.id && aiLoading.action === action;
-                          return (
-                            <button
-                              key={action}
-                              type="button"
-                              onClick={() => handleAiAssist(inc, action)}
-                              disabled={aiLoading !== null}
-                              className="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
-                            >
-                              {busy ? '...' : labels[action]}
-                            </button>
-                          );
-                        })}
+
+                    {/* Expanded editor */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4 pt-2 bg-gray-50 space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Heure</label>
+                            <input
+                              type="time"
+                              value={inc.incident_time ?? ''}
+                              onChange={(e) => handleUpdateIncident(inc, 'incident_time', e.target.value || null as any)}
+                              disabled={isValidated}
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Titre</label>
+                            <input
+                              type="text"
+                              value={inc.title}
+                              onChange={(e) => handleUpdateIncident(inc, 'title', e.target.value)}
+                              disabled={isValidated}
+                              className={inputCls}
+                              placeholder="Titre de l'incident"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
+                          <textarea
+                            value={inc.description}
+                            onChange={(e) => handleUpdateIncident(inc, 'description', e.target.value)}
+                            disabled={isValidated}
+                            rows={2}
+                            className={`${inputCls} resize-none`}
+                            placeholder="Description..."
+                          />
+                          {!isValidated && (
+                            <div className="flex items-center gap-1.5 mt-1.5">
+                              <Sparkles size={12} className="text-gray-400 shrink-0" />
+                              {(['correct_fr', 'rewrite_fr', 'translate_en'] as AiAction[]).map((action) => {
+                                const labels: Record<AiAction, string> = { correct_fr: 'Corriger', rewrite_fr: 'Reformuler', translate_en: 'Traduire EN' };
+                                const busy = aiLoading?.incId === inc.id && aiLoading.action === action;
+                                return (
+                                  <button
+                                    key={action}
+                                    type="button"
+                                    onClick={() => handleAiAssist(inc, action)}
+                                    disabled={aiLoading !== null}
+                                    className="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
+                                  >
+                                    {busy ? '...' : labels[action]}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Résolution</label>
+                          <textarea
+                            value={inc.resolution}
+                            onChange={(e) => handleUpdateIncident(inc, 'resolution', e.target.value)}
+                            disabled={isValidated}
+                            rows={2}
+                            className={`${inputCls} resize-none`}
+                            placeholder="Résolution..."
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={inc.network_impact}
+                              onChange={(e) => handleToggleNetworkImpact(inc, e.target.checked)}
+                              disabled={isValidated}
+                              className="rounded w-4 h-4"
+                            />
+                            Impact réseau
+                          </label>
+                          {inc.network_impact && (
+                            <textarea
+                              value={inc.network_impact_text ?? ''}
+                              onChange={(e) => handleUpdateIncident(inc, 'network_impact_text', e.target.value || null)}
+                              disabled={isValidated}
+                              rows={2}
+                              className={`${inputCls} resize-none`}
+                              placeholder="Décrire l'impact réseau..."
+                            />
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Résolution</label>
-                    <textarea
-                      value={inc.resolution}
-                      onChange={(e) => handleUpdateIncident(inc, 'resolution', e.target.value)}
-                      disabled={isValidated}
-                      rows={2}
-                      className={`${inputCls} resize-none`}
-                      placeholder="Résolution..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={inc.network_impact}
-                        onChange={(e) => handleToggleNetworkImpact(inc, e.target.checked)}
-                        disabled={isValidated}
-                        className="rounded w-4 h-4"
-                      />
-                      Impact réseau
-                    </label>
-                    {inc.network_impact && (
-                      <textarea
-                        value={inc.network_impact_text ?? ''}
-                        onChange={(e) => handleUpdateIncident(inc, 'network_impact_text', e.target.value || null)}
-                        disabled={isValidated}
-                        rows={2}
-                        className={`${inputCls} resize-none`}
-                        placeholder="Décrire l'impact réseau..."
-                      />
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
 
+        {/* Images */}
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-bold text-gray-900">Images</h2>

@@ -17,6 +17,7 @@ export type EventReport = {
   total_days: number;
   current_day: number;
   status: 'draft' | 'in_progress' | 'completed';
+  language: 'fr' | 'en';
   created_at: string;
 };
 
