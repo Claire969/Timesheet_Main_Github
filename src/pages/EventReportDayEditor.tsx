@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, CheckCircle, Save, Sparkles, ChevronDown, ChevronUp, ClipboardPaste, Link } from 'lucide-react';
-import { dayApi, hourlyApi, incidentApi, imageApi, reportApi, wifiApi } from '../lib/eventReportApi';
+import { dayApi, hourlyApi, incidentApi, imageApi, reportApi, wifiApi, setupStepApi } from '../lib/eventReportApi';
 import { aiAssistIncident, type AiAction } from '../lib/aiIncidentApi';
 import { uploadImageBlob, deleteStorageImage } from '../lib/imageStorageApi';
 import { WifiNetworksSection } from '../components/WifiNetworksSection';
@@ -12,6 +12,7 @@ import type {
   EventReportImage,
   EventReport,
   EventReportWifiNetwork,
+  EventReportSetupStep,
 } from '../lib/eventReportTypes';
 
 const AI_ENABLED = false;
@@ -43,6 +44,7 @@ export const EventReportDayEditor = () => {
   const [hourlyGenEnd, setHourlyGenEnd] = useState('18');
 
   const [wifiNetworks, setWifiNetworks] = useState<EventReportWifiNetwork[]>([]);
+  const [setupSteps, setSetupSteps] = useState<EventReportSetupStep[]>([]);
   const [newIncidentForm, setNewIncidentForm] = useState({ incident_time: '', title: '' });
   const [expandedIncidentId, setExpandedIncidentId] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState<{ incId: string; action: AiAction } | null>(null);
@@ -95,8 +97,12 @@ export const EventReportDayEditor = () => {
       setReportLanguage((r as EventReport).language ?? 'fr');
       setReportDescription((r as EventReport).description ?? '');
       if (d.day_number === 1) {
-        const wifi = await wifiApi.listForReport(reportId);
+        const [wifi, steps] = await Promise.all([
+          wifiApi.listForReport(reportId),
+          setupStepApi.listForReport(reportId),
+        ]);
         setWifiNetworks(wifi);
+        setSetupSteps(steps);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur de chargement');
@@ -115,6 +121,38 @@ export const EventReportDayEditor = () => {
       setError(e instanceof Error ? e.message : 'Erreur IA');
     } finally {
       setAiSummaryLoading(false);
+    }
+  };
+
+  const handleAddSetupStep = async () => {
+    if (!reportId) return;
+    try {
+      const step = await setupStepApi.create({
+        report_id: reportId,
+        sort_order: setupSteps.length,
+        text: '',
+      });
+      setSetupSteps((prev) => [...prev, step]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur');
+    }
+  };
+
+  const handleUpdateSetupStep = async (step: EventReportSetupStep, text: string) => {
+    setSetupSteps((prev) => prev.map((s) => (s.id === step.id ? { ...s, text } : s)));
+    try {
+      await setupStepApi.update(step.id, text);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur');
+    }
+  };
+
+  const handleDeleteSetupStep = async (id: string) => {
+    setSetupSteps((prev) => prev.filter((s) => s.id !== id));
+    try {
+      await setupStepApi.delete(id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur');
     }
   };
 
@@ -529,34 +567,82 @@ export const EventReportDayEditor = () => {
             </div>
           ) : null}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Résumé du jour</label>
-            <textarea
-              value={dayForm.summary}
-              onChange={(e) => setDayForm({ ...dayForm, summary: e.target.value })}
-              disabled={isValidated}
-              rows={3}
-              className={`${inputCls} resize-none`}
-              placeholder="Notes spécifiques à ce jour..."
-            />
-            {!isValidated && (
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <Sparkles size={12} className="text-gray-400 shrink-0" />
-                {AI_ENABLED ? (
+          {day?.day_number === 1 ? (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">Étapes de mise en place</label>
+                {!isValidated && (
                   <button
                     type="button"
-                    onClick={handleAiCorrectSummary}
-                    disabled={aiSummaryLoading || !dayForm.summary.trim()}
-                    className="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
+                    onClick={handleAddSetupStep}
+                    className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium"
                   >
-                    {aiSummaryLoading ? '...' : 'Corriger'}
+                    <Plus size={14} />
+                    Ajouter
                   </button>
-                ) : (
-                  <span className="text-xs text-gray-400 italic">Assistant IA non configuré sur le serveur</span>
                 )}
               </div>
-            )}
-          </div>
+              {setupSteps.length === 0 ? (
+                <p className="text-sm text-gray-400 py-3 text-center border border-dashed border-gray-200 rounded-lg">
+                  Aucune étape — cliquez sur Ajouter
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {setupSteps.map((step, idx) => (
+                    <div key={step.id} className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400 w-5 text-right shrink-0">{idx + 1}.</span>
+                      <input
+                        type="text"
+                        value={step.text}
+                        onChange={(e) => handleUpdateSetupStep(step, e.target.value)}
+                        disabled={isValidated}
+                        className={`${inputCls} flex-1`}
+                        placeholder="Décrivez l'étape..."
+                      />
+                      {!isValidated && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSetupStep(step.id)}
+                          className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Résumé du jour</label>
+              <textarea
+                value={dayForm.summary}
+                onChange={(e) => setDayForm({ ...dayForm, summary: e.target.value })}
+                disabled={isValidated}
+                rows={3}
+                className={`${inputCls} resize-none`}
+                placeholder="Notes spécifiques à ce jour..."
+              />
+              {!isValidated && (
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <Sparkles size={12} className="text-gray-400 shrink-0" />
+                  {AI_ENABLED ? (
+                    <button
+                      type="button"
+                      onClick={handleAiCorrectSummary}
+                      disabled={aiSummaryLoading || !dayForm.summary.trim()}
+                      className="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
+                    >
+                      {aiSummaryLoading ? '...' : 'Corriger'}
+                    </button>
+                  ) : (
+                    <span className="text-xs text-gray-400 italic">Assistant IA non configuré sur le serveur</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </section>
 
         {day?.day_number === 1 && (

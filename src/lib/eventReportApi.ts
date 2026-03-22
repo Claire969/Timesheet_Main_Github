@@ -6,6 +6,7 @@ import type {
   EventReportIncident,
   EventReportImage,
   EventReportWifiNetwork,
+  EventReportSetupStep,
 } from './eventReportTypes';
 
 const SCHEMA = 'timesheet';
@@ -305,6 +306,48 @@ export const wifiApi = {
     const { error } = await supabase
       .schema(SCHEMA)
       .from('event_report_wifi_networks')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+};
+
+export const setupStepApi = {
+  async listForReport(report_id: string): Promise<EventReportSetupStep[]> {
+    const { data, error } = await supabase
+      .schema(SCHEMA)
+      .from('event_report_setup_steps')
+      .select('*')
+      .eq('report_id', report_id)
+      .order('sort_order');
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  async create(payload: Omit<EventReportSetupStep, 'id' | 'created_at'>): Promise<EventReportSetupStep> {
+    const { data, error } = await supabase
+      .schema(SCHEMA)
+      .from('event_report_setup_steps')
+      .insert(payload)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, text: string): Promise<void> {
+    const { error } = await supabase
+      .schema(SCHEMA)
+      .from('event_report_setup_steps')
+      .update({ text })
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .schema(SCHEMA)
+      .from('event_report_setup_steps')
       .delete()
       .eq('id', id);
     if (error) throw error;

@@ -74,3 +74,11 @@ export type EventReportWifiNetwork = {
   sort_order: number;
   created_at: string;
 };
+
+export type EventReportSetupStep = {
+  id: string;
+  report_id: string;
+  sort_order: number;
+  text: string;
+  created_at: string;
+};
