@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,35 +13,46 @@ const PROMPTS: Record<string, string> = {
   translate_en: "Translate the following French text to professional English. Return only the translated text, no explanation.",
 };
 
+function unauthorized() {
+  return new Response("Unauthorized", {
+    status: 401,
+    headers: corsHeaders,
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!token) return unauthorized();
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } }
+  );
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user?.id) return unauthorized();
+
   try {
     const { text, action } = await req.json() as { text: string; action: string };
 
     if (!text?.trim()) {
-      return new Response(JSON.stringify({ error: "text is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response("text is required", { status: 400, headers: corsHeaders });
     }
 
     const systemPrompt = PROMPTS[action];
     if (!systemPrompt) {
-      return new Response(JSON.stringify({ error: "invalid action" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response("invalid action", { status: 400, headers: corsHeaders });
     }
 
     const apiKey = Deno.env.get("OPENAI_API_KEY");
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: "OpenAI not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response("OpenAI not configured", { status: 500, headers: corsHeaders });
     }
 
     const controller = new AbortController();
@@ -70,24 +82,17 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!openaiRes.ok) {
-      const err = await openaiRes.text();
-      return new Response(JSON.stringify({ error: `OpenAI error: ${openaiRes.status}`, detail: err }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(`OpenAI error: ${openaiRes.status}`, { status: 502, headers: corsHeaders });
     }
 
     const data = await openaiRes.json() as { choices: { message: { content: string } }[] };
     const result = data.choices?.[0]?.message?.content?.trim() ?? "";
 
-    return new Response(JSON.stringify({ result }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(result, {
+      headers: { ...corsHeaders, "Content-Type": "text/plain; charset=utf-8" },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(msg, { status: 500, headers: corsHeaders });
   }
 });

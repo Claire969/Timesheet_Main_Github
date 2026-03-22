@@ -18,7 +18,7 @@ export async function aiAssistIncident(text: string, action: AiAction): Promise<
     body: JSON.stringify({ text, action }),
   });
 
-  const json = await res.json() as { result?: string; error?: string };
-  if (!res.ok || json.error) throw new Error(json.error ?? `HTTP ${res.status}`);
-  return json.result ?? '';
+  const body = await res.text();
+  if (!res.ok) throw new Error(body || `HTTP ${res.status}`);
+  return body;
 }
