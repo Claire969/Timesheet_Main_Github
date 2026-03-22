@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, CheckCircle, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, CheckCircle, Save, Sparkles } from 'lucide-react';
 import { dayApi, hourlyApi, incidentApi, imageApi, reportApi } from '../lib/eventReportApi';
+import { aiAssistIncident, type AiAction } from '../lib/aiIncidentApi';
 import type {
   EventReportDay,
   EventReportHourlyRow,
@@ -28,6 +29,32 @@ export const EventReportDayEditor = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const [dayForm, setDayForm] = useState({ report_date: '', summary: '', is_setup_day: false });
+  const [aiLoading, setAiLoading] = useState<{ incId: string; action: AiAction } | null>(null);
+
+  const handleAiAssist = async (inc: EventReportIncident, action: AiAction) => {
+    const sourceText = action === 'translate_en'
+      ? [inc.description, inc.resolution].filter(Boolean).join('\n\n')
+      : inc.description;
+    if (!sourceText.trim()) return;
+    setAiLoading({ incId: inc.id, action });
+    try {
+      const result = await aiAssistIncident(sourceText, action);
+      if (action === 'translate_en') {
+        const parts = result.split(/\n\n/);
+        const updated = { ...inc, description: parts[0] ?? inc.description, resolution: parts[1] ?? inc.resolution };
+        setIncidents((prev) => prev.map((i) => (i.id === inc.id ? updated : i)));
+        await incidentApi.update(inc.id, { description: updated.description, resolution: updated.resolution });
+      } else {
+        const updated = { ...inc, description: result };
+        setIncidents((prev) => prev.map((i) => (i.id === inc.id ? updated : i)));
+        await incidentApi.update(inc.id, { description: result });
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur IA');
+    } finally {
+      setAiLoading(null);
+    }
+  };
 
   const load = useCallback(async () => {
     if (!reportId || !dayId) return;
@@ -476,6 +503,26 @@ export const EventReportDayEditor = () => {
                       className={`${inputCls} resize-none`}
                       placeholder="Description..."
                     />
+                    {!isValidated && (
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <Sparkles size={12} className="text-gray-400 shrink-0" />
+                        {(['correct_fr', 'rewrite_fr', 'translate_en'] as AiAction[]).map((action) => {
+                          const labels: Record<AiAction, string> = { correct_fr: 'Corriger', rewrite_fr: 'Reformuler', translate_en: 'Traduire EN' };
+                          const busy = aiLoading?.incId === inc.id && aiLoading.action === action;
+                          return (
+                            <button
+                              key={action}
+                              type="button"
+                              onClick={() => handleAiAssist(inc, action)}
+                              disabled={aiLoading !== null}
+                              className="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
+                            >
+                              {busy ? '...' : labels[action]}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Résolution</label>
