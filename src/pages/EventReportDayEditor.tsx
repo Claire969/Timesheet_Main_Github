@@ -316,6 +316,9 @@ export const EventReportDayEditor = () => {
   };
 
   const handleDeleteIncident = async (id: string) => {
+    const inc = incidents.find((i) => i.id === id);
+    const label = inc?.title?.trim() ? `"${inc.title}"` : 'cet incident';
+    if (!window.confirm(`Supprimer ${label} ?`)) return;
     setIncidents((prev) => prev.filter((i) => i.id !== id));
     if (expandedIncidentId === id) setExpandedIncidentId(null);
     try {
