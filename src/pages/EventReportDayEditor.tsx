@@ -6,6 +6,7 @@ import { aiAssistIncident, type AiAction } from '../lib/aiIncidentApi';
 import { uploadImageBlob, deleteStorageImage, createSignedImageUrl } from '../lib/imageStorageApi';
 import { WifiNetworksSection } from '../components/WifiNetworksSection';
 import { HourlyCharts } from '../components/HourlyCharts';
+import { AiPolishButton } from '../components/AiPolishButton';
 import type {
   EventReportDay,
   EventReportHourlyRow,
@@ -15,8 +16,6 @@ import type {
   EventReportWifiNetwork,
   EventReportSetupStep,
 } from '../lib/eventReportTypes';
-
-const AI_ENABLED = false;
 
 const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 
@@ -609,24 +608,33 @@ export const EventReportDayEditor = () => {
                   Aucune étape — cliquez sur Ajouter
                 </p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {setupSteps.map((step, idx) => (
-                    <div key={step.id} className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400 w-5 text-right shrink-0">{idx + 1}.</span>
-                      <input
-                        type="text"
-                        value={step.text}
-                        onChange={(e) => handleUpdateSetupStep(step, e.target.value)}
-                        className={`${inputCls} flex-1`}
-                        placeholder="Décrivez l'étape..."
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteSetupStep(step.id)}
-                        className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                    <div key={step.id}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400 w-5 text-right shrink-0">{idx + 1}.</span>
+                        <input
+                          type="text"
+                          value={step.text}
+                          onChange={(e) => handleUpdateSetupStep(step, e.target.value)}
+                          className={`${inputCls} flex-1`}
+                          placeholder="Décrivez l'étape..."
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSetupStep(step.id)}
+                          className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      <div className="pl-7">
+                        <AiPolishButton
+                          text={step.text}
+                          language={reportLanguage}
+                          onAccept={(result) => handleUpdateSetupStep(step, result)}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -871,28 +879,11 @@ export const EventReportDayEditor = () => {
                             className={`${inputCls} resize-none`}
                             placeholder="Description..."
                           />
-                          <div className="flex items-center gap-1.5 mt-1.5">
-                            <Sparkles size={12} className="text-gray-400 shrink-0" />
-                            {AI_ENABLED ? (
-                              (['correct_fr', 'rewrite_fr', 'translate_en'] as AiAction[]).map((action) => {
-                                const labels: Record<AiAction, string> = { correct_fr: 'Corriger', rewrite_fr: 'Reformuler', translate_en: 'Traduire EN' };
-                                const busy = aiLoading?.incId === inc.id && aiLoading.action === action;
-                                return (
-                                  <button
-                                    key={action}
-                                    type="button"
-                                    onClick={() => handleAiAssist(inc, action)}
-                                    disabled={aiLoading !== null}
-                                    className="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
-                                  >
-                                    {busy ? '...' : labels[action]}
-                                  </button>
-                                );
-                              })
-                            ) : (
-                              <span className="text-xs text-gray-400 italic">Assistant IA non configuré sur le serveur</span>
-                            )}
-                          </div>
+                          <AiPolishButton
+                            text={inc.description}
+                            language={reportLanguage}
+                            onAccept={(result) => handleUpdateIncident(inc, 'description', result)}
+                          />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Résolution</label>
