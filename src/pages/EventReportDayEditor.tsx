@@ -464,7 +464,7 @@ export const EventReportDayEditor = () => {
   const hours = Array.from({ length: 24 }, (_, i) => pad(i));
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50">
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-200">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
@@ -511,35 +511,33 @@ export const EventReportDayEditor = () => {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-10">
+      <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
         {error && (
-          <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
             {error}
           </div>
         )}
 
         {/* Day info */}
-        <section className="space-y-4">
-          <h2 className="text-base font-bold text-gray-900">Informations du jour</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <section className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Informations du jour</h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
               <input
                 type="date"
                 value={dayForm.report_date}
                 onChange={(e) => setDayForm({ ...dayForm, report_date: e.target.value })}
-
                 className={inputCls}
               />
             </div>
 
-            {/* Day type: clear button group replacing ambiguous checkbox */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Type de journée</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Type de journée</label>
               <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
                 <button
                   type="button"
-  
                   onClick={() => setDayForm({ ...dayForm, is_setup_day: false })}
                   className={`flex-1 py-1.5 font-medium transition-colors ${
                     !dayForm.is_setup_day
@@ -551,7 +549,6 @@ export const EventReportDayEditor = () => {
                 </button>
                 <button
                   type="button"
-  
                   onClick={() => setDayForm({ ...dayForm, is_setup_day: true })}
                   className={`flex-1 py-1.5 font-medium transition-colors border-l border-gray-300 ${
                     dayForm.is_setup_day
@@ -563,43 +560,40 @@ export const EventReportDayEditor = () => {
                 </button>
               </div>
             </div>
-          </div>
 
-          {/* Language selector */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Langue du rapport</label>
-            <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm w-32">
-              <button
-                type="button"
-
-                onClick={() => setReportLanguage('fr')}
-                className={`flex-1 py-1.5 font-medium transition-colors ${
-                  reportLanguage === 'fr'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
-                } disabled:cursor-default`}
-              >
-                FR
-              </button>
-              <button
-                type="button"
-
-                onClick={() => setReportLanguage('en')}
-                className={`flex-1 py-1.5 font-medium transition-colors border-l border-gray-300 ${
-                  reportLanguage === 'en'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
-                } disabled:cursor-default`}
-              >
-                EN
-              </button>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Langue du rapport</label>
+              <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
+                <button
+                  type="button"
+                  onClick={() => setReportLanguage('fr')}
+                  className={`flex-1 py-1.5 font-medium transition-colors ${
+                    reportLanguage === 'fr'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  } disabled:cursor-default`}
+                >
+                  FR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportLanguage('en')}
+                  className={`flex-1 py-1.5 font-medium transition-colors border-l border-gray-300 ${
+                    reportLanguage === 'en'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  } disabled:cursor-default`}
+                >
+                  EN
+                </button>
+              </div>
             </div>
           </div>
 
           {day?.day_number === 1 ? (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700">Étapes de mise en place</label>
+                <label className="block text-xs font-medium text-gray-600">Étapes de mise en place</label>
                 <button
                   type="button"
                   onClick={handleAddSetupStep}
@@ -622,7 +616,6 @@ export const EventReportDayEditor = () => {
                         type="text"
                         value={step.text}
                         onChange={(e) => handleUpdateSetupStep(step, e.target.value)}
-        
                         className={`${inputCls} flex-1`}
                         placeholder="Décrivez l'étape..."
                       />
@@ -652,9 +645,9 @@ export const EventReportDayEditor = () => {
         )}
 
         {/* Hourly rows */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-bold text-gray-900">Suivi horaire réseau</h2>
+        <section className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Suivi horaire réseau</h2>
             <button
               onClick={handleAddHourlyRow}
               className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium"
@@ -664,34 +657,33 @@ export const EventReportDayEditor = () => {
             </button>
           </div>
 
-          {/* Auto-generate rows */}
-          <div className="flex items-center gap-2 mb-4 flex-wrap">
-              <span className="text-xs text-gray-500">Générer de</span>
-              <select
-                value={hourlyGenStart}
-                onChange={(e) => setHourlyGenStart(e.target.value)}
-                className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {hours.map((h) => (
-                  <option key={h} value={h}>{h}:00</option>
-                ))}
-              </select>
-              <span className="text-xs text-gray-500">à</span>
-              <select
-                value={hourlyGenEnd}
-                onChange={(e) => setHourlyGenEnd(e.target.value)}
-                className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {hours.map((h) => (
-                  <option key={h} value={h}>{h}:00</option>
-                ))}
-              </select>
-              <button
-                onClick={handleGenerateHourlyRows}
-                className="px-3 py-1 border border-blue-400 text-blue-600 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors"
-              >
-                Générer
-              </button>
+          <div className="flex items-center gap-2 mb-4 flex-wrap p-3 bg-gray-50 rounded-xl border border-gray-100">
+            <span className="text-xs text-gray-500 font-medium">Générer de</span>
+            <select
+              value={hourlyGenStart}
+              onChange={(e) => setHourlyGenStart(e.target.value)}
+              className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              {hours.map((h) => (
+                <option key={h} value={h}>{h}:00</option>
+              ))}
+            </select>
+            <span className="text-xs text-gray-500 font-medium">à</span>
+            <select
+              value={hourlyGenEnd}
+              onChange={(e) => setHourlyGenEnd(e.target.value)}
+              className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              {hours.map((h) => (
+                <option key={h} value={h}>{h}:00</option>
+              ))}
+            </select>
+            <button
+              onClick={handleGenerateHourlyRows}
+              className="px-3 py-1 border border-blue-400 text-blue-600 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors"
+            >
+              Générer
+            </button>
           </div>
 
           {hourlyRows.length === 0 ? (
@@ -699,26 +691,29 @@ export const EventReportDayEditor = () => {
           ) : (
             <div className="overflow-x-auto rounded-xl border border-gray-200">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600 text-xs">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium">Heure</th>
-                    <th className="px-3 py-2 text-left font-medium">Utilisateurs Wi-Fi</th>
-                    <th className="px-3 py-2 text-left font-medium">BW entrant (Mbps)</th>
-                    <th className="px-3 py-2 text-left font-medium">BW sortant (Mbps)</th>
-                    <th className="px-3 py-2 text-left font-medium">Notes</th>
-                    <th className="px-3 py-2" />
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-24">Heure</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Wi-Fi</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      <span className="text-blue-500">↓</span> Upload
+                    </th>
+                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      <span className="text-green-500">↑</span> Download
+                    </th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Notes</th>
+                    <th className="px-3 py-2.5 w-8" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {hourlyRows.map((row) => (
-                    <tr key={row.id}>
+                  {hourlyRows.map((row, rowIdx) => (
+                    <tr key={row.id} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
                       <td className="px-3 py-2">
                         <input
                           type="text"
                           value={row.hour_label}
                           onChange={(e) => handleUpdateHourlyRow(row, 'hour_label', e.target.value)}
-          
-                          className={inputCls}
+                          className="w-full px-2 py-1 border border-gray-200 rounded-lg text-sm text-center font-mono font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
                           placeholder="08:00"
                         />
                       </td>
@@ -728,45 +723,47 @@ export const EventReportDayEditor = () => {
                           min={0}
                           value={row.wifi_users}
                           onChange={(e) => handleUpdateHourlyRow(row, 'wifi_users', parseInt(e.target.value) || 0)}
-          
-                          className={inputCls}
+                          className="w-full px-2 py-1 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </td>
                       <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.1}
-                          value={row.bandwidth_in}
-                          onChange={(e) => handleUpdateHourlyRow(row, 'bandwidth_in', parseFloat(e.target.value) || 0)}
-          
-                          className={inputCls}
-                        />
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.1}
+                            value={row.bandwidth_in}
+                            onChange={(e) => handleUpdateHourlyRow(row, 'bandwidth_in', parseFloat(e.target.value) || 0)}
+                            className="w-full px-2 py-1 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <span className="text-xs text-gray-400 shrink-0">Mb</span>
+                        </div>
                       </td>
                       <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.1}
-                          value={row.bandwidth_out}
-                          onChange={(e) => handleUpdateHourlyRow(row, 'bandwidth_out', parseFloat(e.target.value) || 0)}
-          
-                          className={inputCls}
-                        />
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.1}
+                            value={row.bandwidth_out}
+                            onChange={(e) => handleUpdateHourlyRow(row, 'bandwidth_out', parseFloat(e.target.value) || 0)}
+                            className="w-full px-2 py-1 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <span className="text-xs text-gray-400 shrink-0">Mb</span>
+                        </div>
                       </td>
                       <td className="px-3 py-2">
                         <input
                           type="text"
                           value={row.notes}
                           onChange={(e) => handleUpdateHourlyRow(row, 'notes', e.target.value)}
-          
-                          className={inputCls}
-                          placeholder="..."
+                          className="w-full px-2 py-1 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="—"
                         />
                       </td>
-                      <td className="px-3 py-2">
-                        <button onClick={() => handleDeleteHourlyRow(row.id)} className="text-gray-400 hover:text-red-500 transition-colors">
-                          <Trash2 size={15} />
+                      <td className="px-3 py-2 text-center">
+                        <button onClick={() => handleDeleteHourlyRow(row.id)} className="text-gray-300 hover:text-red-500 transition-colors">
+                          <Trash2 size={14} />
                         </button>
                       </td>
                     </tr>
@@ -778,23 +775,25 @@ export const EventReportDayEditor = () => {
         </section>
 
         {/* Incidents */}
-        <section>
-          <h2 className="text-base font-bold text-gray-900 mb-3">Incidents</h2>
+        <section className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Incidents</h2>
+            <span className="text-xs text-gray-400">{incidents.length > 0 ? `${incidents.length} incident${incidents.length > 1 ? 's' : ''}` : ''}</span>
+          </div>
 
-          {/* New incident form */}
-          <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <div className="flex items-center gap-2 mb-4 flex-wrap p-3 bg-gray-50 rounded-xl border border-gray-100">
             <input
               type="time"
               value={newIncidentForm.incident_time}
               onChange={(e) => setNewIncidentForm({ ...newIncidentForm, incident_time: e.target.value })}
-              className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-28"
+              className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-28 bg-white"
             />
             <input
               type="text"
               value={newIncidentForm.title}
               onChange={(e) => setNewIncidentForm({ ...newIncidentForm, title: e.target.value })}
               onKeyDown={(e) => { if (e.key === 'Enter') void handleCreateIncident(); }}
-              className="flex-1 min-w-40 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 min-w-40 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
               placeholder="Titre de l'incident..."
             />
             <button
@@ -815,13 +814,12 @@ export const EventReportDayEditor = () => {
                 const isExpanded = expandedIncidentId === inc.id;
                 return (
                   <div key={inc.id}>
-                    {/* Compact row */}
                     <div
                       className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
                       onClick={() => setExpandedIncidentId(isExpanded ? null : inc.id)}
                     >
                       {inc.incident_time && (
-                        <span className="text-xs font-mono text-gray-500 shrink-0 w-12">{inc.incident_time.slice(0, 5)}</span>
+                        <span className="text-xs font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded shrink-0">{inc.incident_time.slice(0, 5)}</span>
                       )}
                       <span className="flex-1 text-sm text-gray-800 font-medium truncate">
                         {inc.title || <span className="text-gray-400 italic">Sans titre</span>}
@@ -838,7 +836,6 @@ export const EventReportDayEditor = () => {
                       {isExpanded ? <ChevronUp size={14} className="text-gray-400 shrink-0" /> : <ChevronDown size={14} className="text-gray-400 shrink-0" />}
                     </div>
 
-                    {/* Expanded editor */}
                     {isExpanded && (
                       <div className="px-4 pb-4 pt-2 bg-gray-50 space-y-3">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -848,7 +845,6 @@ export const EventReportDayEditor = () => {
                               type="time"
                               value={inc.incident_time ?? ''}
                               onChange={(e) => handleUpdateIncident(inc, 'incident_time', e.target.value || null as any)}
-              
                               className={inputCls}
                             />
                           </div>
@@ -858,7 +854,6 @@ export const EventReportDayEditor = () => {
                               type="text"
                               value={inc.title}
                               onChange={(e) => handleUpdateIncident(inc, 'title', e.target.value)}
-              
                               className={inputCls}
                               placeholder="Titre de l'incident"
                             />
@@ -869,32 +864,31 @@ export const EventReportDayEditor = () => {
                           <textarea
                             value={inc.description}
                             onChange={(e) => handleUpdateIncident(inc, 'description', e.target.value)}
-            
                             rows={2}
                             className={`${inputCls} resize-none`}
                             placeholder="Description..."
                           />
                           <div className="flex items-center gap-1.5 mt-1.5">
-                              <Sparkles size={12} className="text-gray-400 shrink-0" />
-                              {AI_ENABLED ? (
-                                (['correct_fr', 'rewrite_fr', 'translate_en'] as AiAction[]).map((action) => {
-                                  const labels: Record<AiAction, string> = { correct_fr: 'Corriger', rewrite_fr: 'Reformuler', translate_en: 'Traduire EN' };
-                                  const busy = aiLoading?.incId === inc.id && aiLoading.action === action;
-                                  return (
-                                    <button
-                                      key={action}
-                                      type="button"
-                                      onClick={() => handleAiAssist(inc, action)}
-                                      disabled={aiLoading !== null}
-                                      className="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
-                                    >
-                                      {busy ? '...' : labels[action]}
-                                    </button>
-                                  );
-                                })
-                              ) : (
-                                <span className="text-xs text-gray-400 italic">Assistant IA non configuré sur le serveur</span>
-                              )}
+                            <Sparkles size={12} className="text-gray-400 shrink-0" />
+                            {AI_ENABLED ? (
+                              (['correct_fr', 'rewrite_fr', 'translate_en'] as AiAction[]).map((action) => {
+                                const labels: Record<AiAction, string> = { correct_fr: 'Corriger', rewrite_fr: 'Reformuler', translate_en: 'Traduire EN' };
+                                const busy = aiLoading?.incId === inc.id && aiLoading.action === action;
+                                return (
+                                  <button
+                                    key={action}
+                                    type="button"
+                                    onClick={() => handleAiAssist(inc, action)}
+                                    disabled={aiLoading !== null}
+                                    className="px-2 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
+                                  >
+                                    {busy ? '...' : labels[action]}
+                                  </button>
+                                );
+                              })
+                            ) : (
+                              <span className="text-xs text-gray-400 italic">Assistant IA non configuré sur le serveur</span>
+                            )}
                           </div>
                         </div>
                         <div>
@@ -902,7 +896,6 @@ export const EventReportDayEditor = () => {
                           <textarea
                             value={inc.resolution}
                             onChange={(e) => handleUpdateIncident(inc, 'resolution', e.target.value)}
-            
                             rows={2}
                             className={`${inputCls} resize-none`}
                             placeholder="Résolution..."
@@ -914,7 +907,6 @@ export const EventReportDayEditor = () => {
                               type="checkbox"
                               checked={inc.network_impact}
                               onChange={(e) => handleToggleNetworkImpact(inc, e.target.checked)}
-              
                               className="rounded w-4 h-4"
                             />
                             Impact réseau
@@ -923,7 +915,6 @@ export const EventReportDayEditor = () => {
                             <textarea
                               value={inc.network_impact_text ?? ''}
                               onChange={(e) => handleUpdateIncident(inc, 'network_impact_text', e.target.value || null)}
-              
                               rows={2}
                               className={`${inputCls} resize-none`}
                               placeholder="Décrire l'impact réseau..."
@@ -940,9 +931,9 @@ export const EventReportDayEditor = () => {
         </section>
 
         {/* Images */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-bold text-gray-900">Images</h2>
+        <section className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Images</h2>
             <button
               onClick={handleAddImage}
               className="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 text-sm"
@@ -952,7 +943,6 @@ export const EventReportDayEditor = () => {
             </button>
           </div>
 
-          {/* Paste drop zone */}
           <div
             ref={imageDropzoneRef}
             className="mb-4 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 py-6 text-center cursor-default"
