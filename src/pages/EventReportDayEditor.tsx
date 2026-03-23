@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, CheckCircle, Save, Sparkles, ChevronDown, ChevronUp, ClipboardPaste, Link } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, CheckCircle, Save, Sparkles, ChevronDown, ChevronUp, ClipboardPaste, Link, ArrowUp, ArrowDown, X, ZoomIn } from 'lucide-react';
 import { dayApi, hourlyApi, incidentApi, imageApi, reportApi, wifiApi, setupStepApi } from '../lib/eventReportApi';
 import { aiAssistIncident, type AiAction } from '../lib/aiIncidentApi';
 import { uploadImageBlob, deleteStorageImage } from '../lib/imageStorageApi';
@@ -51,6 +51,7 @@ export const EventReportDayEditor = () => {
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [manualUrlImgId, setManualUrlImgId] = useState<string | null>(null);
+  const [previewImgUrl, setPreviewImgUrl] = useState<string | null>(null);
   const imageDropzoneRef = useRef<HTMLDivElement>(null);
 
   const handleAiAssist = async (inc: EventReportIncident, action: AiAction) => {
@@ -348,7 +349,6 @@ export const EventReportDayEditor = () => {
   };
 
   const handlePaste = useCallback(async (e: ClipboardEvent) => {
-    if (day?.status === 'validated') return;
     const items = e.clipboardData?.items;
     if (!items) return;
     for (const item of Array.from(items)) {
@@ -393,12 +393,32 @@ export const EventReportDayEditor = () => {
   };
 
   const handleDeleteImage = async (id: string) => {
+    if (!window.confirm('Supprimer cette image ?')) return;
     const img = images.find((i) => i.id === id);
     setImages((prev) => prev.filter((i) => i.id !== id));
     if (manualUrlImgId === id) setManualUrlImgId(null);
     try {
       await imageApi.delete(id);
       if (img?.file_url) void deleteStorageImage(img.file_url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur');
+    }
+  };
+
+  const handleMoveImage = async (id: string, direction: 'up' | 'down') => {
+    const idx = images.findIndex((i) => i.id === id);
+    if (idx < 0) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= images.length) return;
+    const reordered = [...images];
+    [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
+    const withOrder = reordered.map((img, i) => ({ ...img, sort_order: i }));
+    setImages(withOrder);
+    try {
+      await Promise.all([
+        imageApi.update(withOrder[idx].id, { sort_order: withOrder[idx].sort_order }),
+        imageApi.update(withOrder[swapIdx].id, { sort_order: withOrder[swapIdx].sort_order }),
+      ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
     }
@@ -934,25 +954,39 @@ export const EventReportDayEditor = () => {
             <p className="text-sm text-gray-400 py-2 text-center">Aucune image</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {images.map((img) => (
-                <div key={img.id} className="rounded-xl border border-gray-200 overflow-hidden bg-gray-50 group relative">
-                  {img.file_url ? (
-                    <img
-                      src={img.file_url}
-                      alt={img.caption || 'Image'}
-                      className="w-full h-36 object-cover"
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                    />
-                  ) : (
-                    <div className="w-full h-36 flex items-center justify-center text-gray-300 text-xs">Aucune image</div>
-                  )}
-                  <button
-                    onClick={() => handleDeleteImage(img.id)}
-                    className="absolute top-1.5 right-1.5 p-1 bg-white/80 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                  <div className="px-2 py-1.5">
+              {images.map((img, idx) => (
+                <div key={img.id} className="rounded-xl border border-gray-200 overflow-hidden bg-gray-50 flex flex-col">
+                  <div className="relative">
+                    {img.file_url ? (
+                      <>
+                        <img
+                          src={img.file_url}
+                          alt={img.caption || 'Image'}
+                          className="w-full h-36 object-cover cursor-zoom-in"
+                          onClick={() => setPreviewImgUrl(img.file_url)}
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                        />
+                        <button
+                          onClick={() => setPreviewImgUrl(img.file_url)}
+                          className="absolute bottom-1.5 left-1.5 p-1 bg-black/40 hover:bg-black/60 rounded text-white transition-colors"
+                          title="Agrandir"
+                        >
+                          <ZoomIn size={13} />
+                        </button>
+                      </>
+                    ) : (
+                      <div className="w-full h-36 flex items-center justify-center text-gray-300 text-xs">Aucune image</div>
+                    )}
+                    <button
+                      onClick={() => handleDeleteImage(img.id)}
+                      className="absolute top-1.5 right-1.5 p-1 bg-white/90 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors"
+                      title="Supprimer"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+
+                  <div className="px-2 py-1.5 flex flex-col gap-1.5 flex-1">
                     {manualUrlImgId === img.id && !img.file_url ? (
                       <input
                         type="text"
@@ -960,7 +994,7 @@ export const EventReportDayEditor = () => {
                         onChange={(e) => handleUpdateImage(img, 'file_url', e.target.value)}
                         onBlur={() => setManualUrlImgId(null)}
                         autoFocus
-                        className="w-full text-xs px-1.5 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 mb-1"
+                        className="w-full text-xs px-1.5 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                         placeholder="https://..."
                       />
                     ) : null}
@@ -968,10 +1002,27 @@ export const EventReportDayEditor = () => {
                       type="text"
                       value={img.caption}
                       onChange={(e) => handleUpdateImage(img, 'caption', e.target.value)}
-      
                       className="w-full text-xs px-1.5 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-transparent"
                       placeholder="Légende..."
                     />
+                    <div className="flex gap-1 justify-end">
+                      <button
+                        onClick={() => handleMoveImage(img.id, 'up')}
+                        disabled={idx === 0}
+                        className="p-1 rounded text-gray-400 hover:text-gray-700 disabled:opacity-20 transition-colors"
+                        title="Monter"
+                      >
+                        <ArrowUp size={13} />
+                      </button>
+                      <button
+                        onClick={() => handleMoveImage(img.id, 'down')}
+                        disabled={idx === images.length - 1}
+                        className="p-1 rounded text-gray-400 hover:text-gray-700 disabled:opacity-20 transition-colors"
+                        title="Descendre"
+                      >
+                        <ArrowDown size={13} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -979,6 +1030,27 @@ export const EventReportDayEditor = () => {
           )}
         </section>
       </main>
+
+      {/* Lightbox */}
+      {previewImgUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setPreviewImgUrl(null)}
+        >
+          <button
+            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+            onClick={() => setPreviewImgUrl(null)}
+          >
+            <X size={20} />
+          </button>
+          <img
+            src={previewImgUrl}
+            alt="Aperçu"
+            className="max-w-full max-h-[90vh] rounded-xl object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 };
