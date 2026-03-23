@@ -2,6 +2,37 @@ import { supabase } from './supabaseClient';
 
 const BUCKET = 'event-report-images';
 
+export function extractStoragePath(fileUrl: string): string | null {
+  try {
+    const url = new URL(fileUrl);
+    const marker = `/object/`;
+    const markerSign = `/object/sign/`;
+    let pathname = url.pathname;
+    let afterObject: string | null = null;
+    if (pathname.includes(markerSign)) {
+      afterObject = pathname.split(markerSign)[1] ?? null;
+    } else if (pathname.includes(marker)) {
+      afterObject = pathname.split(marker)[1] ?? null;
+    }
+    if (!afterObject) return null;
+    const bucketPrefix = `${BUCKET}/`;
+    if (!afterObject.startsWith(bucketPrefix)) return null;
+    return afterObject.slice(bucketPrefix.length).split('?')[0];
+  } catch {
+    return null;
+  }
+}
+
+export async function createSignedImageUrl(fileUrl: string, expiresIn = 3600): Promise<string | null> {
+  const path = extractStoragePath(fileUrl);
+  if (!path) return null;
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(path, expiresIn);
+  if (error || !data) return null;
+  return data.signedUrl;
+}
+
 export async function uploadImageBlob(
   blob: Blob,
   reportId: string,

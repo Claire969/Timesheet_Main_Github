@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, CheckCircle, Save, Sparkles, ChevronDown, ChevronUp, ClipboardPaste, Link, ArrowUp, ArrowDown, X, ZoomIn } from 'lucide-react';
 import { dayApi, hourlyApi, incidentApi, imageApi, reportApi, wifiApi, setupStepApi } from '../lib/eventReportApi';
 import { aiAssistIncident, type AiAction } from '../lib/aiIncidentApi';
-import { uploadImageBlob, deleteStorageImage } from '../lib/imageStorageApi';
+import { uploadImageBlob, deleteStorageImage, createSignedImageUrl } from '../lib/imageStorageApi';
 import { WifiNetworksSection } from '../components/WifiNetworksSection';
 import type {
   EventReportDay,
@@ -52,7 +52,25 @@ export const EventReportDayEditor = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [manualUrlImgId, setManualUrlImgId] = useState<string | null>(null);
   const [previewImgUrl, setPreviewImgUrl] = useState<string | null>(null);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const imageDropzoneRef = useRef<HTMLDivElement>(null);
+
+  const resolveSignedUrls = useCallback(async (imgs: EventReportImage[]) => {
+    const toResolve = imgs.filter((i) => i.file_url);
+    const results = await Promise.all(
+      toResolve.map(async (i) => {
+        const signed = await createSignedImageUrl(i.file_url, 3600);
+        return { id: i.id, url: signed };
+      })
+    );
+    setSignedUrls((prev) => {
+      const next = { ...prev };
+      for (const r of results) {
+        if (r.url) next[r.id] = r.url;
+      }
+      return next;
+    });
+  }, []);
 
   const handleAiAssist = async (inc: EventReportIncident, action: AiAction) => {
     const sourceText = action === 'translate_en'
@@ -94,6 +112,7 @@ export const EventReportDayEditor = () => {
       setHourlyRows(hr);
       setIncidents(inc);
       setImages(img);
+      void resolveSignedUrls(img);
       setDayForm({ report_date: d.report_date ?? '', summary: d.summary ?? '', is_setup_day: d.is_setup_day ?? false });
       setReportLanguage((r as EventReport).language ?? 'fr');
       setReportDescription((r as EventReport).description ?? '');
@@ -341,6 +360,7 @@ export const EventReportDayEditor = () => {
         sort_order: images.length,
       });
       setImages((prev) => [...prev, img]);
+      void resolveSignedUrls([img]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur d'upload");
     } finally {
@@ -396,6 +416,7 @@ export const EventReportDayEditor = () => {
     if (!window.confirm('Supprimer cette image ?')) return;
     const img = images.find((i) => i.id === id);
     setImages((prev) => prev.filter((i) => i.id !== id));
+    setSignedUrls((prev) => { const n = { ...prev }; delete n[id]; return n; });
     if (manualUrlImgId === id) setManualUrlImgId(null);
     try {
       await imageApi.delete(id);
@@ -958,22 +979,35 @@ export const EventReportDayEditor = () => {
                 <div key={img.id} className="rounded-xl border border-gray-200 overflow-hidden bg-gray-50 flex flex-col">
                   <div className="relative">
                     {img.file_url ? (
-                      <>
-                        <img
-                          src={img.file_url}
-                          alt={img.caption || 'Image'}
-                          className="w-full h-36 object-cover cursor-zoom-in"
-                          onClick={() => setPreviewImgUrl(img.file_url)}
-                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                        />
-                        <button
-                          onClick={() => setPreviewImgUrl(img.file_url)}
-                          className="absolute bottom-1.5 left-1.5 p-1 bg-black/40 hover:bg-black/60 rounded text-white transition-colors"
-                          title="Agrandir"
-                        >
-                          <ZoomIn size={13} />
-                        </button>
-                      </>
+                      signedUrls[img.id] ? (
+                        <>
+                          <img
+                            src={signedUrls[img.id]}
+                            alt={img.caption || 'Image'}
+                            className="w-full h-36 object-cover cursor-zoom-in"
+                            onClick={() => setPreviewImgUrl(signedUrls[img.id])}
+                            onError={(e) => {
+                              const el = e.currentTarget as HTMLImageElement;
+                              el.style.display = 'none';
+                              const parent = el.parentElement;
+                              if (parent) {
+                                const fb = parent.querySelector('[data-fallback]') as HTMLElement | null;
+                                if (fb) fb.style.display = 'flex';
+                              }
+                            }}
+                          />
+                          <div data-fallback className="w-full h-36 items-center justify-center text-gray-400 text-xs bg-gray-100 hidden">Aperçu indisponible</div>
+                          <button
+                            onClick={() => setPreviewImgUrl(signedUrls[img.id])}
+                            className="absolute bottom-1.5 left-1.5 p-1 bg-black/40 hover:bg-black/60 rounded text-white transition-colors"
+                            title="Agrandir"
+                          >
+                            <ZoomIn size={13} />
+                          </button>
+                        </>
+                      ) : (
+                        <div className="w-full h-36 flex items-center justify-center text-gray-400 text-xs bg-gray-100 animate-pulse">Chargement...</div>
+                      )
                     ) : (
                       <div className="w-full h-36 flex items-center justify-center text-gray-300 text-xs">Aucune image</div>
                     )}
