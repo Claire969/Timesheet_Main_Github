@@ -5,19 +5,11 @@ const BUCKET = 'event-report-images';
 export function extractStoragePath(fileUrl: string): string | null {
   try {
     const url = new URL(fileUrl);
-    const marker = `/object/`;
-    const markerSign = `/object/sign/`;
-    let pathname = url.pathname;
-    let afterObject: string | null = null;
-    if (pathname.includes(markerSign)) {
-      afterObject = pathname.split(markerSign)[1] ?? null;
-    } else if (pathname.includes(marker)) {
-      afterObject = pathname.split(marker)[1] ?? null;
-    }
-    if (!afterObject) return null;
+    const pathname = url.pathname;
     const bucketPrefix = `${BUCKET}/`;
-    if (!afterObject.startsWith(bucketPrefix)) return null;
-    return afterObject.slice(bucketPrefix.length).split('?')[0];
+    const idx = pathname.indexOf(bucketPrefix);
+    if (idx === -1) return null;
+    return pathname.slice(idx + bucketPrefix.length).split('?')[0];
   } catch {
     return null;
   }

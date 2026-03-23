@@ -52,12 +52,12 @@ export const EventReportDayEditor = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [manualUrlImgId, setManualUrlImgId] = useState<string | null>(null);
   const [previewImgUrl, setPreviewImgUrl] = useState<string | null>(null);
-  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [signedUrls, setSignedUrls] = useState<Record<string, string | 'failed'>>({});
   const imageDropzoneRef = useRef<HTMLDivElement>(null);
 
   const resolveSignedUrls = useCallback(async (imgs: EventReportImage[]) => {
     const toResolve = imgs.filter((i) => i.file_url);
-    const results = await Promise.all(
+    const results = await Promise.allSettled(
       toResolve.map(async (i) => {
         const signed = await createSignedImageUrl(i.file_url, 3600);
         return { id: i.id, url: signed };
@@ -65,8 +65,14 @@ export const EventReportDayEditor = () => {
     );
     setSignedUrls((prev) => {
       const next = { ...prev };
-      for (const r of results) {
-        if (r.url) next[r.id] = r.url;
+      for (let k = 0; k < results.length; k++) {
+        const r = results[k];
+        const img = toResolve[k];
+        if (r.status === 'fulfilled' && r.value.url) {
+          next[img.id] = r.value.url;
+        } else {
+          next[img.id] = 'failed';
+        }
       }
       return next;
     });
@@ -129,7 +135,7 @@ export const EventReportDayEditor = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [reportId, dayId]);
+  }, [reportId, dayId, resolveSignedUrls]);
 
   const handleAiCorrectSummary = async () => {
     if (!dayForm.summary.trim()) return;
@@ -978,39 +984,45 @@ export const EventReportDayEditor = () => {
               {images.map((img, idx) => (
                 <div key={img.id} className="rounded-xl border border-gray-200 overflow-hidden bg-gray-50 flex flex-col">
                   <div className="relative">
-                    {img.file_url ? (
-                      signedUrls[img.id] ? (
+                    {(() => {
+                      const state = signedUrls[img.id];
+                      if (!img.file_url) {
+                        return <div className="w-full h-36 flex items-center justify-center text-gray-300 text-xs">Aucune image</div>;
+                      }
+                      if (state === undefined) {
+                        return <div className="w-full h-36 flex items-center justify-center text-gray-400 text-xs bg-gray-100 animate-pulse">Chargement...</div>;
+                      }
+                      if (state === 'failed') {
+                        return <div className="w-full h-36 flex items-center justify-center text-gray-400 text-xs bg-gray-100">Aperçu indisponible</div>;
+                      }
+                      return (
                         <>
                           <img
-                            src={signedUrls[img.id]}
+                            src={state}
                             alt={img.caption || 'Image'}
                             className="w-full h-36 object-cover cursor-zoom-in"
-                            onClick={() => setPreviewImgUrl(signedUrls[img.id])}
+                            onClick={() => setPreviewImgUrl(state)}
                             onError={(e) => {
                               const el = e.currentTarget as HTMLImageElement;
                               el.style.display = 'none';
                               const parent = el.parentElement;
                               if (parent) {
-                                const fb = parent.querySelector('[data-fallback]') as HTMLElement | null;
+                                const fb = parent.querySelector('[data-img-fallback]') as HTMLElement | null;
                                 if (fb) fb.style.display = 'flex';
                               }
                             }}
                           />
-                          <div data-fallback className="w-full h-36 items-center justify-center text-gray-400 text-xs bg-gray-100 hidden">Aperçu indisponible</div>
+                          <div data-img-fallback className="w-full h-36 items-center justify-center text-gray-400 text-xs bg-gray-100 hidden">Aperçu indisponible</div>
                           <button
-                            onClick={() => setPreviewImgUrl(signedUrls[img.id])}
+                            onClick={() => setPreviewImgUrl(state)}
                             className="absolute bottom-1.5 left-1.5 p-1 bg-black/40 hover:bg-black/60 rounded text-white transition-colors"
                             title="Agrandir"
                           >
                             <ZoomIn size={13} />
                           </button>
                         </>
-                      ) : (
-                        <div className="w-full h-36 flex items-center justify-center text-gray-400 text-xs bg-gray-100 animate-pulse">Chargement...</div>
-                      )
-                    ) : (
-                      <div className="w-full h-36 flex items-center justify-center text-gray-300 text-xs">Aucune image</div>
-                    )}
+                      );
+                    })()}
                     <button
                       onClick={() => handleDeleteImage(img.id)}
                       className="absolute top-1.5 right-1.5 p-1 bg-white/90 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors"
