@@ -5,6 +5,7 @@ import { dayApi, hourlyApi, incidentApi, imageApi, reportApi, wifiApi, setupStep
 import { aiAssistIncident, type AiAction } from '../lib/aiIncidentApi';
 import { uploadImageBlob, deleteStorageImage, createSignedImageUrl } from '../lib/imageStorageApi';
 import { WifiNetworksSection } from '../components/WifiNetworksSection';
+import { HourlyCharts } from '../components/HourlyCharts';
 import type {
   EventReportDay,
   EventReportHourlyRow,
@@ -772,6 +773,8 @@ export const EventReportDayEditor = () => {
               </table>
             </div>
           )}
+
+          <HourlyCharts rows={hourlyRows} />
         </section>
 
         {/* Incidents */}
