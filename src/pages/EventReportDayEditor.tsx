@@ -879,11 +879,6 @@ export const EventReportDayEditor = () => {
                             className={`${inputCls} resize-none`}
                             placeholder="Description..."
                           />
-                          <AiPolishButton
-                            text={inc.description}
-                            language={reportLanguage}
-                            onAccept={(result) => handleUpdateIncident(inc, 'description', result)}
-                          />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Résolution</label>
@@ -915,6 +910,12 @@ export const EventReportDayEditor = () => {
                             />
                           )}
                         </div>
+                        <AiPolishButton
+                          text={inc.description}
+                          language={reportLanguage}
+                          onAccept={(result) => handleUpdateIncident(inc, 'description', result)}
+                          direct
+                        />
                       </div>
                     )}
                   </div>

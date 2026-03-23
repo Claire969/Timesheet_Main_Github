@@ -7,9 +7,10 @@ interface AiPolishButtonProps {
   text: string;
   language: 'fr' | 'en';
   onAccept: (result: string) => void;
+  direct?: boolean;
 }
 
-export function AiPolishButton({ text, language, onAccept }: AiPolishButtonProps) {
+export function AiPolishButton({ text, language, onAccept, direct = false }: AiPolishButtonProps) {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +24,11 @@ export function AiPolishButton({ text, language, onAccept }: AiPolishButtonProps
     setError(null);
     try {
       const result = await aiAssistIncident(text, action);
-      setPreview(result);
+      if (direct) {
+        onAccept(result);
+      } else {
+        setPreview(result);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'IA non configurée');
     } finally {
@@ -66,7 +71,7 @@ export function AiPolishButton({ text, language, onAccept }: AiPolishButtonProps
         </div>
       )}
 
-      {preview !== null && (
+      {!direct && preview !== null && (
         <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
           <p className="text-xs font-medium text-blue-700 mb-1.5">Suggestion IA</p>
           <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{preview}</p>
