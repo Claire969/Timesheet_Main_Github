@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, CheckCircle, Save, Sparkles, ChevronDown, ChevronUp, ClipboardPaste, Link, ArrowUp, ArrowDown, X, ZoomIn } from 'lucide-react';
 import { dayApi, hourlyApi, incidentApi, imageApi, reportApi, wifiApi, setupStepApi } from '../lib/eventReportApi';
-import { aiAssistIncident, type AiAction } from '../lib/aiIncidentApi';
+import { aiAssistIncident, aiPolishIncident, type AiAction } from '../lib/aiIncidentApi';
 import { uploadImageBlob, deleteStorageImage, createSignedImageUrl } from '../lib/imageStorageApi';
 import { WifiNetworksSection } from '../components/WifiNetworksSection';
 import { HourlyCharts } from '../components/HourlyCharts';
@@ -48,6 +48,7 @@ export const EventReportDayEditor = () => {
   const [newIncidentForm, setNewIncidentForm] = useState({ incident_time: '', title: '' });
   const [expandedIncidentId, setExpandedIncidentId] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState<{ incId: string; action: AiAction } | null>(null);
+  const [incidentPolishLoading, setIncidentPolishLoading] = useState<string | null>(null);
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [manualUrlImgId, setManualUrlImgId] = useState<string | null>(null);
@@ -100,6 +101,41 @@ export const EventReportDayEditor = () => {
       setError(e instanceof Error ? e.message : 'Erreur IA');
     } finally {
       setAiLoading(null);
+    }
+  };
+
+  const handleAiPolishIncident = async (inc: EventReportIncident) => {
+    const fields: Record<string, string> = {};
+    if (inc.title.trim()) fields.title = inc.title;
+    if (inc.description.trim()) fields.description = inc.description;
+    if (inc.resolution.trim()) fields.resolution = inc.resolution;
+    if (inc.network_impact && inc.network_impact_text?.trim()) {
+      fields.network_impact_text = inc.network_impact_text;
+    }
+    if (Object.keys(fields).length === 0) return;
+    setIncidentPolishLoading(inc.id);
+    try {
+      const result = await aiPolishIncident(fields, reportLanguage);
+      const updated: EventReportIncident = {
+        ...inc,
+        title: result.title ?? inc.title,
+        description: result.description ?? inc.description,
+        resolution: result.resolution ?? inc.resolution,
+        network_impact_text: result.network_impact_text !== undefined
+          ? result.network_impact_text
+          : inc.network_impact_text,
+      };
+      setIncidents((prev) => prev.map((i) => (i.id === inc.id ? updated : i)));
+      await incidentApi.update(inc.id, {
+        title: updated.title,
+        description: updated.description,
+        resolution: updated.resolution,
+        network_impact_text: updated.network_impact_text,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur IA');
+    } finally {
+      setIncidentPolishLoading(null);
     }
   };
 
@@ -910,12 +946,17 @@ export const EventReportDayEditor = () => {
                             />
                           )}
                         </div>
-                        <AiPolishButton
-                          text={inc.description}
-                          language={reportLanguage}
-                          onAccept={(result) => handleUpdateIncident(inc, 'description', result)}
-                          direct
-                        />
+                        <div className="mt-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleAiPolishIncident(inc)}
+                            disabled={incidentPolishLoading === inc.id}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
+                          >
+                            <Sparkles size={11} />
+                            {incidentPolishLoading === inc.id ? 'En cours...' : 'Correction & lissage'}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

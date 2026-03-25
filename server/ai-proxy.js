@@ -8,6 +8,8 @@ const PROMPTS = {
   correct_fr: "Corrige l'orthographe, la grammaire et la ponctuation du texte suivant en français. Retourne uniquement le texte corrigé, sans explication.",
   rewrite_fr: "Réécris le texte suivant dans un style professionnel en français, adapté à un rapport technique d'événement. Retourne uniquement le texte réécrit, sans explication.",
   translate_en: "Translate the following French text to professional English. Return only the translated text, no explanation.",
+  polish_incident_fr: `Tu reçois un objet JSON représentant un incident dans un rapport technique d'événement en français. Améliore le style, l'orthographe, la grammaire et la ponctuation de chaque champ fourni. Retourne UNIQUEMENT un objet JSON valide avec exactement les mêmes clés, sans aucune explication ni texte supplémentaire.`,
+  polish_incident_en: `You receive a JSON object representing an incident in a technical event report in English. Improve the style, spelling, grammar, and punctuation of each provided field. Return ONLY a valid JSON object with exactly the same keys, no explanation or extra text.`,
 };
 
 function json(res, status, obj) {
@@ -31,11 +33,11 @@ function callOpenAI(systemPrompt, userText) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({
       model: 'gpt-4o-mini',
-      max_tokens: 512,
+      max_tokens: 1024,
       temperature: 0.3,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userText.slice(0, 2000) },
+        { role: 'user', content: userText.slice(0, 4000) },
       ],
     });
 
@@ -109,8 +111,13 @@ const server = http.createServer(async (req, res) => {
     const systemPrompt = PROMPTS[action];
     if (!systemPrompt) return text(res, 400, 'invalid action');
 
+    const isJsonAction = action === 'polish_incident_fr' || action === 'polish_incident_en';
+
     try {
       const result = await callOpenAI(systemPrompt, inputText);
+      if (isJsonAction) {
+        return json(res, 200, JSON.parse(result));
+      }
       return text(res, 200, result);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
