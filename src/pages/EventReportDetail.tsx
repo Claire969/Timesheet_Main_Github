@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CreditCard as Edit, Calendar, Building2, MapPin } from 'lucide-react';
+import { ArrowLeft, CreditCard as Edit, Calendar, Building2, MapPin, Download } from 'lucide-react';
 import { reportApi, dayApi } from '../lib/eventReportApi';
 import type { EventReport, EventReportDay } from '../lib/eventReportTypes';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { ExportModal } from '../components/ExportModal';
+import { usePdfExport } from '../lib/usePdfExport';
 
 type ReportRow = EventReport & { venue_client_name?: string; venue_client_logo?: string | null };
 
@@ -38,6 +40,8 @@ export const EventReportDetail = () => {
   const [days, setDays] = useState<EventReportDay[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const { exportPdf, isExporting } = usePdfExport();
 
   useEffect(() => {
     if (!id) return;
@@ -57,6 +61,14 @@ export const EventReportDetail = () => {
     };
     void load();
   }, [id]);
+
+  const allValidated = days.length > 0 && days.every((d) => d.status === 'validated');
+
+  const handleExportPdf = async () => {
+    if (!report) return;
+    setShowExportModal(false);
+    await exportPdf(report, days);
+  };
 
   if (isLoading) {
     return (
@@ -91,6 +103,16 @@ export const EventReportDetail = () => {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <ThemeToggle />
+            {allValidated && (
+              <button
+                onClick={() => setShowExportModal(true)}
+                disabled={isExporting}
+                className="flex items-center gap-1.5 border border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 text-green-700 dark:text-green-400 rounded-xl text-sm px-3 py-2 transition-colors disabled:opacity-50"
+              >
+                <Download size={14} />
+                {isExporting ? 'Export...' : 'Exporter'}
+              </button>
+            )}
             <button
               onClick={() => navigate(`/event-reports/${id}/edit`)}
               className="flex items-center gap-1.5 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm px-3 py-2 transition-colors"
@@ -201,6 +223,14 @@ export const EventReportDetail = () => {
           </div>
         </div>
       </main>
+
+      {showExportModal && (
+        <ExportModal
+          onClose={() => setShowExportModal(false)}
+          onExportPdf={handleExportPdf}
+          isExporting={isExporting}
+        />
+      )}
     </div>
   );
 };
