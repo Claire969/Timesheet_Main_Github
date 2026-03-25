@@ -3,8 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { reportApi } from '../lib/eventReportApi';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 interface ClientRow { id: string; name: string; logo_url: string | null; }
+
+const inputCls = 'w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500';
 
 export const EventReportForm = () => {
   const navigate = useNavigate();
@@ -85,72 +88,73 @@ export const EventReportForm = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <p className="text-gray-400 text-sm">Chargement...</p>
+      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
+        <p className="text-gray-400 dark:text-gray-500 text-sm">Chargement...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-200">
+    <div className="min-h-screen bg-white dark:bg-gray-900">
+      <header className="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
           <button
             onClick={() => navigate(isEdit && id ? `/event-reports/${id}` : '/event-reports')}
-            className="flex items-center gap-1.5 text-gray-500 hover:text-gray-800 transition-colors text-sm"
+            className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 transition-colors text-sm"
           >
             <ArrowLeft size={16} />
             Retour
           </button>
-          <span className="text-gray-300">|</span>
-          <h1 className="text-lg font-bold text-gray-900">
+          <span className="text-gray-300 dark:text-gray-600">|</span>
+          <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex-1">
             {isEdit ? 'Modifier le rapport' : 'Nouveau rapport'}
           </h1>
+          <ThemeToggle />
         </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-8">
         <form onSubmit={handleSubmit} className="space-y-5">
           {error && (
-            <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            <div className="px-4 py-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Nom de l'événement *
             </label>
             <input
               type="text"
               value={form.event_name}
               onChange={(e) => setForm({ ...form, event_name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={inputCls}
               placeholder="Ex: Festival XYZ 2026"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Client final
             </label>
             <input
               type="text"
               value={form.final_client_name}
               onChange={(e) => setForm({ ...form, final_client_name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={inputCls}
               placeholder="Nom du client final (texte libre)"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Venue / Salle (client Timesheet)
             </label>
             <select
               value={form.venue_client_id}
               onChange={(e) => setForm({ ...form, venue_client_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={inputCls}
             >
               <option value="">-- Aucune venue --</option>
               {clients.map((c) => (
@@ -162,26 +166,26 @@ export const EventReportForm = () => {
                 <img
                   src={selectedClient.logo_url}
                   alt={selectedClient.name}
-                  className="w-10 h-10 object-contain rounded-lg border border-gray-200 bg-gray-50"
+                  className="w-10 h-10 object-contain rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                 />
-                <span className="text-sm text-gray-500">{selectedClient.name}</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">{selectedClient.name}</span>
               </div>
             )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Date de début</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Date de début</label>
               <input
                 type="date"
                 value={form.start_date}
                 onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={inputCls}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Nombre de jours *
               </label>
               <input
@@ -190,7 +194,7 @@ export const EventReportForm = () => {
                 max={365}
                 value={form.total_days}
                 onChange={(e) => setForm({ ...form, total_days: parseInt(e.target.value) || 1 })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={inputCls}
               />
             </div>
           </div>
@@ -199,7 +203,7 @@ export const EventReportForm = () => {
             <button
               type="button"
               onClick={() => navigate(isEdit && id ? `/event-reports/${id}` : '/event-reports')}
-              className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               Annuler
             </button>

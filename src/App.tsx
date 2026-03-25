@@ -1,6 +1,7 @@
 import { createContext, useContext, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { RequireAuth } from './components/RequireAuth';
 import Login from './pages/Login';
 import { AuthCallback } from './pages/AuthCallback';
@@ -67,6 +68,7 @@ function App() {
   const [clientTimesheets, setClientTimesheets] = useState<ClientTimesheetsMap>({});
 
   return (
+    <ThemeProvider>
     <AppStateContext.Provider value={{ clients, setClients, clientTimesheets, setClientTimesheets }}>
       <AuthProvider>
         <Routes>
@@ -132,6 +134,7 @@ function App() {
         </Routes>
       </AuthProvider>
     </AppStateContext.Provider>
+    </ThemeProvider>
   );
 }
 
