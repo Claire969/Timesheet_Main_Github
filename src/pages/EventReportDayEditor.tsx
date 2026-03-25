@@ -49,6 +49,7 @@ export const EventReportDayEditor = () => {
   const [expandedIncidentId, setExpandedIncidentId] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState<{ incId: string; action: AiAction } | null>(null);
   const [incidentPolishLoading, setIncidentPolishLoading] = useState<string | null>(null);
+  const [incidentPolishDone, setIncidentPolishDone] = useState<string | null>(null);
   const [stepAiLoading, setStepAiLoading] = useState<Set<string>>(new Set());
   const [stepAiPreview, setStepAiPreview] = useState<Record<string, string>>({});
   const [stepAiError, setStepAiError] = useState<Record<string, string>>({});
@@ -135,6 +136,8 @@ export const EventReportDayEditor = () => {
         resolution: updated.resolution,
         network_impact_text: updated.network_impact_text,
       });
+      setIncidentPolishDone(inc.id);
+      setTimeout(() => setIncidentPolishDone(null), 2000);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur IA');
     } finally {
@@ -551,7 +554,10 @@ export const EventReportDayEditor = () => {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {successMsg && (
-              <span className="text-xs text-green-600 font-medium">{successMsg}</span>
+              <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
+                <Check size={12} />
+                {successMsg}
+              </span>
             )}
             {isValidated && (
               <span className="text-xs px-2.5 py-1.5 bg-green-100 text-green-700 rounded-full font-medium">
@@ -1016,15 +1022,22 @@ export const EventReportDayEditor = () => {
                           )}
                         </div>
                         <div className="mt-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleAiPolishIncident(inc)}
-                            disabled={incidentPolishLoading === inc.id}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
-                          >
-                            <Sparkles size={11} />
-                            {incidentPolishLoading === inc.id ? 'En cours...' : 'Correction & lissage'}
-                          </button>
+                          {incidentPolishDone === inc.id ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
+                              <Check size={11} />
+                              Appliqué
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleAiPolishIncident(inc)}
+                              disabled={incidentPolishLoading === inc.id}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 transition-colors"
+                            >
+                              <Sparkles size={11} />
+                              {incidentPolishLoading === inc.id ? 'En cours...' : 'Correction & lissage'}
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
