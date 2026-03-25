@@ -20,7 +20,7 @@
   .print-page {
     page-break-after: always;
     break-after: page;
-    padding: 16mm 18mm;
+    padding: 14mm 16mm 18mm;
     box-sizing: border-box;
   }
 
@@ -30,7 +30,14 @@
   }
 
   @page {
-    margin: 0;
+    margin: 0 0 10mm;
     size: A4 portrait;
+
+    @bottom-center {
+      content: counter(page) " / " counter(pages);
+      font-size: 8pt;
+      color: #9ca3af;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+    }
   }
 }
