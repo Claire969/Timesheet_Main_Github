@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, CheckCircle, Save, Sparkles, ChevronDown, ChevronUp, ClipboardPaste, Link, ArrowUp, ArrowDown, X, ZoomIn } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Check, CheckCircle, Save, Sparkles, ChevronDown, ChevronUp, ClipboardPaste, Link, ArrowUp, ArrowDown, X, ZoomIn } from 'lucide-react';
 import { dayApi, hourlyApi, incidentApi, imageApi, reportApi, wifiApi, setupStepApi } from '../lib/eventReportApi';
 import { aiAssistIncident, aiPolishIncident, type AiAction } from '../lib/aiIncidentApi';
 import { uploadImageBlob, deleteStorageImage, createSignedImageUrl } from '../lib/imageStorageApi';
@@ -49,6 +49,9 @@ export const EventReportDayEditor = () => {
   const [expandedIncidentId, setExpandedIncidentId] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState<{ incId: string; action: AiAction } | null>(null);
   const [incidentPolishLoading, setIncidentPolishLoading] = useState<string | null>(null);
+  const [stepAiLoading, setStepAiLoading] = useState<Set<string>>(new Set());
+  const [stepAiPreview, setStepAiPreview] = useState<Record<string, string>>({});
+  const [stepAiError, setStepAiError] = useState<Record<string, string>>({});
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [manualUrlImgId, setManualUrlImgId] = useState<string | null>(null);
@@ -211,11 +214,41 @@ export const EventReportDayEditor = () => {
 
   const handleDeleteSetupStep = async (id: string) => {
     setSetupSteps((prev) => prev.filter((s) => s.id !== id));
+    setStepAiPreview((prev) => { const n = { ...prev }; delete n[id]; return n; });
+    setStepAiError((prev) => { const n = { ...prev }; delete n[id]; return n; });
     try {
       await setupStepApi.delete(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
     }
+  };
+
+  const handleAiPolishStep = async (step: EventReportSetupStep) => {
+    if (!step.text.trim()) return;
+    const action = reportLanguage === 'en' ? 'translate_en' : 'rewrite_fr';
+    setStepAiLoading((prev) => new Set(prev).add(step.id));
+    setStepAiPreview((prev) => { const n = { ...prev }; delete n[step.id]; return n; });
+    setStepAiError((prev) => { const n = { ...prev }; delete n[step.id]; return n; });
+    try {
+      const result = await aiAssistIncident(step.text, action);
+      setStepAiPreview((prev) => ({ ...prev, [step.id]: result }));
+    } catch (e) {
+      setStepAiError((prev) => ({ ...prev, [step.id]: e instanceof Error ? e.message : 'IA non configurée' }));
+    } finally {
+      setStepAiLoading((prev) => { const n = new Set(prev); n.delete(step.id); return n; });
+    }
+  };
+
+  const handleAcceptStepPreview = (step: EventReportSetupStep) => {
+    const preview = stepAiPreview[step.id];
+    if (preview === undefined) return;
+    handleUpdateSetupStep(step, preview);
+    setStepAiPreview((prev) => { const n = { ...prev }; delete n[step.id]; return n; });
+  };
+
+  const handleCancelStepPreview = (stepId: string) => {
+    setStepAiPreview((prev) => { const n = { ...prev }; delete n[stepId]; return n; });
+    setStepAiError((prev) => { const n = { ...prev }; delete n[stepId]; return n; });
   };
 
   useEffect(() => { void load(); }, [load]);
@@ -658,19 +691,55 @@ export const EventReportDayEditor = () => {
                         />
                         <button
                           type="button"
+                          onClick={() => handleAiPolishStep(step)}
+                          disabled={stepAiLoading.has(step.id) || !step.text.trim()}
+                          className="text-gray-300 hover:text-blue-500 disabled:opacity-30 transition-colors shrink-0"
+                          title="Correction & lissage"
+                        >
+                          <Sparkles size={14} />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleDeleteSetupStep(step.id)}
                           className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
                         >
                           <Trash2 size={14} />
                         </button>
                       </div>
-                      <div className="pl-7">
-                        <AiPolishButton
-                          text={step.text}
-                          language={reportLanguage}
-                          onAccept={(result) => handleUpdateSetupStep(step, result)}
-                        />
-                      </div>
+                      {stepAiError[step.id] && (
+                        <div className="pl-7 mt-1 flex items-center gap-2">
+                          <span className="text-xs text-red-500 italic">{stepAiError[step.id]}</span>
+                          <button type="button" onClick={() => handleCancelStepPreview(step.id)} className="text-gray-400 hover:text-gray-600">
+                            <X size={12} />
+                          </button>
+                        </div>
+                      )}
+                      {stepAiPreview[step.id] !== undefined && (
+                        <div className="pl-7 mt-2">
+                          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                            <p className="text-xs font-medium text-blue-700 mb-1.5">Suggestion IA</p>
+                            <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{stepAiPreview[step.id]}</p>
+                            <div className="flex items-center gap-2 mt-2.5">
+                              <button
+                                type="button"
+                                onClick={() => handleAcceptStepPreview(step)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors"
+                              >
+                                <Check size={11} />
+                                Remplacer
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleCancelStepPreview(step.id)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+                              >
+                                <X size={11} />
+                                Annuler
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
