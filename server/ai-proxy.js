@@ -12,6 +12,25 @@ const PROMPTS = {
   polish_incident_en: `You receive a JSON object representing an incident in a technical event report in English. Improve the style, spelling, grammar, and punctuation of each provided field. Return ONLY a valid JSON object with exactly the same keys, no explanation or extra text.`,
 };
 
+const SCREENSHOT_SYSTEM_PROMPT = `You are analyzing a network monitoring screenshot from an event report. Extract data for the LAST FULLY VISIBLE hour block shown in the graph — not a partial/cut-off hour, not an average.
+
+Rules:
+- Identify the last complete hour interval visible (e.g. "14:00" if the range shown ends at 15:00).
+- Extract the download value (bandwidth out) and upload value (bandwidth in) for that hour only.
+- Values are typically in GB or MB — include the unit if visible.
+- If the hour label is ambiguous or not clearly readable, set "uncertain": true.
+- If a value is not readable, set it to null.
+
+Return ONLY a valid JSON object with this exact shape:
+{
+  "hour_label": "HH:MM or null",
+  "bandwidth_out": <number in GB or null>,
+  "bandwidth_in": <number in GB or null>,
+  "uncertain": <true or false>
+}
+
+No explanation. No extra text. Just the JSON object.`;
+
 function json(res, status, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -78,6 +97,60 @@ function callOpenAI(systemPrompt, userText) {
   });
 }
 
+function callOpenAIVision(imageUrl) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      model: 'gpt-4o',
+      max_tokens: 512,
+      temperature: 0.1,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: SCREENSHOT_SYSTEM_PROMPT },
+            { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } },
+          ],
+        },
+      ],
+    });
+
+    const req = https.request(
+      {
+        hostname: 'api.openai.com',
+        path: '/v1/chat/completions',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Length': Buffer.byteLength(body),
+        },
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          if (res.statusCode !== 200) {
+            return reject(new Error(`OpenAI error ${res.statusCode}: ${data}`));
+          }
+          try {
+            const parsed = JSON.parse(data);
+            resolve(parsed.choices?.[0]?.message?.content?.trim() ?? '');
+          } catch {
+            reject(new Error('Failed to parse OpenAI response'));
+          }
+        });
+      }
+    );
+
+    req.on('error', reject);
+    req.setTimeout(30000, () => {
+      req.destroy(new Error('OpenAI vision request timed out'));
+    });
+    req.write(body);
+    req.end();
+  });
+}
+
 const server = http.createServer(async (req, res) => {
   addCors(res);
 
@@ -105,7 +178,20 @@ const server = http.createServer(async (req, res) => {
       return text(res, 400, 'Invalid JSON');
     }
 
-    const { text: inputText, action } = parsed;
+    const { text: inputText, action, imageUrl } = parsed;
+
+    if (action === 'analyze_screenshot') {
+      if (!imageUrl?.trim()) return text(res, 400, 'imageUrl is required');
+      try {
+        const result = await callOpenAIVision(imageUrl);
+        const stripped = result.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+        return json(res, 200, JSON.parse(stripped));
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Unknown error';
+        return text(res, 502, msg);
+      }
+    }
+
     if (!inputText?.trim()) return text(res, 400, 'text is required');
 
     const systemPrompt = PROMPTS[action];

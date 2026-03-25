@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Check, CheckCircle, Save, Sparkles, ChevronDown, ChevronUp, ClipboardPaste, Link, ArrowUp, ArrowDown, X, ZoomIn } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Check, CheckCircle, Save, Sparkles, ChevronDown, ChevronUp, ClipboardPaste, Link, ArrowUp, ArrowDown, X, ZoomIn, ScanSearch } from 'lucide-react';
 import { dayApi, hourlyApi, incidentApi, imageApi, reportApi, wifiApi, setupStepApi } from '../lib/eventReportApi';
-import { aiAssistIncident, aiPolishIncident, type AiAction } from '../lib/aiIncidentApi';
+import { aiAssistIncident, aiPolishIncident, aiAnalyzeScreenshot, type AiAction, type ScreenshotAnalysisResult } from '../lib/aiIncidentApi';
 import { uploadImageBlob, deleteStorageImage, createSignedImageUrl } from '../lib/imageStorageApi';
 import { WifiNetworksSection } from '../components/WifiNetworksSection';
 import { HourlyCharts } from '../components/HourlyCharts';
@@ -59,6 +59,9 @@ export const EventReportDayEditor = () => {
   const [manualUrlImgId, setManualUrlImgId] = useState<string | null>(null);
   const [previewImgUrl, setPreviewImgUrl] = useState<string | null>(null);
   const [signedUrls, setSignedUrls] = useState<Record<string, string | 'failed'>>({});
+  const [screenshotAnalyzing, setScreenshotAnalyzing] = useState<Record<string, boolean>>({});
+  const [screenshotDrafts, setScreenshotDrafts] = useState<Record<string, ScreenshotAnalysisResult>>({});
+  const [screenshotErrors, setScreenshotErrors] = useState<Record<string, string>>({});
   const imageDropzoneRef = useRef<HTMLDivElement>(null);
 
   const resolveSignedUrls = useCallback(async (imgs: EventReportImage[]) => {
@@ -83,6 +86,47 @@ export const EventReportDayEditor = () => {
       return next;
     });
   }, []);
+
+  const handleAnalyzeScreenshot = async (imgId: string, signedUrl: string) => {
+    setScreenshotAnalyzing((prev) => ({ ...prev, [imgId]: true }));
+    setScreenshotErrors((prev) => { const n = { ...prev }; delete n[imgId]; return n; });
+    setScreenshotDrafts((prev) => { const n = { ...prev }; delete n[imgId]; return n; });
+    try {
+      const result = await aiAnalyzeScreenshot(signedUrl);
+      setScreenshotDrafts((prev) => ({ ...prev, [imgId]: result }));
+    } catch (e) {
+      setScreenshotErrors((prev) => ({ ...prev, [imgId]: e instanceof Error ? e.message : 'Erreur IA' }));
+    } finally {
+      setScreenshotAnalyzing((prev) => { const n = { ...prev }; delete n[imgId]; return n; });
+    }
+  };
+
+  const handleAcceptScreenshotDraft = async (imgId: string) => {
+    const draft = screenshotDrafts[imgId];
+    if (!draft || !dayId) return;
+    setScreenshotDrafts((prev) => { const n = { ...prev }; delete n[imgId]; return n; });
+    try {
+      const row = await hourlyApi.upsert({
+        day_id: dayId,
+        hour_label: draft.hour_label ?? '',
+        wifi_users: 0,
+        bandwidth_in: draft.bandwidth_in ?? 0,
+        bandwidth_out: draft.bandwidth_out ?? 0,
+        notes: '',
+      });
+      setHourlyRows((prev) => {
+        const combined = [...prev.filter((r) => r.hour_label !== row.hour_label || r.id === row.id), row];
+        return combined.sort((a, b) => a.hour_label.localeCompare(b.hour_label));
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur');
+    }
+  };
+
+  const handleRejectScreenshotDraft = (imgId: string) => {
+    setScreenshotDrafts((prev) => { const n = { ...prev }; delete n[imgId]; return n; });
+    setScreenshotErrors((prev) => { const n = { ...prev }; delete n[imgId]; return n; });
+  };
 
   const handleAiAssist = async (inc: EventReportIncident, action: AiAction) => {
     const sourceText = action === 'translate_en'
@@ -1161,24 +1205,87 @@ export const EventReportDayEditor = () => {
                       className="w-full text-xs px-1.5 py-1 border border-gray-200 dark:border-gray-700 rounded bg-transparent text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                       placeholder="Légende..."
                     />
-                    <div className="flex gap-1 justify-end">
-                      <button
-                        onClick={() => handleMoveImage(img.id, 'up')}
-                        disabled={idx === 0}
-                        className="p-1 rounded text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-20 transition-colors"
-                        title="Monter"
-                      >
-                        <ArrowUp size={13} />
-                      </button>
-                      <button
-                        onClick={() => handleMoveImage(img.id, 'down')}
-                        disabled={idx === images.length - 1}
-                        className="p-1 rounded text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-20 transition-colors"
-                        title="Descendre"
-                      >
-                        <ArrowDown size={13} />
-                      </button>
+                    <div className="flex items-center gap-1 justify-between">
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => handleMoveImage(img.id, 'up')}
+                          disabled={idx === 0}
+                          className="p-1 rounded text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-20 transition-colors"
+                          title="Monter"
+                        >
+                          <ArrowUp size={13} />
+                        </button>
+                        <button
+                          onClick={() => handleMoveImage(img.id, 'down')}
+                          disabled={idx === images.length - 1}
+                          className="p-1 rounded text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-20 transition-colors"
+                          title="Descendre"
+                        >
+                          <ArrowDown size={13} />
+                        </button>
+                      </div>
+                      {typeof signedUrls[img.id] === 'string' && signedUrls[img.id] !== 'failed' && (
+                        <button
+                          onClick={() => handleAnalyzeScreenshot(img.id, signedUrls[img.id] as string)}
+                          disabled={screenshotAnalyzing[img.id]}
+                          className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-40 transition-colors"
+                          title="Analyser avec l'IA"
+                        >
+                          <ScanSearch size={12} />
+                          {screenshotAnalyzing[img.id] ? '...' : 'Analyser'}
+                        </button>
+                      )}
                     </div>
+                    {screenshotErrors[img.id] && (
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <span className="text-xs text-red-500 dark:text-red-400 leading-tight">{screenshotErrors[img.id]}</span>
+                        <button type="button" onClick={() => handleRejectScreenshotDraft(img.id)} className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 shrink-0">
+                          <X size={11} />
+                        </button>
+                      </div>
+                    )}
+                    {screenshotDrafts[img.id] && (
+                      <div className="mt-1.5 rounded-lg border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 p-2.5">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">Proposition IA</span>
+                          {screenshotDrafts[img.id].uncertain && (
+                            <span className="text-xs px-1 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded font-medium">Incertain</span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5 mb-2 text-xs">
+                          <div className="text-center">
+                            <div className="text-gray-500 dark:text-gray-400">Heure</div>
+                            <div className="font-mono font-semibold text-gray-800 dark:text-gray-200">{screenshotDrafts[img.id].hour_label ?? '—'}</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-green-600 dark:text-green-400">↓ DL</div>
+                            <div className="font-mono font-semibold text-gray-800 dark:text-gray-200">{screenshotDrafts[img.id].bandwidth_out != null ? `${screenshotDrafts[img.id].bandwidth_out} GB` : '—'}</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-blue-600 dark:text-blue-400">↑ UL</div>
+                            <div className="font-mono font-semibold text-gray-800 dark:text-gray-200">{screenshotDrafts[img.id].bandwidth_in != null ? `${screenshotDrafts[img.id].bandwidth_in} GB` : '—'}</div>
+                          </div>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleAcceptScreenshotDraft(img.id)}
+                            className="flex-1 flex items-center justify-center gap-1 py-1 text-xs rounded bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors"
+                          >
+                            <Check size={11} />
+                            Valider
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRejectScreenshotDraft(img.id)}
+                            className="flex-1 flex items-center justify-center gap-1 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            <X size={11} />
+                            Rejeter
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

@@ -36,3 +36,24 @@ export async function aiPolishIncident(
   }
   return res.json() as Promise<IncidentPolishFields>;
 }
+
+export interface ScreenshotAnalysisResult {
+  hour_label: string | null;
+  bandwidth_out: number | null;
+  bandwidth_in: number | null;
+  uncertain: boolean;
+}
+
+export async function aiAnalyzeScreenshot(imageUrl: string): Promise<ScreenshotAnalysisResult> {
+  const res = await fetch('/ai-assist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'analyze_screenshot', imageUrl }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(body || `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<ScreenshotAnalysisResult>;
+}
