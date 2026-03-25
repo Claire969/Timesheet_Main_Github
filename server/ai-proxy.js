@@ -293,7 +293,8 @@ const server = http.createServer(async (req, res) => {
     try {
       const result = await callOpenAI(systemPrompt, inputText);
       if (isJsonAction) {
-        return json(res, 200, JSON.parse(result));
+        const stripped = result.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+        return json(res, 200, JSON.parse(stripped));
       }
       return text(res, 200, result);
     } catch (e) {
