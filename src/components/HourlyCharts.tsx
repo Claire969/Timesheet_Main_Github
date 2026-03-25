@@ -5,9 +5,10 @@ interface LineChartProps {
   series: { label: string; color: string; values: number[] }[];
   yUnit?: string;
   height?: number;
+  yMin?: number;
 }
 
-function LineChart({ labels, series, yUnit = '', height = 140 }: LineChartProps) {
+function LineChart({ labels, series, yUnit = '', height = 140, yMin = 0 }: LineChartProps) {
   const PAD = { top: 12, right: 16, bottom: 32, left: 44 };
   const W = 600;
   const H = height;
@@ -15,7 +16,7 @@ function LineChart({ labels, series, yUnit = '', height = 140 }: LineChartProps)
   const innerH = H - PAD.top - PAD.bottom;
 
   const allValues = series.flatMap((s) => s.values);
-  const maxVal = Math.max(...allValues, 1);
+  const maxVal = Math.max(...allValues, yMin, 1);
   const n = labels.length;
 
   const xPos = (i: number) => PAD.left + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
@@ -139,7 +140,8 @@ export function HourlyCharts({ rows }: HourlyChartsProps) {
         <LineChart
           labels={labels}
           series={[{ label: 'Wi-Fi', color: '#3b82f6', values: wifiValues }]}
-          height={130}
+          height={160}
+          yMin={1000}
         />
       </div>
 
