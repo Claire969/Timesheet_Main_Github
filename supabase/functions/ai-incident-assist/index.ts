@@ -34,7 +34,30 @@ Return ONLY a valid JSON object with this exact shape:
 
 No explanation. No extra text. Just the JSON object.`;
 
-const JSON_ACTIONS = new Set(["polish_incident_fr", "polish_incident_en", "analyze_screenshot"]);
+function makeScreenshotForHourPrompt(targetHour: string): string {
+  return `You are analyzing a network monitoring screenshot from an event report. The user has selected the hour "${targetHour}" as the target. Extract values FOR THAT SPECIFIC HOUR ONLY.
+
+Rules:
+- The target hour is explicitly "${targetHour}". Do NOT pick a different hour.
+- Extract the download value (bandwidth out) and upload value (bandwidth in) for that hour only.
+- Values are typically in GB or MB. Convert to GB if needed (e.g. 512 MB = 0.512 GB). Return a plain number.
+- If the graph is unclear or the target hour is not readable, set "uncertain": true and return null for values you cannot read.
+- Do NOT invent values. If unsure, prefer null over a guess.
+- wifi_users: if clearly visible as a labeled user count for that hour, include it as an integer; otherwise return null.
+
+Return ONLY a valid JSON object with this exact shape:
+{
+  "hour_label": "${targetHour}",
+  "bandwidth_out": <number in GB or null>,
+  "bandwidth_in": <number in GB or null>,
+  "wifi_users": <integer or null>,
+  "uncertain": <true or false>
+}
+
+No explanation. No extra text. Just the JSON object.`;
+}
+
+const JSON_ACTIONS = new Set(["polish_incident_fr", "polish_incident_en", "analyze_screenshot", "analyze_screenshot_for_hour"]);
 
 function unauthorized() {
   return new Response("Unauthorized", {
@@ -62,13 +85,72 @@ Deno.serve(async (req: Request) => {
   if (authError || !user?.id) return unauthorized();
 
   try {
-    const body = await req.json() as { text?: string; action: string; imageUrl?: string };
-    const { action, imageUrl } = body;
+    const body = await req.json() as { text?: string; action: string; imageUrl?: string; base64Image?: string; targetHour?: string };
+    const { action, imageUrl, base64Image, targetHour } = body;
     const text = body.text;
 
     const apiKey = Deno.env.get("OPENAI_API_KEY");
     if (!apiKey) {
       return new Response("OpenAI not configured", { status: 500, headers: corsHeaders });
+    }
+
+    if (action === "analyze_screenshot_for_hour") {
+      if (!base64Image?.trim()) {
+        return new Response("base64Image is required", { status: 400, headers: corsHeaders });
+      }
+      if (!targetHour?.trim()) {
+        return new Response("targetHour is required", { status: 400, headers: corsHeaders });
+      }
+
+      const prompt = makeScreenshotForHourPrompt(targetHour);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+
+      let openaiRes: Response;
+      try {
+        openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            max_tokens: 512,
+            temperature: 0.1,
+            messages: [
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: prompt },
+                  { type: "image_url", image_url: { url: base64Image, detail: "high" } },
+                ],
+              },
+            ],
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      if (!openaiRes.ok) {
+        return new Response(`OpenAI error: ${openaiRes.status}`, { status: 502, headers: corsHeaders });
+      }
+
+      const data = await openaiRes.json() as { choices: { message: { content: string } }[] };
+      const result = (data.choices?.[0]?.message?.content?.trim() ?? "")
+        .replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(result);
+      } catch {
+        return new Response("Invalid JSON from AI", { status: 502, headers: corsHeaders });
+      }
+      return new Response(JSON.stringify(parsed), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (action === "analyze_screenshot") {
