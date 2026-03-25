@@ -145,19 +145,19 @@ export function HourlyCharts({ rows }: HourlyChartsProps) {
 
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bande passante (Mbps)</span>
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bande passante (GB)</span>
           <Legend
             items={[
-              { label: 'Upload (↓)', color: '#3b82f6' },
-              { label: 'Download (↑)', color: '#10b981' },
+              { label: 'Download (↓)', color: '#10b981' },
+              { label: 'Upload (↑)', color: '#3b82f6' },
             ]}
           />
         </div>
         <LineChart
           labels={labels}
           series={[
-            { label: 'Upload', color: '#3b82f6', values: bwInValues },
             { label: 'Download', color: '#10b981', values: bwOutValues },
+            { label: 'Upload', color: '#3b82f6', values: bwInValues },
           ]}
           yUnit=""
           height={130}

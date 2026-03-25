@@ -705,10 +705,10 @@ export const EventReportDayEditor = () => {
                     <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-24">Heure</th>
                     <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Wi-Fi</th>
                     <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      <span className="text-blue-500">↓</span> Upload
+                      <span className="text-green-500">↓</span> Download
                     </th>
                     <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      <span className="text-green-500">↑</span> Download
+                      <span className="text-blue-500">↑</span> Upload
                     </th>
                     <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Notes</th>
                     <th className="px-3 py-2.5 w-8" />
@@ -740,12 +740,12 @@ export const EventReportDayEditor = () => {
                           <input
                             type="number"
                             min={0}
-                            step={0.1}
-                            value={row.bandwidth_in}
-                            onChange={(e) => handleUpdateHourlyRow(row, 'bandwidth_in', parseFloat(e.target.value) || 0)}
+                            step={0.01}
+                            value={row.bandwidth_out}
+                            onChange={(e) => handleUpdateHourlyRow(row, 'bandwidth_out', parseFloat(e.target.value) || 0)}
                             className="w-full px-2 py-1 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
-                          <span className="text-xs text-gray-400 shrink-0">Mb</span>
+                          <span className="text-xs text-gray-400 shrink-0">GB</span>
                         </div>
                       </td>
                       <td className="px-3 py-2">
@@ -753,12 +753,12 @@ export const EventReportDayEditor = () => {
                           <input
                             type="number"
                             min={0}
-                            step={0.1}
-                            value={row.bandwidth_out}
-                            onChange={(e) => handleUpdateHourlyRow(row, 'bandwidth_out', parseFloat(e.target.value) || 0)}
+                            step={0.01}
+                            value={row.bandwidth_in}
+                            onChange={(e) => handleUpdateHourlyRow(row, 'bandwidth_in', parseFloat(e.target.value) || 0)}
                             className="w-full px-2 py-1 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
-                          <span className="text-xs text-gray-400 shrink-0">Mb</span>
+                          <span className="text-xs text-gray-400 shrink-0">GB</span>
                         </div>
                       </td>
                       <td className="px-3 py-2">
