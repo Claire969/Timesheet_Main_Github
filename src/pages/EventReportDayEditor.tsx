@@ -867,7 +867,6 @@ export const EventReportDayEditor = () => {
                     <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                       <span className="text-blue-500">↑</span> Upload
                     </th>
-                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Notes</th>
                     <th className="px-3 py-2.5 w-8" />
                   </tr>
                 </thead>
@@ -889,7 +888,7 @@ export const EventReportDayEditor = () => {
                           min={0}
                           value={row.wifi_users}
                           onChange={(e) => handleUpdateHourlyRow(row, 'wifi_users', parseInt(e.target.value) || 0)}
-                          className="w-full px-2 py-1 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-2 py-1 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-center bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </td>
                       <td className="px-3 py-2">
@@ -900,7 +899,7 @@ export const EventReportDayEditor = () => {
                             step={0.01}
                             value={row.bandwidth_out}
                             onChange={(e) => handleUpdateHourlyRow(row, 'bandwidth_out', parseFloat(e.target.value) || 0)}
-                            className="w-full px-2 py-1 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-center bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                           />
                           <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">GB</span>
                         </div>
@@ -913,19 +912,10 @@ export const EventReportDayEditor = () => {
                             step={0.01}
                             value={row.bandwidth_in}
                             onChange={(e) => handleUpdateHourlyRow(row, 'bandwidth_in', parseFloat(e.target.value) || 0)}
-                            className="w-full px-2 py-1 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-center bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                           />
                           <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">GB</span>
                         </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="text"
-                          value={row.notes}
-                          onChange={(e) => handleUpdateHourlyRow(row, 'notes', e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="—"
-                        />
                       </td>
                       <td className="px-3 py-2 text-center">
                         <button onClick={() => handleDeleteHourlyRow(row.id)} className="text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition-colors">
