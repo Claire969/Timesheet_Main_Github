@@ -57,3 +57,28 @@ export async function aiAnalyzeScreenshot(imageUrl: string): Promise<ScreenshotA
   }
   return res.json() as Promise<ScreenshotAnalysisResult>;
 }
+
+export interface HourScreenshotAnalysisResult {
+  hour_label: string;
+  bandwidth_out: number | null;
+  bandwidth_in: number | null;
+  wifi_users: number | null;
+  uncertain: boolean;
+}
+
+export async function aiAnalyzeScreenshotForRow(
+  base64Image: string,
+  targetHour: string,
+): Promise<HourScreenshotAnalysisResult> {
+  const res = await fetch('/ai-assist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'analyze_screenshot_for_hour', base64Image, targetHour }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(body || `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<HourScreenshotAnalysisResult>;
+}

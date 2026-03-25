@@ -31,6 +31,29 @@ Return ONLY a valid JSON object with this exact shape:
 
 No explanation. No extra text. Just the JSON object.`;
 
+function makeScreenshotForHourPrompt(targetHour) {
+  return `You are analyzing a network monitoring screenshot from an event report. The user has selected the hour "${targetHour}" as the target. Extract values FOR THAT SPECIFIC HOUR ONLY.
+
+Rules:
+- The target hour is explicitly "${targetHour}". Do NOT pick a different hour.
+- Extract the download value (bandwidth out) and upload value (bandwidth in) for that hour only.
+- Values are typically in GB or MB. Convert to GB if needed (e.g. 512 MB = 0.512 GB). Return a plain number.
+- If the graph is unclear or the target hour is not readable, set "uncertain": true and return null for values you cannot read.
+- Do NOT invent values. If unsure, prefer null over a guess.
+- wifi_users: if clearly visible as a labeled user count for that hour, include it as an integer; otherwise return null.
+
+Return ONLY a valid JSON object with this exact shape:
+{
+  "hour_label": "${targetHour}",
+  "bandwidth_out": <number in GB or null>,
+  "bandwidth_in": <number in GB or null>,
+  "wifi_users": <integer or null>,
+  "uncertain": <true or false>
+}
+
+No explanation. No extra text. Just the JSON object.`;
+}
+
 function json(res, status, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -151,6 +174,61 @@ function callOpenAIVision(imageUrl) {
   });
 }
 
+function callOpenAIVisionBase64(base64DataUri, targetHour) {
+  const prompt = makeScreenshotForHourPrompt(targetHour);
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      model: 'gpt-4o',
+      max_tokens: 512,
+      temperature: 0.1,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: base64DataUri, detail: 'high' } },
+          ],
+        },
+      ],
+    });
+
+    const req = https.request(
+      {
+        hostname: 'api.openai.com',
+        path: '/v1/chat/completions',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Length': Buffer.byteLength(body),
+        },
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          if (res.statusCode !== 200) {
+            return reject(new Error(`OpenAI error ${res.statusCode}: ${data}`));
+          }
+          try {
+            const parsed = JSON.parse(data);
+            resolve(parsed.choices?.[0]?.message?.content?.trim() ?? '');
+          } catch {
+            reject(new Error('Failed to parse OpenAI response'));
+          }
+        });
+      }
+    );
+
+    req.on('error', reject);
+    req.setTimeout(30000, () => {
+      req.destroy(new Error('OpenAI vision request timed out'));
+    });
+    req.write(body);
+    req.end();
+  });
+}
+
 const server = http.createServer(async (req, res) => {
   addCors(res);
 
@@ -178,7 +256,20 @@ const server = http.createServer(async (req, res) => {
       return text(res, 400, 'Invalid JSON');
     }
 
-    const { text: inputText, action, imageUrl } = parsed;
+    const { text: inputText, action, imageUrl, base64Image, targetHour } = parsed;
+
+    if (action === 'analyze_screenshot_for_hour') {
+      if (!base64Image?.trim()) return text(res, 400, 'base64Image is required');
+      if (!targetHour?.trim()) return text(res, 400, 'targetHour is required');
+      try {
+        const result = await callOpenAIVisionBase64(base64Image, targetHour);
+        const stripped = result.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+        return json(res, 200, JSON.parse(stripped));
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Unknown error';
+        return text(res, 502, msg);
+      }
+    }
 
     if (action === 'analyze_screenshot') {
       if (!imageUrl?.trim()) return text(res, 400, 'imageUrl is required');

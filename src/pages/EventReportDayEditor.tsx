@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Check, CheckCircle, Save, Sparkles, ChevronDown, ChevronUp, ClipboardPaste, Link, ArrowUp, ArrowDown, X, ZoomIn, ScanSearch } from 'lucide-react';
 import { dayApi, hourlyApi, incidentApi, imageApi, reportApi, wifiApi, setupStepApi } from '../lib/eventReportApi';
-import { aiAssistIncident, aiPolishIncident, aiAnalyzeScreenshot, type AiAction, type ScreenshotAnalysisResult } from '../lib/aiIncidentApi';
+import { aiAssistIncident, aiPolishIncident, aiAnalyzeScreenshot, aiAnalyzeScreenshotForRow, type AiAction, type ScreenshotAnalysisResult, type HourScreenshotAnalysisResult } from '../lib/aiIncidentApi';
 import { uploadImageBlob, deleteStorageImage, createSignedImageUrl } from '../lib/imageStorageApi';
 import { WifiNetworksSection } from '../components/WifiNetworksSection';
 import { HourlyCharts } from '../components/HourlyCharts';
@@ -63,6 +63,12 @@ export const EventReportDayEditor = () => {
   const [screenshotDrafts, setScreenshotDrafts] = useState<Record<string, ScreenshotAnalysisResult>>({});
   const [screenshotErrors, setScreenshotErrors] = useState<Record<string, string>>({});
   const imageDropzoneRef = useRef<HTMLDivElement>(null);
+
+  const [rowAnalyserOpen, setRowAnalyserOpen] = useState<string | null>(null);
+  const [rowAnalyserAnalyzing, setRowAnalyserAnalyzing] = useState<Record<string, boolean>>({});
+  const [rowAnalyserDraft, setRowAnalyserDraft] = useState<Record<string, HourScreenshotAnalysisResult>>({});
+  const [rowAnalyserError, setRowAnalyserError] = useState<Record<string, string>>({});
+  const rowAnalyserFileRef = useRef<HTMLInputElement>(null);
 
   const resolveSignedUrls = useCallback(async (imgs: EventReportImage[]) => {
     const toResolve = imgs.filter((i) => i.file_url);
@@ -126,6 +132,57 @@ export const EventReportDayEditor = () => {
   const handleRejectScreenshotDraft = (imgId: string) => {
     setScreenshotDrafts((prev) => { const n = { ...prev }; delete n[imgId]; return n; });
     setScreenshotErrors((prev) => { const n = { ...prev }; delete n[imgId]; return n; });
+  };
+
+  const readFileAsBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const handleRowAnalyserRunWithFile = async (rowId: string, targetHour: string, file: File) => {
+    setRowAnalyserError((prev) => { const n = { ...prev }; delete n[rowId]; return n; });
+    setRowAnalyserDraft((prev) => { const n = { ...prev }; delete n[rowId]; return n; });
+    setRowAnalyserAnalyzing((prev) => ({ ...prev, [rowId]: true }));
+    try {
+      const base64 = await readFileAsBase64(file);
+      const result = await aiAnalyzeScreenshotForRow(base64, targetHour);
+      setRowAnalyserDraft((prev) => ({ ...prev, [rowId]: result }));
+    } catch (e) {
+      setRowAnalyserError((prev) => ({ ...prev, [rowId]: e instanceof Error ? e.message : 'Erreur IA' }));
+    } finally {
+      setRowAnalyserAnalyzing((prev) => { const n = { ...prev }; delete n[rowId]; return n; });
+    }
+  };
+
+  const handleRowAnalyserPaste = async (rowId: string, targetHour: string, e: React.ClipboardEvent) => {
+    const item = Array.from(e.clipboardData.items).find((i) => i.type.startsWith('image/'));
+    if (!item) return;
+    e.preventDefault();
+    const file = item.getAsFile();
+    if (!file) return;
+    await handleRowAnalyserRunWithFile(rowId, targetHour, file);
+  };
+
+  const handleRowAnalyserAccept = (row: EventReportHourlyRow) => {
+    const draft = rowAnalyserDraft[row.id];
+    if (!draft) return;
+    const updated: EventReportHourlyRow = {
+      ...row,
+      bandwidth_out: draft.bandwidth_out ?? row.bandwidth_out,
+      bandwidth_in: draft.bandwidth_in ?? row.bandwidth_in,
+      wifi_users: draft.wifi_users != null ? draft.wifi_users : row.wifi_users,
+    };
+    setHourlyRows((prev) => prev.map((r) => (r.id === row.id ? updated : r)));
+    setRowAnalyserDraft((prev) => { const n = { ...prev }; delete n[row.id]; return n; });
+    setRowAnalyserOpen(null);
+  };
+
+  const handleRowAnalyserReject = (rowId: string) => {
+    setRowAnalyserDraft((prev) => { const n = { ...prev }; delete n[rowId]; return n; });
+    setRowAnalyserError((prev) => { const n = { ...prev }; delete n[rowId]; return n; });
   };
 
   const handleAiAssist = async (inc: EventReportIncident, action: AiAction) => {
@@ -868,10 +925,12 @@ export const EventReportDayEditor = () => {
                       <span className="text-blue-500">↑</span> Upload
                     </th>
                     <th className="px-3 py-2.5 w-8" />
+                    <th className="px-3 py-2.5 w-8" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {hourlyRows.map((row, rowIdx) => (
+                    <>
                     <tr key={row.id} className={rowIdx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50/50 dark:bg-gray-900/30'}>
                       <td className="px-3 py-2">
                         <input
@@ -918,11 +977,114 @@ export const EventReportDayEditor = () => {
                         </div>
                       </td>
                       <td className="px-3 py-2 text-center">
+                        <button
+                          title={`Analyser capture pour ${row.hour_label}`}
+                          onClick={() => setRowAnalyserOpen(rowAnalyserOpen === row.id ? null : row.id)}
+                          className={`transition-colors ${rowAnalyserOpen === row.id ? 'text-blue-500 dark:text-blue-400' : 'text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400'}`}
+                        >
+                          <ScanSearch size={14} />
+                        </button>
+                      </td>
+                      <td className="px-3 py-2 text-center">
                         <button onClick={() => handleDeleteHourlyRow(row.id)} className="text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition-colors">
                           <Trash2 size={14} />
                         </button>
                       </td>
                     </tr>
+                    {rowAnalyserOpen === row.id && (
+                      <tr key={`${row.id}-analyser`} className="bg-blue-50/60 dark:bg-blue-900/10 border-t border-blue-100 dark:border-blue-800/40">
+                        <td colSpan={6} className="px-4 py-3">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                                Analyser capture pour <span className="font-mono">{row.hour_label}</span>
+                              </span>
+                              {!rowAnalyserAnalyzing[row.id] && !rowAnalyserDraft[row.id] && (
+                                <>
+                                  <input
+                                    ref={rowAnalyserFileRef}
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) await handleRowAnalyserRunWithFile(row.id, row.hour_label, file);
+                                      e.target.value = '';
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => rowAnalyserFileRef.current?.click()}
+                                    className="flex items-center gap-1 px-2 py-1 text-xs border border-blue-300 dark:border-blue-600 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                                  >
+                                    Choisir fichier
+                                  </button>
+                                  <div
+                                    tabIndex={0}
+                                    onPaste={(e) => handleRowAnalyserPaste(row.id, row.hour_label, e)}
+                                    className="flex items-center gap-1 px-2 py-1 text-xs border border-dashed border-blue-300 dark:border-blue-600 text-blue-500 dark:text-blue-400 rounded-lg cursor-text focus:outline-none focus:ring-2 focus:ring-blue-400 select-none"
+                                  >
+                                    <ClipboardPaste size={12} />
+                                    Coller capture (Ctrl+V)
+                                  </div>
+                                </>
+                              )}
+                              {rowAnalyserAnalyzing[row.id] && (
+                                <span className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 animate-pulse">
+                                  <Sparkles size={12} />
+                                  Analyse en cours…
+                                </span>
+                              )}
+                              <button
+                                onClick={() => { setRowAnalyserOpen(null); handleRowAnalyserReject(row.id); }}
+                                className="ml-auto text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                            {rowAnalyserError[row.id] && (
+                              <p className="text-xs text-red-500 dark:text-red-400">{rowAnalyserError[row.id]}</p>
+                            )}
+                            {rowAnalyserDraft[row.id] && (
+                              <div className="flex flex-col gap-2 mt-1 p-3 bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-700 rounded-xl text-xs">
+                                {rowAnalyserDraft[row.id].uncertain && (
+                                  <p className="text-amber-600 dark:text-amber-400 font-medium">Valeurs incertaines — vérifiez avant de valider.</p>
+                                )}
+                                <div className="flex gap-4 flex-wrap">
+                                  <span className="text-gray-500 dark:text-gray-400">
+                                    <span className="text-green-500">↓</span> Download : <span className="font-mono font-medium text-gray-800 dark:text-gray-200">{rowAnalyserDraft[row.id].bandwidth_out != null ? `${rowAnalyserDraft[row.id].bandwidth_out} GB` : '—'}</span>
+                                  </span>
+                                  <span className="text-gray-500 dark:text-gray-400">
+                                    <span className="text-blue-500">↑</span> Upload : <span className="font-mono font-medium text-gray-800 dark:text-gray-200">{rowAnalyserDraft[row.id].bandwidth_in != null ? `${rowAnalyserDraft[row.id].bandwidth_in} GB` : '—'}</span>
+                                  </span>
+                                  {rowAnalyserDraft[row.id].wifi_users != null && (
+                                    <span className="text-gray-500 dark:text-gray-400">
+                                      Wi-Fi : <span className="font-mono font-medium text-gray-800 dark:text-gray-200">{rowAnalyserDraft[row.id].wifi_users}</span>
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex gap-2 mt-1">
+                                  <button
+                                    onClick={() => handleRowAnalyserAccept(row)}
+                                    className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition-colors"
+                                  >
+                                    <Check size={12} />
+                                    Valider
+                                  </button>
+                                  <button
+                                    onClick={() => handleRowAnalyserReject(row.id)}
+                                    className="flex items-center gap-1 px-3 py-1 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg text-xs font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                  >
+                                    <X size={12} />
+                                    Rejeter
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </>
                   ))}
                 </tbody>
               </table>
