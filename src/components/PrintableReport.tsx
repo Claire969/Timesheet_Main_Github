@@ -317,60 +317,70 @@ function PrintableDayPage({ dayData, dayIndex, totalEventDays }: {
               {incidents.length}
             </span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {incidents.map((inc) => (
+          <div style={{ border: `1px solid ${BORDER}`, borderRadius: 8, overflow: 'hidden' }}>
+            {incidents.map((inc, idx) => (
               <div
                 key={inc.id}
                 style={{
-                  border: `1px solid ${inc.network_impact ? '#fca5a5' : BORDER}`,
-                  borderLeft: `4px solid ${inc.network_impact ? '#dc2626' : '#94a3b8'}`,
-                  borderRadius: 6,
-                  padding: '12px 16px',
-                  background: inc.network_impact ? '#fff5f5' : '#fff',
+                  display: 'grid',
+                  gridTemplateColumns: '52px 1fr',
+                  borderBottom: idx < incidents.length - 1 ? `1px solid ${BORDER}` : 'none',
+                  borderLeft: `3px solid ${inc.network_impact ? '#dc2626' : '#94a3b8'}`,
+                  background: inc.network_impact ? '#fff9f9' : (idx % 2 === 0 ? BG_ROW_ALT : '#fff'),
                   pageBreakInside: 'avoid',
                   breakInside: 'avoid',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-                  {inc.incident_time && (
-                    <span style={{
-                      fontSize: 9,
-                      fontFamily: 'monospace',
-                      background: NAVY_LIGHT,
-                      color: NAVY,
-                      padding: '2px 7px',
-                      borderRadius: 4,
-                      fontWeight: 700,
-                      letterSpacing: '0.05em',
-                    }}>
-                      {inc.incident_time.slice(0, 5)}
-                    </span>
+                {/* Time column */}
+                <div style={{
+                  padding: '8px 0 8px 10px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'center',
+                  paddingTop: 10,
+                  borderRight: `1px solid ${BORDER}`,
+                }}>
+                  <span style={{
+                    fontSize: 9,
+                    fontFamily: 'monospace',
+                    fontWeight: 700,
+                    color: NAVY,
+                    letterSpacing: '0.04em',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {inc.incident_time ? inc.incident_time.slice(0, 5) : '—'}
+                  </span>
+                </div>
+
+                {/* Content column */}
+                <div style={{ padding: '8px 12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: TEXT_PRIMARY, flex: 1, lineHeight: 1.3 }}>{inc.title}</span>
+                    {inc.network_impact && (
+                      <span style={{ fontSize: 8, background: '#fee2e2', color: '#b91c1c', padding: '1px 6px', borderRadius: 20, fontWeight: 700, letterSpacing: '0.04em', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        Impact réseau
+                      </span>
+                    )}
+                  </div>
+                  {inc.description && (
+                    <div style={{ marginBottom: 3 }}>
+                      <span style={{ fontSize: 8, fontWeight: 700, color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Description — </span>
+                      <span style={{ fontSize: 10, color: TEXT_PRIMARY, lineHeight: 1.55 }}>{inc.description}</span>
+                    </div>
                   )}
-                  <span style={{ fontSize: 12, fontWeight: 800, color: TEXT_PRIMARY, flex: 1 }}>{inc.title}</span>
-                  {inc.network_impact && (
-                    <span style={{ fontSize: 9, background: '#fee2e2', color: '#b91c1c', padding: '2px 8px', borderRadius: 20, fontWeight: 700, letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
-                      Impact réseau
-                    </span>
+                  {inc.resolution && (
+                    <div style={{ marginBottom: 3 }}>
+                      <span style={{ fontSize: 8, fontWeight: 700, color: ACCENT_GREEN, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Résolution — </span>
+                      <span style={{ fontSize: 10, color: TEXT_PRIMARY, lineHeight: 1.55 }}>{inc.resolution}</span>
+                    </div>
+                  )}
+                  {inc.network_impact && inc.network_impact_text && (
+                    <div>
+                      <span style={{ fontSize: 8, fontWeight: 700, color: '#b91c1c', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Impact réseau — </span>
+                      <span style={{ fontSize: 10, color: '#7f1d1d', lineHeight: 1.55 }}>{inc.network_impact_text}</span>
+                    </div>
                   )}
                 </div>
-                {inc.description && (
-                  <div style={{ marginBottom: inc.resolution ? 6 : 0 }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Description</span>
-                    <p style={{ fontSize: 10.5, color: TEXT_PRIMARY, margin: '3px 0 0', lineHeight: 1.6 }}>{inc.description}</p>
-                  </div>
-                )}
-                {inc.resolution && (
-                  <div style={{ marginTop: 6, paddingTop: 6, borderTop: `1px solid ${BORDER}` }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: ACCENT_GREEN, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Résolution</span>
-                    <p style={{ fontSize: 10.5, color: TEXT_PRIMARY, margin: '3px 0 0', lineHeight: 1.6 }}>{inc.resolution}</p>
-                  </div>
-                )}
-                {inc.network_impact && inc.network_impact_text && (
-                  <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #fca5a5' }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: '#b91c1c', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Détail impact réseau</span>
-                    <p style={{ fontSize: 10.5, color: '#7f1d1d', margin: '3px 0 0', lineHeight: 1.6 }}>{inc.network_impact_text}</p>
-                  </div>
-                )}
               </div>
             ))}
           </div>
