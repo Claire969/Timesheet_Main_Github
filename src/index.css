@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* repeat-header is hidden on screen; shown only in print via @media print below */
+.repeat-header {
+  display: none;
+}
+
 @media print {
   body > *:not(#print-root) {
     display: none !important;
@@ -17,11 +22,26 @@
     color-adjust: exact !important;
   }
 
+  /* Repeat header: fixed at top of every physical page */
+  .repeat-header {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+  }
+
   .print-page {
     page-break-after: always;
     break-after: page;
     padding: 14mm 16mm 18mm;
     box-sizing: border-box;
+  }
+
+  /* Day pages: add extra top padding to clear the fixed repeat-header (~35px) */
+  .print-page:not(:first-child) {
+    padding-top: calc(14mm + 38px);
   }
 
   .print-page:last-child {

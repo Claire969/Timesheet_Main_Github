@@ -218,6 +218,40 @@ function DayPageHeader({ eventName, centerLabel, reportDate, isContinuation, pag
   );
 }
 
+// ─── Fixed repeat header (stamped on every physical page via position:fixed) ──
+// Rendered once at document level; shows on all pages except the cover.
+// The cover suppression is handled via CSS: .print-page:first-child ~ .repeat-header
+// does not apply since it lives outside .print-page, so we rely on the cover
+// having its own full-bleed header that visually overrides it.
+
+function RepeatHeader({ eventName, totalPages }: {
+  eventName: string;
+  totalPages: number;
+}) {
+  return (
+    <div className="repeat-header">
+      <div style={{
+        background: NAVY,
+        padding: '6px 18px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+        <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: '0.04em', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          Clear Computing
+        </div>
+        <div style={{ fontSize: 9, fontWeight: 800, color: '#fff', letterSpacing: '0.02em', textAlign: 'center', flex: 'none', padding: '0 16px' }}>
+          {eventName}
+        </div>
+        <div style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.04em', flex: 1, textAlign: 'right', whiteSpace: 'nowrap' }}>
+          Rapport réseau · {totalPages} pages
+        </div>
+      </div>
+      <div style={{ height: 3, background: `linear-gradient(90deg, ${ACCENT_BLUE} 0%, #38bdf8 100%)` }} />
+    </div>
+  );
+}
+
 // ─── Day page ─────────────────────────────────────────────────────────────────
 
 function PrintableDayPage({ dayData, dayIndex, totalEventDays, pageNumber, totalPages, eventName }: {
@@ -430,7 +464,7 @@ function IncidentsSection({ incidents }: { incidents: EventReportIncident[] }) {
                   <span style={{ fontSize: 10, color: TEXT_PRIMARY, lineHeight: 1.6 }}>{inc.resolution}</span>
                 </div>
               )}
-              {inc.network_impact && inc.network_impact_text?.trim() && (
+              {inc.network_impact && inc.network_impact_text?.trim() && inc.network_impact_text.toLowerCase() !== 'null' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '0 8px', alignItems: 'baseline' }}>
                   <span style={{ fontSize: 8, fontWeight: 700, color: INC_IMPACT_COLOR, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Impact</span>
                   <span style={{ fontSize: 10, color: TEXT_PRIMARY, lineHeight: 1.6 }}>{inc.network_impact_text}</span>
@@ -445,10 +479,16 @@ function IncidentsSection({ incidents }: { incidents: EventReportIncident[] }) {
 }
 
 function ImagesSection({ images }: { images: EventReportImage[] }) {
+  const isSingle = images.length === 1;
   return (
     <div style={sectionBlock}>
       <div style={sectionLabel}>Captures / Photos</div>
-      <div style={{ display: 'grid', gridTemplateColumns: images.length === 1 ? '1fr' : '1fr 1fr', gap: 12 }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isSingle ? 'minmax(0, 480px)' : '1fr 1fr',
+        gap: 12,
+        justifyContent: isSingle ? 'start' : undefined,
+      }}>
         {images.map((img) => (
           <div
             key={img.id}
@@ -461,11 +501,11 @@ function ImagesSection({ images }: { images: EventReportImage[] }) {
               pageBreakBefore: 'auto',
             }}
           >
-            <div style={{ background: BG_ROW_ALT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, minHeight: 40, maxHeight: images.length === 1 ? 340 : 220, overflow: 'hidden' }}>
+            <div style={{ background: BG_ROW_ALT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, minHeight: 40, maxHeight: isSingle ? 220 : 220, overflow: 'hidden' }}>
               <img
                 src={img.file_url}
                 alt={img.caption || ''}
-                style={{ maxWidth: '100%', maxHeight: images.length === 1 ? 320 : 200, width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto' }}
+                style={{ maxWidth: '100%', maxHeight: isSingle ? 200 : 200, width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto' }}
               />
             </div>
             {img.caption && (
@@ -727,6 +767,12 @@ export function PrintableReport({ data }: PrintableReportProps) {
           <span style={{ fontSize: 8, color: TEXT_MUTED, letterSpacing: '0.03em' }}>Document confidentiel</span>
         </div>
       </div>
+
+      {/* ═══════════════════════════ REPEAT HEADER ═══════════════════════════ */}
+      {/* position:fixed in @media print — stamps on every page after the cover */}
+      {eventDays.length > 0 && (
+        <RepeatHeader eventName={report.event_name} totalPages={eventDays.length + 1} />
+      )}
 
       {/* ═══════════════════════════ DAY PAGES ═══════════════════════════════ */}
       {eventDays.map((dayData, i) => (
