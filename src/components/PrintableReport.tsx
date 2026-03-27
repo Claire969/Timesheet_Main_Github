@@ -317,7 +317,7 @@ function PrintableDayPage({ dayData, dayIndex, totalEventDays }: {
               {incidents.length}
             </span>
           </div>
-          <div style={{ border: `1px solid ${BORDER}`, borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ border: `1px solid ${BORDER}`, borderRadius: 8, overflow: 'hidden', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
             {incidents.map((inc, idx) => (
               <div
                 key={inc.id}
@@ -389,16 +389,26 @@ function PrintableDayPage({ dayData, dayIndex, totalEventDays }: {
 
       {/* Images */}
       {images.length > 0 && (
-        <div style={sectionBlock}>
+        <div style={{ ...sectionBlock, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
           <div style={sectionLabel}>Captures / Photos</div>
           <div style={{ display: 'grid', gridTemplateColumns: images.length === 1 ? '1fr' : '1fr 1fr', gap: 12 }}>
             {images.map((img) => (
-              <div key={img.id} style={{ border: `1px solid ${BORDER}`, borderRadius: 6, overflow: 'hidden', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                <div style={{ background: BG_ROW_ALT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, minHeight: 40 }}>
+              <div
+                key={img.id}
+                style={{
+                  border: `1px solid ${BORDER}`,
+                  borderRadius: 6,
+                  overflow: 'hidden',
+                  pageBreakInside: 'avoid',
+                  breakInside: 'avoid',
+                  pageBreakBefore: 'auto',
+                }}
+              >
+                <div style={{ background: BG_ROW_ALT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, minHeight: 40, maxHeight: images.length === 1 ? 340 : 220, overflow: 'hidden' }}>
                   <img
                     src={img.file_url}
                     alt={img.caption || ''}
-                    style={{ maxWidth: '100%', maxHeight: images.length === 1 ? 260 : 180, objectFit: 'contain', display: 'block' }}
+                    style={{ maxWidth: '100%', maxHeight: images.length === 1 ? 320 : 200, width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto' }}
                   />
                 </div>
                 {img.caption && (
