@@ -177,6 +177,47 @@ function PrintLineChart({
   );
 }
 
+// ─── Shared day-page header (first page + continuation) ──────────────────────
+
+function DayPageHeader({ eventName, centerLabel, reportDate, isContinuation, pageNumber, totalPages }: {
+  eventName: string;
+  centerLabel: string;
+  reportDate: string | null;
+  isContinuation: boolean;
+  pageNumber: number;
+  totalPages: number;
+}) {
+  return (
+    <>
+      <div style={{
+        background: NAVY,
+        padding: isContinuation ? '7px 18px' : '9px 18px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 0,
+      }}>
+        <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: '0.04em', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {eventName}
+        </div>
+        <div style={{ fontSize: isContinuation ? 9 : 10, fontWeight: 800, color: '#fff', letterSpacing: '0.02em', textAlign: 'center', flex: 'none', padding: '0 16px' }}>
+          {centerLabel}
+          {isContinuation && (
+            <span style={{ fontSize: 8, fontWeight: 500, color: 'rgba(255,255,255,0.45)', marginLeft: 6 }}>(suite)</span>
+          )}
+          {!isContinuation && reportDate && (
+            <span style={{ fontSize: 8, fontWeight: 500, color: 'rgba(255,255,255,0.55)', marginLeft: 8 }}>{fmtDate(reportDate)}</span>
+          )}
+        </div>
+        <div style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.04em', flex: 1, textAlign: 'right', whiteSpace: 'nowrap' }}>
+          Page {pageNumber} / {totalPages}
+        </div>
+      </div>
+      <div style={{ height: 3, background: `linear-gradient(90deg, ${ACCENT_BLUE} 0%, #38bdf8 100%)`, marginBottom: 20 }} />
+    </>
+  );
+}
+
 // ─── Day page ─────────────────────────────────────────────────────────────────
 
 function PrintableDayPage({ dayData, dayIndex, totalEventDays, pageNumber, totalPages, eventName }: {
@@ -189,256 +230,279 @@ function PrintableDayPage({ dayData, dayIndex, totalEventDays, pageNumber, total
 }) {
   const { day, hourlyRows, incidents, images } = dayData;
   const sorted = [...hourlyRows].sort((a, b) => a.hour_label.localeCompare(b.hour_label));
-  const hasData = sorted.length > 0 || incidents.length > 0 || images.length > 0 || !!day.summary;
+  const hasMainContent = sorted.length > 0 || !!day.summary;
+  const hasData = hasMainContent || incidents.length > 0 || images.length > 0;
 
   const dayTypeLabel = day.is_setup_day ? 'Montage' : 'Événement';
   const dayNumberLabel = day.is_setup_day ? 'Montage' : `Jour ${dayIndex + 1}`;
   const centerLabel = `${dayNumberLabel} — ${dayTypeLabel}`;
 
+  const headerProps = {
+    eventName,
+    centerLabel,
+    reportDate: day.report_date,
+    totalPages,
+  };
+
+  // Compute continuation page numbers relative to this day's start page.
+  // page 1 = main content; +1 = incidents (if hasMainContent); +1/+2 = images.
+  const incidentContPageNumber = pageNumber + 1;
+  const imagesContPageNumber = hasMainContent && incidents.length > 0
+    ? pageNumber + 2
+    : pageNumber + 1;
+
   return (
-    <div className="print-page">
-      {/* Repeated page header */}
-      <div style={{
-        background: NAVY,
-        padding: '9px 18px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 0,
-      }}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: '0.04em', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {eventName}
-        </div>
-        <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', letterSpacing: '0.02em', textAlign: 'center', flex: 'none', padding: '0 16px' }}>
-          {centerLabel}
-          {day.report_date && (
-            <span style={{ fontSize: 8, fontWeight: 500, color: 'rgba(255,255,255,0.55)', marginLeft: 8 }}>{fmtDate(day.report_date)}</span>
-          )}
-        </div>
-        <div style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.04em', flex: 1, textAlign: 'right', whiteSpace: 'nowrap' }}>
-          Page {pageNumber} / {totalPages}
-        </div>
-      </div>
-      <div style={{ height: 3, background: `linear-gradient(90deg, ${ACCENT_BLUE} 0%, #38bdf8 100%)`, marginBottom: 20 }} />
+    <>
+      {/* ── Page 1: summary + table + charts ── */}
+      <div className="print-page">
+        <DayPageHeader {...headerProps} isContinuation={false} pageNumber={pageNumber} />
 
-      {!hasData && (
-        <p style={{ fontSize: 11, color: TEXT_MUTED, fontStyle: 'italic' }}>Aucune donnée enregistrée pour ce jour.</p>
-      )}
+        {!hasData && (
+          <p style={{ fontSize: 11, color: TEXT_MUTED, fontStyle: 'italic' }}>Aucune donnée enregistrée pour ce jour.</p>
+        )}
 
-      {/* Summary */}
-      {day.summary && (
-        <div style={{ ...sectionBlock, background: '#f8fafc', borderRadius: 6, padding: '12px 16px', border: `1px solid ${BORDER}` }}>
-          <div style={sectionLabel}>Résumé du jour</div>
-          <p style={{ fontSize: 11, color: TEXT_PRIMARY, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{day.summary}</p>
-        </div>
-      )}
-
-      {/* Hourly table */}
-      {sorted.length > 0 && (
-        <div style={sectionBlock}>
-          <div style={sectionLabel}>Suivi réseau horaire</div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10, borderRadius: 6, overflow: 'hidden' }}>
-            <thead>
-              <tr>
-                {['Heure', 'Utilisateurs Wi-Fi', 'Download (GB)', 'Upload (GB)'].map((h, i) => (
-                  <th
-                    key={h}
-                    style={{
-                      background: NAVY,
-                      color: '#fff',
-                      padding: '7px 12px',
-                      textAlign: i === 0 ? 'left' : 'right',
-                      fontWeight: 700,
-                      fontSize: 9,
-                      letterSpacing: '0.05em',
-                      textTransform: 'uppercase',
-                      borderRight: i < 3 ? '1px solid rgba(255,255,255,0.1)' : 'none',
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((row, i) => (
-                <tr key={row.id} style={{ background: i % 2 === 0 ? BG_ROW_ALT : '#fff', borderBottom: `1px solid ${BORDER}` }}>
-                  <td style={{ padding: '5px 12px', fontWeight: 700, color: NAVY, fontVariantNumeric: 'tabular-nums', fontSize: 10 }}>{row.hour_label}</td>
-                  <td style={{ padding: '5px 12px', color: TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{row.wifi_users ?? '—'}</td>
-                  <td style={{ padding: '5px 12px', color: TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{row.bandwidth_out != null ? row.bandwidth_out.toFixed(2) : '—'}</td>
-                  <td style={{ padding: '5px 12px', color: TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{row.bandwidth_in != null ? row.bandwidth_in.toFixed(2) : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* Charts */}
-          <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '10px 12px' }}>
-              <PrintLineChart
-                rows={sorted}
-                field="wifi_users"
-                color={ACCENT_BLUE}
-                label="Utilisateurs Wi-Fi"
-              />
-            </div>
-            <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '10px 12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Bande passante (GB)</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 8, color: TEXT_MUTED }}>
-                  <span style={{ display: 'inline-block', width: 12, height: 2, backgroundColor: ACCENT_GREEN, borderRadius: 1 }} />
-                  Download ↓
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 8, color: TEXT_MUTED }}>
-                  <span style={{ display: 'inline-block', width: 12, height: 2, backgroundColor: ACCENT_BLUE, borderRadius: 1 }} />
-                  Upload ↑
-                </span>
-              </div>
-              <PrintLineChart
-                rows={sorted}
-                field="bandwidth_out"
-                color={ACCENT_GREEN}
-                label=""
-                secondaryField="bandwidth_in"
-                secondaryColor={ACCENT_BLUE}
-                secondaryLabel="Upload ↑"
-              />
-            </div>
+        {/* Summary */}
+        {day.summary && (
+          <div style={{ ...sectionBlock, background: '#f8fafc', borderRadius: 6, padding: '12px 16px', border: `1px solid ${BORDER}` }}>
+            <div style={sectionLabel}>Résumé du jour</div>
+            <p style={{ fontSize: 11, color: TEXT_PRIMARY, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{day.summary}</p>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Incidents */}
-      {incidents.length > 0 && (
-        <div style={sectionBlock}>
-          <div style={sectionLabel}>
-            Incidents
-            <span style={{ fontSize: 9, background: NAVY_LIGHT, color: NAVY, padding: '1px 7px', borderRadius: 20, fontWeight: 700, marginLeft: 4 }}>
-              {incidents.length}
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {incidents.map((inc) => (
-              <div
-                key={inc.id}
-                style={{
-                  border: `1px solid ${BORDER}`,
-                  borderLeft: `3px solid ${inc.network_impact ? INC_IMPACT_COLOR : NAVY}`,
-                  borderRadius: 5,
-                  background: BG_ROW_ALT,
-                  overflow: 'hidden',
-                  pageBreakInside: 'avoid',
-                  breakInside: 'avoid',
-                }}
-              >
-                {/* Incident header row */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '7px 12px 6px',
-                  borderBottom: `1px solid ${BORDER}`,
-                  background: '#fff',
-                  gap: 12,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                    {inc.incident_time && (
-                      <span style={{
+        {/* Hourly table */}
+        {sorted.length > 0 && (
+          <div style={sectionBlock}>
+            <div style={sectionLabel}>Suivi réseau horaire</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10, borderRadius: 6, overflow: 'hidden' }}>
+              <thead>
+                <tr>
+                  {['Heure', 'Utilisateurs Wi-Fi', 'Download (GB)', 'Upload (GB)'].map((h, i) => (
+                    <th
+                      key={h}
+                      style={{
+                        background: NAVY,
+                        color: '#fff',
+                        padding: '7px 12px',
+                        textAlign: i === 0 ? 'left' : 'right',
+                        fontWeight: 700,
                         fontSize: 9,
-                        fontFamily: 'monospace',
-                        fontWeight: 800,
-                        color: NAVY,
-                        background: NAVY_LIGHT,
-                        padding: '2px 7px',
-                        borderRadius: 3,
-                        letterSpacing: '0.06em',
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                      }}>
-                        {inc.incident_time.slice(0, 5)}
-                      </span>
-                    )}
-                    <span style={{ fontSize: 11, fontWeight: 800, color: NAVY, lineHeight: 1.3 }}>{inc.title}</span>
-                  </div>
-                  {inc.network_impact && (
-                    <span style={{
-                      fontSize: 8,
-                      background: '#FEF3E2',
-                      color: INC_IMPACT_COLOR,
-                      border: `1px solid #F5D9A0`,
-                      padding: '2px 8px',
-                      borderRadius: 3,
-                      fontWeight: 700,
-                      letterSpacing: '0.04em',
-                      whiteSpace: 'nowrap',
-                      flexShrink: 0,
-                    }}>
-                      Impact réseau
-                    </span>
-                  )}
-                </div>
+                        letterSpacing: '0.05em',
+                        textTransform: 'uppercase',
+                        borderRight: i < 3 ? '1px solid rgba(255,255,255,0.1)' : 'none',
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((row, i) => (
+                  <tr key={row.id} style={{ background: i % 2 === 0 ? BG_ROW_ALT : '#fff', borderBottom: `1px solid ${BORDER}` }}>
+                    <td style={{ padding: '5px 12px', fontWeight: 700, color: NAVY, fontVariantNumeric: 'tabular-nums', fontSize: 10 }}>{row.hour_label}</td>
+                    <td style={{ padding: '5px 12px', color: TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{row.wifi_users ?? '—'}</td>
+                    <td style={{ padding: '5px 12px', color: TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{row.bandwidth_out != null ? row.bandwidth_out.toFixed(2) : '—'}</td>
+                    <td style={{ padding: '5px 12px', color: TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{row.bandwidth_in != null ? row.bandwidth_in.toFixed(2) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-                {/* Incident body */}
-                <div style={{ padding: '7px 12px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {inc.description?.trim() && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '0 8px', alignItems: 'baseline' }}>
-                      <span style={{ fontSize: 8, fontWeight: 700, color: INC_LABEL_COLOR, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Description</span>
-                      <span style={{ fontSize: 10, color: TEXT_PRIMARY, lineHeight: 1.6 }}>{inc.description}</span>
-                    </div>
-                  )}
-                  {inc.resolution?.trim() && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '0 8px', alignItems: 'baseline' }}>
-                      <span style={{ fontSize: 8, fontWeight: 700, color: INC_LABEL_COLOR, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Résolution</span>
-                      <span style={{ fontSize: 10, color: TEXT_PRIMARY, lineHeight: 1.6 }}>{inc.resolution}</span>
-                    </div>
-                  )}
-                  {inc.network_impact && inc.network_impact_text?.trim() && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '0 8px', alignItems: 'baseline' }}>
-                      <span style={{ fontSize: 8, fontWeight: 700, color: INC_IMPACT_COLOR, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Impact</span>
-                      <span style={{ fontSize: 10, color: TEXT_PRIMARY, lineHeight: 1.6 }}>{inc.network_impact_text}</span>
-                    </div>
-                  )}
-                </div>
+            {/* Charts */}
+            <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '10px 12px' }}>
+                <PrintLineChart
+                  rows={sorted}
+                  field="wifi_users"
+                  color={ACCENT_BLUE}
+                  label="Utilisateurs Wi-Fi"
+                />
               </div>
-            ))}
+              <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '10px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Bande passante (GB)</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 8, color: TEXT_MUTED }}>
+                    <span style={{ display: 'inline-block', width: 12, height: 2, backgroundColor: ACCENT_GREEN, borderRadius: 1 }} />
+                    Download ↓
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 8, color: TEXT_MUTED }}>
+                    <span style={{ display: 'inline-block', width: 12, height: 2, backgroundColor: ACCENT_BLUE, borderRadius: 1 }} />
+                    Upload ↑
+                  </span>
+                </div>
+                <PrintLineChart
+                  rows={sorted}
+                  field="bandwidth_out"
+                  color={ACCENT_GREEN}
+                  label=""
+                  secondaryField="bandwidth_in"
+                  secondaryColor={ACCENT_BLUE}
+                  secondaryLabel="Upload ↑"
+                />
+              </div>
+            </div>
           </div>
+        )}
+
+        {/* Incidents on same page only when there is no main content */}
+        {!hasMainContent && incidents.length > 0 && (
+          <IncidentsSection incidents={incidents} />
+        )}
+
+        {/* Images on same page only when this page has nothing else */}
+        {!hasMainContent && incidents.length === 0 && images.length > 0 && (
+          <ImagesSection images={images} />
+        )}
+      </div>
+
+      {/* ── Continuation page: incidents (only when main content exists on page 1) ── */}
+      {hasMainContent && incidents.length > 0 && (
+        <div className="print-page">
+          <DayPageHeader {...headerProps} isContinuation={true} pageNumber={incidentContPageNumber} />
+          <IncidentsSection incidents={incidents} />
         </div>
       )}
 
-      {/* Images */}
-      {images.length > 0 && (
-        <div style={{ ...sectionBlock, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-          <div style={sectionLabel}>Captures / Photos</div>
-          <div style={{ display: 'grid', gridTemplateColumns: images.length === 1 ? '1fr' : '1fr 1fr', gap: 12 }}>
-            {images.map((img) => (
-              <div
-                key={img.id}
-                style={{
-                  border: `1px solid ${BORDER}`,
-                  borderRadius: 6,
-                  overflow: 'hidden',
-                  pageBreakInside: 'avoid',
-                  breakInside: 'avoid',
-                  pageBreakBefore: 'auto',
-                }}
-              >
-                <div style={{ background: BG_ROW_ALT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, minHeight: 40, maxHeight: images.length === 1 ? 340 : 220, overflow: 'hidden' }}>
-                  <img
-                    src={img.file_url}
-                    alt={img.caption || ''}
-                    style={{ maxWidth: '100%', maxHeight: images.length === 1 ? 320 : 200, width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto' }}
-                  />
-                </div>
-                {img.caption && (
-                  <div style={{ padding: '5px 10px', background: '#fff', borderTop: `1px solid ${BORDER}` }}>
-                    <p style={{ fontSize: 9, color: TEXT_MUTED, margin: 0, textAlign: 'center', lineHeight: 1.4 }}>{img.caption}</p>
-                  </div>
+      {/* ── Continuation page: images (only when main content or incidents exist) ── */}
+      {(hasMainContent || incidents.length > 0) && images.length > 0 && (
+        <div className="print-page">
+          <DayPageHeader {...headerProps} isContinuation={true} pageNumber={imagesContPageNumber} />
+          <ImagesSection images={images} />
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─── Extracted section renderers ─────────────────────────────────────────────
+
+function IncidentsSection({ incidents }: { incidents: EventReportIncident[] }) {
+  return (
+    <div style={sectionBlock}>
+      <div style={sectionLabel}>
+        Incidents
+        <span style={{ fontSize: 9, background: NAVY_LIGHT, color: NAVY, padding: '1px 7px', borderRadius: 20, fontWeight: 700, marginLeft: 4 }}>
+          {incidents.length}
+        </span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {incidents.map((inc) => (
+          <div
+            key={inc.id}
+            style={{
+              border: `1px solid ${BORDER}`,
+              borderLeft: `3px solid ${inc.network_impact ? INC_IMPACT_COLOR : NAVY}`,
+              borderRadius: 5,
+              background: BG_ROW_ALT,
+              overflow: 'hidden',
+              pageBreakInside: 'avoid',
+              breakInside: 'avoid',
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '7px 12px 6px',
+              borderBottom: `1px solid ${BORDER}`,
+              background: '#fff',
+              gap: 12,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                {inc.incident_time && (
+                  <span style={{
+                    fontSize: 9,
+                    fontFamily: 'monospace',
+                    fontWeight: 800,
+                    color: NAVY,
+                    background: NAVY_LIGHT,
+                    padding: '2px 7px',
+                    borderRadius: 3,
+                    letterSpacing: '0.06em',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}>
+                    {inc.incident_time.slice(0, 5)}
+                  </span>
                 )}
+                <span style={{ fontSize: 11, fontWeight: 800, color: NAVY, lineHeight: 1.3 }}>{inc.title}</span>
               </div>
-            ))}
+              {inc.network_impact && (
+                <span style={{
+                  fontSize: 8,
+                  background: '#FEF3E2',
+                  color: INC_IMPACT_COLOR,
+                  border: `1px solid #F5D9A0`,
+                  padding: '2px 8px',
+                  borderRadius: 3,
+                  fontWeight: 700,
+                  letterSpacing: '0.04em',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}>
+                  Impact réseau
+                </span>
+              )}
+            </div>
+            <div style={{ padding: '7px 12px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {inc.description?.trim() && (
+                <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '0 8px', alignItems: 'baseline' }}>
+                  <span style={{ fontSize: 8, fontWeight: 700, color: INC_LABEL_COLOR, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Description</span>
+                  <span style={{ fontSize: 10, color: TEXT_PRIMARY, lineHeight: 1.6 }}>{inc.description}</span>
+                </div>
+              )}
+              {inc.resolution?.trim() && (
+                <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '0 8px', alignItems: 'baseline' }}>
+                  <span style={{ fontSize: 8, fontWeight: 700, color: INC_LABEL_COLOR, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Résolution</span>
+                  <span style={{ fontSize: 10, color: TEXT_PRIMARY, lineHeight: 1.6 }}>{inc.resolution}</span>
+                </div>
+              )}
+              {inc.network_impact && inc.network_impact_text?.trim() && (
+                <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '0 8px', alignItems: 'baseline' }}>
+                  <span style={{ fontSize: 8, fontWeight: 700, color: INC_IMPACT_COLOR, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Impact</span>
+                  <span style={{ fontSize: 10, color: TEXT_PRIMARY, lineHeight: 1.6 }}>{inc.network_impact_text}</span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ImagesSection({ images }: { images: EventReportImage[] }) {
+  return (
+    <div style={{ ...sectionBlock, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+      <div style={sectionLabel}>Captures / Photos</div>
+      <div style={{ display: 'grid', gridTemplateColumns: images.length === 1 ? '1fr' : '1fr 1fr', gap: 12 }}>
+        {images.map((img) => (
+          <div
+            key={img.id}
+            style={{
+              border: `1px solid ${BORDER}`,
+              borderRadius: 6,
+              overflow: 'hidden',
+              pageBreakInside: 'avoid',
+              breakInside: 'avoid',
+              pageBreakBefore: 'auto',
+            }}
+          >
+            <div style={{ background: BG_ROW_ALT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, minHeight: 40, maxHeight: images.length === 1 ? 340 : 220, overflow: 'hidden' }}>
+              <img
+                src={img.file_url}
+                alt={img.caption || ''}
+                style={{ maxWidth: '100%', maxHeight: images.length === 1 ? 320 : 200, width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto' }}
+              />
+            </div>
+            {img.caption && (
+              <div style={{ padding: '5px 10px', background: '#fff', borderTop: `1px solid ${BORDER}` }}>
+                <p style={{ fontSize: 9, color: TEXT_MUTED, margin: 0, textAlign: 'center', lineHeight: 1.4 }}>{img.caption}</p>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
