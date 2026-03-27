@@ -32,6 +32,12 @@
     z-index: 100;
   }
 
+  /* Cover page sits above the fixed repeat-header on page 1 */
+  .print-page:first-child {
+    position: relative;
+    z-index: 101;
+  }
+
   .print-page {
     page-break-after: always;
     break-after: page;
