@@ -42,16 +42,18 @@ const fmtDateRange = (report: ReportRow) => {
 
 // ─── Design tokens (shared inline style constants) ───────────────────────────
 
-const NAVY = '#1a3557';
+const NAVY = '#183B6B';
 const NAVY_LIGHT = '#e8eef6';
 const TEXT_PRIMARY = '#1a1a2e';
 const TEXT_SECONDARY = '#4b5563';
 const TEXT_MUTED = '#9ca3af';
-const BORDER = '#e2e8f0';
+const BORDER = '#D9E2EC';
 const ACCENT_BLUE = '#2563eb';
 const ACCENT_GREEN = '#059669';
 const ACCENT_ORANGE = '#d97706';
-const BG_ROW_ALT = '#f7f9fc';
+const BG_ROW_ALT = '#F4F7FB';
+const INC_LABEL_COLOR = '#5B6B7A';
+const INC_IMPACT_COLOR = '#C97A1A';
 
 const sectionLabel: React.CSSProperties = {
   fontSize: 9,
@@ -177,49 +179,47 @@ function PrintLineChart({
 
 // ─── Day page ─────────────────────────────────────────────────────────────────
 
-function PrintableDayPage({ dayData, dayIndex, totalEventDays }: {
+function PrintableDayPage({ dayData, dayIndex, totalEventDays, pageNumber, totalPages, eventName }: {
   dayData: PrintableDayData;
   dayIndex: number;
   totalEventDays: number;
+  pageNumber: number;
+  totalPages: number;
+  eventName: string;
 }) {
   const { day, hourlyRows, incidents, images } = dayData;
   const sorted = [...hourlyRows].sort((a, b) => a.hour_label.localeCompare(b.hour_label));
   const hasData = sorted.length > 0 || incidents.length > 0 || images.length > 0 || !!day.summary;
 
-  const dayTitle = day.is_setup_day
-    ? 'Mise en place / Installation'
-    : `Jour ${dayIndex + 1} sur ${totalEventDays}`;
-
-  const daySubtitle = day.is_setup_day
-    ? (day.report_date ? fmtDate(day.report_date) : '')
-    : day.report_date
-    ? fmtDate(day.report_date)
-    : '';
+  const dayTypeLabel = day.is_setup_day ? 'Montage' : 'Événement';
+  const dayNumberLabel = day.is_setup_day ? 'Montage' : `Jour ${dayIndex + 1}`;
+  const centerLabel = `${dayNumberLabel} — ${dayTypeLabel}`;
 
   return (
     <div className="print-page">
-      {/* Day header bar */}
+      {/* Repeated page header */}
       <div style={{
         background: NAVY,
-        borderRadius: 6,
-        padding: '12px 18px',
-        marginBottom: 20,
+        padding: '9px 18px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        marginBottom: 0,
       }}>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>{dayTitle}</div>
-          {daySubtitle && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>{daySubtitle}</div>}
+        <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: '0.04em', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {eventName}
         </div>
-        <div style={{ textAlign: 'right' }}>
-          {day.is_setup_day && (
-            <span style={{ fontSize: 9, background: 'rgba(255,255,255,0.15)', color: '#fff', padding: '3px 10px', borderRadius: 20, fontWeight: 700, letterSpacing: '0.05em' }}>
-              SETUP
-            </span>
+        <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', letterSpacing: '0.02em', textAlign: 'center', flex: 'none', padding: '0 16px' }}>
+          {centerLabel}
+          {day.report_date && (
+            <span style={{ fontSize: 8, fontWeight: 500, color: 'rgba(255,255,255,0.55)', marginLeft: 8 }}>{fmtDate(day.report_date)}</span>
           )}
         </div>
+        <div style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.04em', flex: 1, textAlign: 'right', whiteSpace: 'nowrap' }}>
+          Page {pageNumber} / {totalPages}
+        </div>
       </div>
+      <div style={{ height: 3, background: `linear-gradient(90deg, ${ACCENT_BLUE} 0%, #38bdf8 100%)`, marginBottom: 20 }} />
 
       {!hasData && (
         <p style={{ fontSize: 11, color: TEXT_MUTED, fontStyle: 'italic' }}>Aucune donnée enregistrée pour ce jour.</p>
@@ -313,71 +313,89 @@ function PrintableDayPage({ dayData, dayIndex, totalEventDays }: {
         <div style={sectionBlock}>
           <div style={sectionLabel}>
             Incidents
-            <span style={{ fontSize: 9, background: '#fee2e2', color: '#b91c1c', padding: '1px 7px', borderRadius: 20, fontWeight: 700, marginLeft: 4 }}>
+            <span style={{ fontSize: 9, background: NAVY_LIGHT, color: NAVY, padding: '1px 7px', borderRadius: 20, fontWeight: 700, marginLeft: 4 }}>
               {incidents.length}
             </span>
           </div>
-          <div style={{ border: `1px solid ${BORDER}`, borderRadius: 8, overflow: 'hidden', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-            {incidents.map((inc, idx) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {incidents.map((inc) => (
               <div
                 key={inc.id}
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: '52px 1fr',
-                  borderBottom: idx < incidents.length - 1 ? `1px solid ${BORDER}` : 'none',
-                  borderLeft: `3px solid ${inc.network_impact ? '#dc2626' : '#94a3b8'}`,
-                  background: inc.network_impact ? '#fff9f9' : (idx % 2 === 0 ? BG_ROW_ALT : '#fff'),
+                  border: `1px solid ${BORDER}`,
+                  borderLeft: `3px solid ${inc.network_impact ? INC_IMPACT_COLOR : NAVY}`,
+                  borderRadius: 5,
+                  background: BG_ROW_ALT,
+                  overflow: 'hidden',
                   pageBreakInside: 'avoid',
                   breakInside: 'avoid',
                 }}
               >
-                {/* Time column */}
+                {/* Incident header row */}
                 <div style={{
-                  padding: '8px 0 8px 10px',
                   display: 'flex',
-                  alignItems: 'flex-start',
-                  justifyContent: 'center',
-                  paddingTop: 10,
-                  borderRight: `1px solid ${BORDER}`,
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '7px 12px 6px',
+                  borderBottom: `1px solid ${BORDER}`,
+                  background: '#fff',
+                  gap: 12,
                 }}>
-                  <span style={{
-                    fontSize: 9,
-                    fontFamily: 'monospace',
-                    fontWeight: 700,
-                    color: NAVY,
-                    letterSpacing: '0.04em',
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {inc.incident_time ? inc.incident_time.slice(0, 5) : '—'}
-                  </span>
-                </div>
-
-                {/* Content column */}
-                <div style={{ padding: '8px 12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: TEXT_PRIMARY, flex: 1, lineHeight: 1.3 }}>{inc.title}</span>
-                    {inc.network_impact && (
-                      <span style={{ fontSize: 8, background: '#fee2e2', color: '#b91c1c', padding: '1px 6px', borderRadius: 20, fontWeight: 700, letterSpacing: '0.04em', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                        Impact réseau
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                    {inc.incident_time && (
+                      <span style={{
+                        fontSize: 9,
+                        fontFamily: 'monospace',
+                        fontWeight: 800,
+                        color: NAVY,
+                        background: NAVY_LIGHT,
+                        padding: '2px 7px',
+                        borderRadius: 3,
+                        letterSpacing: '0.06em',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}>
+                        {inc.incident_time.slice(0, 5)}
                       </span>
                     )}
+                    <span style={{ fontSize: 11, fontWeight: 800, color: NAVY, lineHeight: 1.3 }}>{inc.title}</span>
                   </div>
-                  {inc.description && (
-                    <div style={{ marginBottom: 3 }}>
-                      <span style={{ fontSize: 8, fontWeight: 700, color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Description — </span>
-                      <span style={{ fontSize: 10, color: TEXT_PRIMARY, lineHeight: 1.55 }}>{inc.description}</span>
+                  {inc.network_impact && (
+                    <span style={{
+                      fontSize: 8,
+                      background: '#FEF3E2',
+                      color: INC_IMPACT_COLOR,
+                      border: `1px solid #F5D9A0`,
+                      padding: '2px 8px',
+                      borderRadius: 3,
+                      fontWeight: 700,
+                      letterSpacing: '0.04em',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                    }}>
+                      Impact réseau
+                    </span>
+                  )}
+                </div>
+
+                {/* Incident body */}
+                <div style={{ padding: '7px 12px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {inc.description?.trim() && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '0 8px', alignItems: 'baseline' }}>
+                      <span style={{ fontSize: 8, fontWeight: 700, color: INC_LABEL_COLOR, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Description</span>
+                      <span style={{ fontSize: 10, color: TEXT_PRIMARY, lineHeight: 1.6 }}>{inc.description}</span>
                     </div>
                   )}
-                  {inc.resolution && (
-                    <div style={{ marginBottom: 3 }}>
-                      <span style={{ fontSize: 8, fontWeight: 700, color: ACCENT_GREEN, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Résolution — </span>
-                      <span style={{ fontSize: 10, color: TEXT_PRIMARY, lineHeight: 1.55 }}>{inc.resolution}</span>
+                  {inc.resolution?.trim() && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '0 8px', alignItems: 'baseline' }}>
+                      <span style={{ fontSize: 8, fontWeight: 700, color: INC_LABEL_COLOR, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Résolution</span>
+                      <span style={{ fontSize: 10, color: TEXT_PRIMARY, lineHeight: 1.6 }}>{inc.resolution}</span>
                     </div>
                   )}
-                  {inc.network_impact && inc.network_impact_text && (
-                    <div>
-                      <span style={{ fontSize: 8, fontWeight: 700, color: '#b91c1c', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Impact réseau — </span>
-                      <span style={{ fontSize: 10, color: '#7f1d1d', lineHeight: 1.55 }}>{inc.network_impact_text}</span>
+                  {inc.network_impact && inc.network_impact_text?.trim() && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '0 8px', alignItems: 'baseline' }}>
+                      <span style={{ fontSize: 8, fontWeight: 700, color: INC_IMPACT_COLOR, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Impact</span>
+                      <span style={{ fontSize: 10, color: TEXT_PRIMARY, lineHeight: 1.6 }}>{inc.network_impact_text}</span>
                     </div>
                   )}
                 </div>
@@ -680,6 +698,9 @@ export function PrintableReport({ data }: PrintableReportProps) {
           dayData={dayData}
           dayIndex={i}
           totalEventDays={eventDays.length}
+          pageNumber={i + 2}
+          totalPages={eventDays.length + 1}
+          eventName={report.event_name}
         />
       ))}
     </div>
