@@ -428,180 +428,192 @@ export function PrintableReport({ data }: PrintableReportProps) {
     >
 
       {/* ═══════════════════════════ COVER PAGE ══════════════════════════════ */}
-      <div className="print-page" style={{ display: 'flex', flexDirection: 'column', minHeight: '267mm' }}>
+      <div className="print-page" style={{ display: 'flex', flexDirection: 'column', padding: 0, minHeight: '267mm' }}>
 
-        {/* Top accent bar */}
-        <div style={{ height: 6, background: `linear-gradient(90deg, ${NAVY} 0%, #2563eb 100%)`, marginBottom: 0 }} />
-
-        {/* Header: branding + client logo */}
+        {/* ── Full-width header band ── */}
         <div style={{
+          background: NAVY,
+          padding: '22px 28px 20px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '20px 0 20px',
-          borderBottom: `1px solid ${BORDER}`,
-          marginBottom: 32,
+          flexShrink: 0,
         }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: NAVY, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-            Clear Computing
-          </div>
-          {report.venue_client_logo ? (
-            <img
-              src={report.venue_client_logo}
-              alt={report.venue_client_name ?? ''}
-              style={{ maxHeight: 44, maxWidth: 130, objectFit: 'contain' }}
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-            />
-          ) : report.venue_client_name ? (
-            <div style={{ fontSize: 13, fontWeight: 700, color: TEXT_SECONDARY }}>{report.venue_client_name}</div>
-          ) : null}
-        </div>
-
-        {/* Hero: event title block */}
-        <div style={{ flex: 1 }}>
-          <div style={{ marginBottom: 28 }}>
-            <div style={{
-              display: 'inline-block',
-              fontSize: 9,
-              fontWeight: 800,
-              color: ACCENT_BLUE,
-              textTransform: 'uppercase',
-              letterSpacing: '0.14em',
-              background: '#eff6ff',
-              padding: '3px 10px',
-              borderRadius: 20,
-              marginBottom: 14,
-            }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 4 }}>
+              Clear Computing
+            </div>
+            <div style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
               Rapport d'événement réseau
             </div>
-            <h1 style={{ fontSize: 30, fontWeight: 900, color: TEXT_PRIMARY, lineHeight: 1.15, margin: '0 0 14px', letterSpacing: '-0.02em' }}>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {report.venue_client_logo ? (
+              <img
+                src={report.venue_client_logo}
+                alt={report.venue_client_name ?? ''}
+                style={{ maxHeight: 42, maxWidth: 120, objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.85 }}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+              />
+            ) : report.venue_client_name ? (
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.75)', letterSpacing: '0.06em' }}>{report.venue_client_name}</div>
+            ) : null}
+          </div>
+        </div>
+
+        {/* ── Accent stripe ── */}
+        <div style={{ height: 4, background: `linear-gradient(90deg, ${ACCENT_BLUE} 0%, #38bdf8 100%)`, flexShrink: 0 }} />
+
+        {/* ── Body ── */}
+        <div style={{ flex: 1, padding: '28px 28px 20px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+
+          {/* Event title hero */}
+          <div style={{ marginBottom: 28, paddingBottom: 24, borderBottom: `1px solid ${BORDER}` }}>
+            <div style={{ fontSize: 26, fontWeight: 900, color: TEXT_PRIMARY, lineHeight: 1.15, letterSpacing: '-0.02em', marginBottom: 8 }}>
               {report.event_name}
-            </h1>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20 }}>
-              {report.final_client_name && (
-                <div>
-                  <div style={{ fontSize: 9, color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Client</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: TEXT_PRIMARY }}>{report.final_client_name}</div>
-                </div>
-              )}
-              {report.venue_client_name && (
-                <div>
-                  <div style={{ fontSize: 9, color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Lieu / Salle</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: TEXT_PRIMARY }}>{report.venue_client_name}</div>
-                </div>
-              )}
-              <div>
-                <div style={{ fontSize: 9, color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Date</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: TEXT_PRIMARY }}>{fmtDateRange(report)}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 9, color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Durée</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: TEXT_PRIMARY }}>{report.total_days} jour{report.total_days > 1 ? 's' : ''}</div>
-              </div>
             </div>
+            {(report.final_client_name || report.venue_client_name) && (
+              <div style={{ fontSize: 13, fontWeight: 500, color: TEXT_SECONDARY }}>
+                {[report.final_client_name, report.venue_client_name].filter(Boolean).join(' · ')}
+              </div>
+            )}
           </div>
 
-          {/* Author + meta card */}
+          {/* Metadata grid card */}
           <div style={{
-            background: NAVY_LIGHT,
-            border: `1px solid #c7d8ee`,
+            background: '#f8fafc',
+            border: `1px solid ${BORDER}`,
             borderRadius: 8,
-            padding: '14px 18px',
-            marginBottom: 24,
+            overflow: 'hidden',
+            marginBottom: 22,
           }}>
-            <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
-              <div>
-                <div style={{ fontSize: 9, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>Rapport rédigé par</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: NAVY }}>Claire Vandenbosch</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 9, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>Statut</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT_GREEN }}>Validé</div>
-              </div>
+            <div style={{
+              background: NAVY_LIGHT,
+              borderBottom: `1px solid #c7d8ee`,
+              padding: '8px 16px',
+              fontSize: 9,
+              fontWeight: 800,
+              color: NAVY,
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+            }}>
+              Informations générales
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0 }}>
+              {[
+                { label: 'Client', value: report.final_client_name || '—' },
+                { label: 'Lieu / Salle', value: report.venue_client_name || '—' },
+                { label: 'Date', value: fmtDateRange(report) },
+                { label: 'Durée', value: `${report.total_days} jour${report.total_days > 1 ? 's' : ''}` },
+                { label: 'Rédigé par', value: 'Claire Vandenbosch' },
+                { label: 'Statut', value: 'Validé', valueColor: ACCENT_GREEN },
+              ].map(({ label, value, valueColor }, idx) => (
+                <div
+                  key={label}
+                  style={{
+                    padding: '10px 16px',
+                    borderRight: idx % 3 < 2 ? `1px solid ${BORDER}` : 'none',
+                    borderBottom: idx < 3 ? `1px solid ${BORDER}` : 'none',
+                    background: '#fff',
+                  }}
+                >
+                  <div style={{ fontSize: 8, fontWeight: 700, color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{label}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: valueColor || TEXT_PRIMARY, lineHeight: 1.3 }}>{value}</div>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Wi-Fi networks */}
+          {/* Wi-Fi section */}
           {wifiNetworks.length > 0 && (
-            <div style={{ marginBottom: 24 }}>
-              <div style={sectionLabel}>
-                <span style={{ display: 'inline-block', width: 3, height: 14, background: ACCENT_BLUE, borderRadius: 2, marginRight: 2 }} />
+            <div style={{ marginBottom: 22 }}>
+              <div style={{
+                fontSize: 9, fontWeight: 800, color: NAVY, textTransform: 'uppercase',
+                letterSpacing: '0.1em', marginBottom: 8,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <span style={{ display: 'inline-block', width: 3, height: 13, background: ACCENT_BLUE, borderRadius: 2 }} />
                 Réseaux Wi-Fi déployés
               </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
-                <thead>
-                  <tr>
-                    {['SSID', 'Mot de passe', 'Débit / Bande passante'].map((h, i) => (
-                      <th
-                        key={h}
-                        style={{
+              <div style={{ border: `1px solid ${BORDER}`, borderRadius: 8, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+                  <thead>
+                    <tr>
+                      {['SSID', 'Mot de passe', 'Débit / Bande passante'].map((h, i) => (
+                        <th key={h} style={{
                           background: NAVY,
                           color: '#fff',
-                          padding: '7px 12px',
+                          padding: '7px 14px',
                           textAlign: 'left',
                           fontWeight: 700,
                           fontSize: 9,
                           letterSpacing: '0.05em',
                           textTransform: 'uppercase',
                           borderRight: i < 2 ? '1px solid rgba(255,255,255,0.1)' : 'none',
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {wifiNetworks.map((net, i) => (
-                    <tr key={net.id} style={{ background: i % 2 === 0 ? BG_ROW_ALT : '#fff', borderBottom: `1px solid ${BORDER}` }}>
-                      <td style={{ padding: '6px 12px', fontWeight: 700, color: NAVY, fontSize: 10.5 }}>{net.ssid}</td>
-                      <td style={{ padding: '6px 12px', color: TEXT_PRIMARY, fontFamily: 'monospace', fontSize: 10 }}>{net.password || '—'}</td>
-                      <td style={{ padding: '6px 12px', color: TEXT_PRIMARY }}>{net.speed || '—'}</td>
+                        }}>
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {wifiNetworks.map((net, i) => (
+                      <tr key={net.id} style={{ background: i % 2 === 0 ? BG_ROW_ALT : '#fff', borderBottom: i < wifiNetworks.length - 1 ? `1px solid ${BORDER}` : 'none' }}>
+                        <td style={{ padding: '7px 14px', fontWeight: 700, color: NAVY }}>{net.ssid}</td>
+                        <td style={{ padding: '7px 14px', color: TEXT_PRIMARY, fontFamily: 'monospace', fontSize: 10 }}>{net.password || '—'}</td>
+                        <td style={{ padding: '7px 14px', color: TEXT_PRIMARY }}>{net.speed || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
           {/* Setup steps */}
-          {setupSteps.length > 0 && (
-            <div style={{ marginBottom: 24 }}>
-              <div style={sectionLabel}>
-                <span style={{ display: 'inline-block', width: 3, height: 14, background: ACCENT_ORANGE, borderRadius: 2, marginRight: 2 }} />
+          {setupSteps.filter(s => s.text?.trim()).length > 0 && (
+            <div style={{ marginBottom: 22 }}>
+              <div style={{
+                fontSize: 9, fontWeight: 800, color: NAVY, textTransform: 'uppercase',
+                letterSpacing: '0.1em', marginBottom: 8,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <span style={{ display: 'inline-block', width: 3, height: 13, background: ACCENT_ORANGE, borderRadius: 2 }} />
                 Mise en place
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {setupSteps.map((step, i) => (
-                  <div key={step.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <div style={{ border: `1px solid ${BORDER}`, borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
+                {setupSteps.filter(s => s.text?.trim()).map((step, i, arr) => (
+                  <div key={step.id} style={{
+                    display: 'flex', gap: 12, alignItems: 'flex-start',
+                    padding: '8px 14px',
+                    borderBottom: i < arr.length - 1 ? `1px solid ${BORDER}` : 'none',
+                    background: i % 2 === 0 ? BG_ROW_ALT : '#fff',
+                  }}>
                     <div style={{
-                      minWidth: 20,
-                      height: 20,
-                      background: NAVY,
-                      color: '#fff',
-                      fontSize: 9,
-                      fontWeight: 800,
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginTop: 1,
-                      flexShrink: 0,
+                      minWidth: 20, height: 20, borderRadius: '50%',
+                      background: NAVY, color: '#fff',
+                      fontSize: 9, fontWeight: 800,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0, marginTop: 1,
                     }}>
                       {i + 1}
                     </div>
-                    <div style={{ fontSize: 11, color: TEXT_PRIMARY, lineHeight: 1.6, paddingTop: 1 }}>{step.text}</div>
+                    <div style={{ fontSize: 10.5, color: TEXT_PRIMARY, lineHeight: 1.6 }}>{step.text}</div>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Building plan images (setup day images) */}
+          {/* Building plan */}
           {setupDay && setupDay.images.length > 0 && (
-            <div style={{ marginBottom: 24 }}>
-              <div style={sectionLabel}>
-                <span style={{ display: 'inline-block', width: 3, height: 14, background: TEXT_MUTED, borderRadius: 2, marginRight: 2 }} />
+            <div style={{ marginBottom: 0 }}>
+              <div style={{
+                fontSize: 9, fontWeight: 800, color: NAVY, textTransform: 'uppercase',
+                letterSpacing: '0.1em', marginBottom: 8,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <span style={{ display: 'inline-block', width: 3, height: 13, background: TEXT_MUTED, borderRadius: 2 }} />
                 Plan / Schéma de salle
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: setupDay.images.length === 1 ? '1fr' : '1fr 1fr', gap: 12 }}>
@@ -611,7 +623,7 @@ export function PrintableReport({ data }: PrintableReportProps) {
                       <img
                         src={img.file_url}
                         alt={img.caption || 'Plan de salle'}
-                        style={{ maxWidth: '100%', maxHeight: 200, objectFit: 'contain', display: 'block' }}
+                        style={{ maxWidth: '100%', maxHeight: 190, objectFit: 'contain', display: 'block' }}
                       />
                     </div>
                     {img.caption && (
@@ -624,19 +636,20 @@ export function PrintableReport({ data }: PrintableReportProps) {
               </div>
             </div>
           )}
+
         </div>
 
-        {/* Cover footer */}
+        {/* ── Cover footer ── */}
         <div style={{
           borderTop: `1px solid ${BORDER}`,
-          paddingTop: 10,
-          marginTop: 16,
+          padding: '8px 28px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          flexShrink: 0,
         }}>
-          <span style={{ fontSize: 8.5, color: TEXT_MUTED }}>Clear Computing · {report.event_name}</span>
-          <span style={{ fontSize: 8.5, color: TEXT_MUTED }}>Document confidentiel</span>
+          <span style={{ fontSize: 8, color: TEXT_MUTED, letterSpacing: '0.03em' }}>Clear Computing · {report.event_name}</span>
+          <span style={{ fontSize: 8, color: TEXT_MUTED, letterSpacing: '0.03em' }}>Document confidentiel</span>
         </div>
       </div>
 
