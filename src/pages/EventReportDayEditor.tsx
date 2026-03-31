@@ -112,13 +112,14 @@ export const EventReportDayEditor = () => {
     if (!draft || !dayId) return;
     setScreenshotDrafts((prev) => { const n = { ...prev }; delete n[imgId]; return n; });
     try {
+      const existingRow = hourlyRows.find((r) => r.hour_label === (draft.hour_label ?? ''));
       const row = await hourlyApi.upsert({
         day_id: dayId,
         hour_label: draft.hour_label ?? '',
-        wifi_users: 0,
-        bandwidth_in: draft.bandwidth_in ?? 0,
-        bandwidth_out: draft.bandwidth_out ?? 0,
-        notes: '',
+        wifi_users: existingRow?.wifi_users ?? 0,
+        bandwidth_in: draft.bandwidth_in != null ? Math.round(draft.bandwidth_in * 10) / 10 : 0,
+        bandwidth_out: draft.bandwidth_out != null ? Math.round(draft.bandwidth_out * 10) / 10 : 0,
+        notes: existingRow?.notes ?? '',
       });
       setHourlyRows((prev) => {
         const combined = [...prev.filter((r) => r.hour_label !== row.hour_label || r.id === row.id), row];
@@ -171,8 +172,8 @@ export const EventReportDayEditor = () => {
     if (!draft) return;
     const updated: EventReportHourlyRow = {
       ...row,
-      bandwidth_out: draft.bandwidth_out ?? row.bandwidth_out,
-      bandwidth_in: draft.bandwidth_in ?? row.bandwidth_in,
+      bandwidth_out: draft.bandwidth_out != null ? Math.round(draft.bandwidth_out * 10) / 10 : row.bandwidth_out,
+      bandwidth_in: draft.bandwidth_in != null ? Math.round(draft.bandwidth_in * 10) / 10 : row.bandwidth_in,
       wifi_users: draft.wifi_users != null ? draft.wifi_users : row.wifi_users,
     };
     setHourlyRows((prev) => prev.map((r) => (r.id === row.id ? updated : r)));
@@ -1051,10 +1052,10 @@ export const EventReportDayEditor = () => {
                                 )}
                                 <div className="flex gap-4 flex-wrap">
                                   <span className="text-gray-500 dark:text-gray-400">
-                                    <span className="text-green-500">↓</span> Download : <span className="font-mono font-medium text-gray-800 dark:text-gray-200">{rowAnalyserDraft[row.id].bandwidth_out != null ? `${rowAnalyserDraft[row.id].bandwidth_out} GB` : '—'}</span>
+                                    <span className="text-green-500">↓</span> Download : <span className="font-mono font-medium text-gray-800 dark:text-gray-200">{rowAnalyserDraft[row.id].bandwidth_out != null ? `${rowAnalyserDraft[row.id].bandwidth_out.toFixed(1)} GB` : '—'}</span>
                                   </span>
                                   <span className="text-gray-500 dark:text-gray-400">
-                                    <span className="text-blue-500">↑</span> Upload : <span className="font-mono font-medium text-gray-800 dark:text-gray-200">{rowAnalyserDraft[row.id].bandwidth_in != null ? `${rowAnalyserDraft[row.id].bandwidth_in} GB` : '—'}</span>
+                                    <span className="text-blue-500">↑</span> Upload : <span className="font-mono font-medium text-gray-800 dark:text-gray-200">{rowAnalyserDraft[row.id].bandwidth_in != null ? `${rowAnalyserDraft[row.id].bandwidth_in.toFixed(1)} GB` : '—'}</span>
                                   </span>
                                   {rowAnalyserDraft[row.id].wifi_users != null && (
                                     <span className="text-gray-500 dark:text-gray-400">
@@ -1411,11 +1412,11 @@ export const EventReportDayEditor = () => {
                           </div>
                           <div className="text-center">
                             <div className="text-green-600 dark:text-green-400">↓ DL</div>
-                            <div className="font-mono font-semibold text-gray-800 dark:text-gray-200">{screenshotDrafts[img.id].bandwidth_out != null ? `${screenshotDrafts[img.id].bandwidth_out} GB` : '—'}</div>
+                            <div className="font-mono font-semibold text-gray-800 dark:text-gray-200">{screenshotDrafts[img.id].bandwidth_out != null ? `${screenshotDrafts[img.id].bandwidth_out.toFixed(1)} GB` : '—'}</div>
                           </div>
                           <div className="text-center">
                             <div className="text-blue-600 dark:text-blue-400">↑ UL</div>
-                            <div className="font-mono font-semibold text-gray-800 dark:text-gray-200">{screenshotDrafts[img.id].bandwidth_in != null ? `${screenshotDrafts[img.id].bandwidth_in} GB` : '—'}</div>
+                            <div className="font-mono font-semibold text-gray-800 dark:text-gray-200">{screenshotDrafts[img.id].bandwidth_in != null ? `${screenshotDrafts[img.id].bandwidth_in.toFixed(1)} GB` : '—'}</div>
                           </div>
                         </div>
                         <div className="flex gap-1.5">
