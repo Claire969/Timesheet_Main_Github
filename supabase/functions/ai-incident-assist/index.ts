@@ -40,7 +40,8 @@ function makeScreenshotForHourPrompt(targetHour: string): string {
 Rules:
 - The target hour is explicitly "${targetHour}". Do NOT pick a different hour.
 - Extract the download value (bandwidth out) and upload value (bandwidth in) for that hour only.
-- Values are typically in GB or MB. Convert to GB if needed (e.g. 512 MB = 0.512 GB). Return a plain number.
+- Return the RAW numeric value exactly as shown on screen, and the EXACT unit string as shown (e.g. "Mbps", "MB/s", "GB", "MB", "Kb/s", "Gbps", "KB/s", "GB/s").
+- Do NOT convert units yourself. Return the number and unit separately.
 - If the graph is unclear or the target hour is not readable, set "uncertain": true and return null for values you cannot read.
 - Do NOT invent values. If unsure, prefer null over a guess.
 - wifi_users: if clearly visible as a labeled user count for that hour, include it as an integer; otherwise return null.
@@ -48,13 +49,59 @@ Rules:
 Return ONLY a valid JSON object with this exact shape:
 {
   "hour_label": "${targetHour}",
-  "bandwidth_out": <number in GB or null>,
-  "bandwidth_in": <number in GB or null>,
+  "bandwidth_out_raw": <number as shown on screen or null>,
+  "bandwidth_out_unit": "<unit string as shown or null>",
+  "bandwidth_in_raw": <number as shown on screen or null>,
+  "bandwidth_in_unit": "<unit string as shown or null>",
   "wifi_users": <integer or null>,
   "uncertain": <true or false>
 }
 
 No explanation. No extra text. Just the JSON object.`;
+}
+
+function normalizeToGB(raw: number | null | undefined, unit: string | null | undefined): { gb: number | null; uncertain: boolean } {
+  if (raw == null || raw === undefined) return { gb: null, uncertain: false };
+  if (!unit) return { gb: null, uncertain: true };
+
+  const u = unit.trim();
+
+  const ratePatternsFull: Array<[RegExp, number]> = [
+    [/^GB\/s$/i, 3600],
+    [/^MB\/s$/i, 3600 / 1000],
+    [/^KB\/s$/i, 3600 / 1_000_000],
+    [/^Gbps$/i, 3600 / 8],
+    [/^Mbps$/i, 3600 / 8 / 1000],
+    [/^[Kk]bps$/i, 3600 / 8 / 1_000_000],
+    [/^Gb\/s$/i, 3600 / 8],
+    [/^Mb\/s$/i, 3600 / 8 / 1000],
+    [/^[Kk]b\/s$/i, 3600 / 8 / 1_000_000],
+  ];
+
+  for (const [re, factor] of ratePatternsFull) {
+    if (re.test(u)) {
+      const gb = parseFloat((raw * factor).toFixed(2));
+      return { gb, uncertain: false };
+    }
+  }
+
+  const volumePatterns: Array<[RegExp, number]> = [
+    [/^GB$/i, 1],
+    [/^MB$/i, 1 / 1000],
+    [/^[Kk]B$/i, 1 / 1_000_000],
+    [/^[Gg]b$/i, 1 / 8],
+    [/^[Mm]b$/i, 1 / 8 / 1000],
+    [/^[Kk]b$/i, 1 / 8 / 1_000_000],
+  ];
+
+  for (const [re, factor] of volumePatterns) {
+    if (re.test(u)) {
+      const gb = parseFloat((raw * factor).toFixed(2));
+      return { gb, uncertain: false };
+    }
+  }
+
+  return { gb: null, uncertain: true };
 }
 
 const JSON_ACTIONS = new Set(["polish_incident_fr", "polish_incident_en", "analyze_screenshot", "analyze_screenshot_for_hour"]);
@@ -142,13 +189,31 @@ Deno.serve(async (req: Request) => {
       const result = (data.choices?.[0]?.message?.content?.trim() ?? "")
         .replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
 
-      let parsed: unknown;
+      let parsed: Record<string, unknown>;
       try {
-        parsed = JSON.parse(result);
+        parsed = JSON.parse(result) as Record<string, unknown>;
       } catch {
         return new Response("Invalid JSON from AI", { status: 502, headers: corsHeaders });
       }
-      return new Response(JSON.stringify(parsed), {
+
+      const outNorm = normalizeToGB(
+        parsed.bandwidth_out_raw as number | null,
+        parsed.bandwidth_out_unit as string | null,
+      );
+      const inNorm = normalizeToGB(
+        parsed.bandwidth_in_raw as number | null,
+        parsed.bandwidth_in_unit as string | null,
+      );
+
+      const normalized = {
+        hour_label: parsed.hour_label as string,
+        bandwidth_out: outNorm.gb,
+        bandwidth_in: inNorm.gb,
+        wifi_users: parsed.wifi_users as number | null ?? null,
+        uncertain: !!(parsed.uncertain) || outNorm.uncertain || inNorm.uncertain,
+      };
+
+      return new Response(JSON.stringify(normalized), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
