@@ -35,29 +35,66 @@ Return ONLY a valid JSON object with this exact shape:
 No explanation. No extra text. Just the JSON object.`;
 
 function makeScreenshotForHourPrompt(targetHour: string): string {
-  return `You are analyzing a network monitoring screenshot from an event report. The user has selected the hour "${targetHour}" as the target. Extract values FOR THAT SPECIFIC HOUR ONLY.
+  return `Tu analyses une capture Sophos de trafic WAN dans un rapport d'événement réseau. L'heure cible est "${targetHour}".
 
-Rules:
-- The target hour is explicitly "${targetHour}". Do NOT pick a different hour.
-- Extract the download value (bandwidth out) and upload value (bandwidth in) for that hour only.
-- Return the RAW numeric value exactly as shown on screen, and the EXACT unit string as shown (e.g. "Mbps", "MB/s", "GB", "MB", "Kb/s", "Gbps", "KB/s", "GB/s").
-- Do NOT convert units yourself. Return the number and unit separately.
-- If the graph is unclear or the target hour is not readable, set "uncertain": true and return null for values you cannot read.
-- Do NOT invent values. If unsure, prefer null over a guess.
-- wifi_users: if clearly visible as a labeled user count for that hour, include it as an integer; otherwise return null.
+RÈGLE ABSOLUE
+- Les valeurs affichées dans le tableau (Max / Min / Moyenne / Actuel) sont en kbit/s.
+- Ce ne sont PAS des Go.
+- Il est interdit de reprendre directement une valeur Max/Min/Moyenne/Actuel comme volume en Go.
 
-Return ONLY a valid JSON object with this exact shape:
+INTERPRÉTATION DES COULEURS
+- Sur un graphe "Zone WAN : Transfert de données total en amont/en aval" :
+  - Orange = montée = Upload (bandwidth_in)
+  - Bleu/Violet = descente = Download (bandwidth_out)
+
+OBJECTIF
+- Estimer le volume transféré sur la période "${targetHour}" (1 heure).
+- Le volume doit être calculé à partir du débit moyen estimé sur la période, pas à partir du débit maximum.
+
+MÉTHODE
+1. Identifier la zone temporelle correspondant à "${targetHour}" sur l'axe horizontal.
+   - Si le graphe couvre plusieurs heures, découper visuellement selon l'axe du temps.
+   - N'utiliser que la portion correspondant à l'heure demandée.
+
+2. Estimer le débit moyen sur cette période pour chaque courbe :
+   - moyenne_download (bleu/violet) en kbit/s — utiliser l'aire visuelle sous la courbe
+   - moyenne_upload (orange) en kbit/s — utiliser l'aire visuelle sous la courbe
+   - Les valeurs Max/Min/Actuel servent seulement d'indices d'ordre de grandeur, pas de résultat final.
+
+3. Convertir le débit moyen en volume pour 1 heure :
+   Go = moyenne_kbit_s × 3600 / 8 000 000
+   Go ≈ moyenne_kbit_s × 0.00045
+
+4. Arrondir proprement :
+   - < 10 Go : 1 décimale (ex. 4.5)
+   - ≥ 10 Go : entier ou 0.5 selon la précision visuelle
+
+SANITY CHECK OBLIGATOIRE
+- Si le résultat en Go ressemble directement à une valeur kbit/s visible dans le tableau, c'est faux — recommencer.
+- Exemples de résultats corrects :
+  - 100 000 kbit/s moyen sur 1 h ≈ 45 Go
+  - 50 000 kbit/s moyen sur 1 h ≈ 22.5 Go
+  - 10 000 kbit/s moyen sur 1 h ≈ 4.5 Go
+  - 1 000 kbit/s moyen sur 1 h ≈ 0.5 Go
+
+RÈGLES SUPPLÉMENTAIRES
+- Ne jamais inverser montée/descente.
+- Ne jamais utiliser directement la valeur Max comme Go.
+- Si l'image est floue ou ambiguë, retourner une estimation prudente avec "uncertain": true.
+- wifi_users : si un compteur d'utilisateurs Wi-Fi est clairement visible pour cette heure, l'inclure en entier ; sinon null.
+
+Retourne UNIQUEMENT un objet JSON valide avec cette forme exacte :
 {
   "hour_label": "${targetHour}",
-  "bandwidth_out_raw": <number as shown on screen or null>,
-  "bandwidth_out_unit": "<unit string as shown or null>",
-  "bandwidth_in_raw": <number as shown on screen or null>,
-  "bandwidth_in_unit": "<unit string as shown or null>",
-  "wifi_users": <integer or null>,
-  "uncertain": <true or false>
+  "bandwidth_out_raw": <volume download estimé en Go, nombre décimal, ou null>,
+  "bandwidth_out_unit": "GB",
+  "bandwidth_in_raw": <volume upload estimé en Go, nombre décimal, ou null>,
+  "bandwidth_in_unit": "GB",
+  "wifi_users": <entier ou null>,
+  "uncertain": <true ou false>
 }
 
-No explanation. No extra text. Just the JSON object.`;
+Aucune explication. Aucun texte supplémentaire. Uniquement l'objet JSON.`;
 }
 
 function normalizeToGB(raw: number | null | undefined, unit: string | null | undefined): { gb: number | null; uncertain: boolean } {
