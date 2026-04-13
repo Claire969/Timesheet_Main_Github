@@ -7,8 +7,8 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY ?? '';
 const DEPLOY_TOKEN = process.env.DEPLOY_TOKEN ?? '';
 
 const DEPLOY_ACTIONS = {
-  deploy_dev: '/home/admin/update-timesheet.sh',
-  deploy_prod: 'cd /home/admin/timesheet && ./deploy-prod.sh',
+  deploy_dev: `sudo -u admin -H bash -lc '/home/admin/update-timesheet.sh'`,
+  deploy_prod: `sudo -u admin -H bash -lc 'cd /home/admin/timesheet && ./deploy-prod.sh'`,
 };
 
 function runDeploy(action) {

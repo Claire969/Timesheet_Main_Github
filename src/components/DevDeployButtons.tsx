@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 const DEV_HOST = 'timesheet-dev.clearcomputing.be';
-const PROXY_BASE = import.meta.env.VITE_AI_PROXY_URL ?? 'http://127.0.0.1:3579';
+const PROXY_BASE = '';
 const SESSION_KEY = 'deploy_token';
 
 function getOrAskToken(): string | null {
