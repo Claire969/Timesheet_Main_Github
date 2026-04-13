@@ -478,25 +478,23 @@ function IncidentsSection({ incidents }: { incidents: EventReportIncident[] }) {
   );
 }
 
-function ImageCard({ img, isSingle }: { img: EventReportImage; isSingle: boolean }) {
+const cardBase: React.CSSProperties = {
+  minWidth: 0,
+  border: `1px solid ${BORDER}`,
+  borderRadius: 6,
+  overflow: 'hidden',
+  pageBreakInside: 'avoid',
+  breakInside: 'avoid',
+};
+
+function CardImg({ img, maxHeight }: { img: EventReportImage; maxHeight: number }) {
   return (
-    <div
-      style={{
-        flex: isSingle ? '0 0 auto' : '1 1 0',
-        width: isSingle ? '60%' : undefined,
-        minWidth: 0,
-        border: `1px solid ${BORDER}`,
-        borderRadius: 6,
-        overflow: 'hidden',
-        pageBreakInside: 'avoid',
-        breakInside: 'avoid',
-      }}
-    >
+    <div style={cardBase}>
       <div style={{ background: BG_ROW_ALT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
         <img
           src={img.file_url}
           alt={img.caption || ''}
-          style={{ maxWidth: '100%', maxHeight: isSingle ? 280 : 200, width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto' }}
+          style={{ maxWidth: '100%', maxHeight, width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto' }}
         />
       </div>
       {img.caption && (
@@ -509,60 +507,65 @@ function ImageCard({ img, isSingle }: { img: EventReportImage; isSingle: boolean
 }
 
 function ImagesSection({ images }: { images: EventReportImage[] }) {
-  const isSingle = images.length === 1;
-  const isDouble = images.length === 2;
+  const count = images.length;
 
-  if (isSingle) {
+  if (count === 1) {
     return (
       <div style={{ ...sectionBlock, marginBottom: 16 }}>
         <div style={sectionLabel}>Captures / Photos</div>
-        <ImageCard img={images[0]} isSingle={true} />
+        <CardImg img={images[0]} maxHeight={380} />
       </div>
     );
   }
 
-  if (isDouble) {
+  if (count === 2) {
     return (
       <div style={{ ...sectionBlock, marginBottom: 16 }}>
         <div style={sectionLabel}>Captures / Photos</div>
         <div style={{ display: 'flex', gap: 10 }}>
           {images.map((img) => (
-            <ImageCard key={img.id} img={img} isSingle={false} />
+            <div key={img.id} style={{ flex: '1 1 0', minWidth: 0 }}>
+              <CardImg img={img} maxHeight={300} />
+            </div>
           ))}
         </div>
       </div>
     );
   }
 
+  if (count === 3) {
+    return (
+      <div style={{ ...sectionBlock, marginBottom: 16 }}>
+        <div style={sectionLabel}>Captures / Photos</div>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+          {images.slice(0, 2).map((img) => (
+            <div key={img.id} style={{ flex: '1 1 0', minWidth: 0 }}>
+              <CardImg img={img} maxHeight={240} />
+            </div>
+          ))}
+        </div>
+        <CardImg img={images[2]} maxHeight={300} />
+      </div>
+    );
+  }
+
+  const rows: EventReportImage[][] = [];
+  for (let i = 0; i < images.length; i += 2) {
+    rows.push(images.slice(i, i + 2));
+  }
+
   return (
     <div style={{ ...sectionBlock, marginBottom: 16 }}>
       <div style={sectionLabel}>Captures / Photos</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-        {images.map((img) => (
-          <div
-            key={img.id}
-            style={{
-              flex: '1 1 calc(50% - 5px)',
-              minWidth: 0,
-              border: `1px solid ${BORDER}`,
-              borderRadius: 6,
-              overflow: 'hidden',
-              pageBreakInside: 'avoid',
-              breakInside: 'avoid',
-            }}
-          >
-            <div style={{ background: BG_ROW_ALT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
-              <img
-                src={img.file_url}
-                alt={img.caption || ''}
-                style={{ maxWidth: '100%', maxHeight: 180, width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto' }}
-              />
-            </div>
-            {img.caption && (
-              <div style={{ padding: '5px 10px', background: '#fff', borderTop: `1px solid ${BORDER}` }}>
-                <p style={{ fontSize: 9, color: TEXT_MUTED, margin: 0, textAlign: 'center', lineHeight: 1.4 }}>{img.caption}</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {rows.map((row, rowIdx) => (
+          <div key={rowIdx} style={{ display: 'flex', gap: 10 }}>
+            {row.map((img) => (
+              <div key={img.id} style={{ flex: '1 1 0', minWidth: 0 }}>
+                <CardImg img={img} maxHeight={220} />
               </div>
-            )}
+            ))}
+            {row.length === 1 && <div style={{ flex: '1 1 0', minWidth: 0 }} />}
           </div>
         ))}
       </div>
