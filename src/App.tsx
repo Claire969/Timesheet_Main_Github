@@ -11,6 +11,7 @@ import { EventReports } from './pages/EventReports';
 import { EventReportForm } from './pages/EventReportForm';
 import { EventReportDetail } from './pages/EventReportDetail';
 import { EventReportDayEditor } from './pages/EventReportDayEditor';
+import { DevDeployButtons } from './components/DevDeployButtons';
 
 export type Forfait = 'none' | 'halfDay' | 'fullDay';
 
@@ -132,6 +133,7 @@ function App() {
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <DevDeployButtons />
       </AuthProvider>
     </AppStateContext.Provider>
     </ThemeProvider>

@@ -1,8 +1,26 @@
 import http from 'node:http';
 import https from 'node:https';
+import { exec } from 'node:child_process';
 
 const PORT = process.env.AI_PROXY_PORT ?? 3579;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY ?? '';
+const DEPLOY_TOKEN = process.env.DEPLOY_TOKEN ?? '';
+
+const DEPLOY_ACTIONS = {
+  deploy_dev: '/home/admin/update-timesheet.sh',
+  deploy_prod: 'cd /home/admin/timesheet && ./deploy-prod.sh',
+};
+
+function runDeploy(action) {
+  return new Promise((resolve, reject) => {
+    const cmd = DEPLOY_ACTIONS[action];
+    if (!cmd) return reject(new Error('Unknown action'));
+    exec(cmd, { timeout: 120000 }, (err, stdout, stderr) => {
+      if (err) return reject(new Error(stderr || err.message));
+      resolve(stdout);
+    });
+  });
+}
 
 const PROMPTS = {
   correct_fr: "Corrige l'orthographe, la grammaire et la ponctuation du texte suivant en français. Retourne uniquement le texte corrigé, sans explication.",
@@ -236,6 +254,20 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(204);
     res.end();
     return;
+  }
+
+  if (req.method === 'POST' && (req.url === '/deploy/dev' || req.url === '/deploy/prod')) {
+    const token = req.headers['x-deploy-token'];
+    if (!DEPLOY_TOKEN || token !== DEPLOY_TOKEN) {
+      return json(res, 403, { error: 'Forbidden' });
+    }
+    const action = req.url === '/deploy/dev' ? 'deploy_dev' : 'deploy_prod';
+    try {
+      const output = await runDeploy(action);
+      return json(res, 200, { ok: true, output });
+    } catch (e) {
+      return json(res, 500, { error: e instanceof Error ? e.message : 'Deploy failed' });
+    }
   }
 
   if (req.method !== 'POST' || req.url !== '/ai-assist') {
