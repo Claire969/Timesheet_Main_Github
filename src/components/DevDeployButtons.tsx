@@ -2,7 +2,16 @@ import { useState } from 'react';
 
 const DEV_HOST = 'timesheet-dev.clearcomputing.be';
 const PROXY_BASE = import.meta.env.VITE_AI_PROXY_URL ?? 'http://127.0.0.1:3579';
-const DEPLOY_TOKEN = import.meta.env.VITE_DEPLOY_TOKEN ?? '';
+const SESSION_KEY = 'deploy_token';
+
+function getOrAskToken(): string | null {
+  const stored = sessionStorage.getItem(SESSION_KEY);
+  if (stored) return stored;
+  const entered = window.prompt('Deploy token:');
+  if (!entered) return null;
+  sessionStorage.setItem(SESSION_KEY, entered);
+  return entered;
+}
 
 type Status = 'idle' | 'loading' | 'ok' | 'error';
 
@@ -11,18 +20,21 @@ function useDeployAction(endpoint: string) {
   const [message, setMessage] = useState('');
 
   const trigger = async () => {
+    const token = getOrAskToken();
+    if (!token) return;
     setStatus('loading');
     setMessage('');
     try {
       const res = await fetch(`${PROXY_BASE}${endpoint}`, {
         method: 'POST',
-        headers: { 'x-deploy-token': DEPLOY_TOKEN },
+        headers: { 'x-deploy-token': token },
       });
       const data = await res.json();
       if (res.ok) {
         setStatus('ok');
         setMessage('Done');
       } else {
+        if (res.status === 403) sessionStorage.removeItem(SESSION_KEY);
         setStatus('error');
         setMessage(data.error ?? 'Error');
       }
