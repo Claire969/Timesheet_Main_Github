@@ -385,7 +385,7 @@ function PrintableDayPage({ dayData, dayIndex, totalEventDays, pageNumber, total
 
 function IncidentsSection({ incidents }: { incidents: EventReportIncident[] }) {
   return (
-    <div style={sectionBlock}>
+    <div style={{ ...sectionBlock, marginBottom: 16 }}>
       <div style={sectionLabel}>
         Incidents
         <span style={{ fontSize: 9, background: NAVY_LIGHT, color: NAVY, padding: '1px 7px', borderRadius: 20, fontWeight: 700, marginLeft: 4 }}>
@@ -478,22 +478,25 @@ function IncidentsSection({ incidents }: { incidents: EventReportIncident[] }) {
   );
 }
 
-function ImageCard({ img, maxHeight }: { img: EventReportImage; maxHeight: number }) {
+function ImageCard({ img, isSingle }: { img: EventReportImage; isSingle: boolean }) {
   return (
     <div
       style={{
-        flex: '1 1 0',
+        flex: isSingle ? '0 0 auto' : '1 1 0',
+        width: isSingle ? '60%' : undefined,
         minWidth: 0,
         border: `1px solid ${BORDER}`,
         borderRadius: 6,
         overflow: 'hidden',
+        pageBreakInside: 'avoid',
+        breakInside: 'avoid',
       }}
     >
-      <div style={{ background: BG_ROW_ALT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, minHeight: 40, maxHeight, overflow: 'hidden' }}>
+      <div style={{ background: BG_ROW_ALT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
         <img
           src={img.file_url}
           alt={img.caption || ''}
-          style={{ maxWidth: '100%', maxHeight: maxHeight - 16, width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto' }}
+          style={{ maxWidth: '100%', maxHeight: isSingle ? 280 : 200, width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto' }}
         />
       </div>
       {img.caption && (
@@ -507,36 +510,58 @@ function ImageCard({ img, maxHeight }: { img: EventReportImage; maxHeight: numbe
 
 function ImagesSection({ images }: { images: EventReportImage[] }) {
   const isSingle = images.length === 1;
+  const isDouble = images.length === 2;
 
-  const rows: EventReportImage[][] = [];
   if (isSingle) {
-    rows.push([images[0]]);
-  } else {
-    for (let i = 0; i < images.length; i += 2) {
-      rows.push(images.slice(i, i + 2));
-    }
+    return (
+      <div style={{ ...sectionBlock, marginBottom: 16 }}>
+        <div style={sectionLabel}>Captures / Photos</div>
+        <ImageCard img={images[0]} isSingle={true} />
+      </div>
+    );
+  }
+
+  if (isDouble) {
+    return (
+      <div style={{ ...sectionBlock, marginBottom: 16 }}>
+        <div style={sectionLabel}>Captures / Photos</div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {images.map((img) => (
+            <ImageCard key={img.id} img={img} isSingle={false} />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div style={sectionBlock}>
+    <div style={{ ...sectionBlock, marginBottom: 16 }}>
       <div style={sectionLabel}>Captures / Photos</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {rows.map((row, rowIdx) => (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+        {images.map((img) => (
           <div
-            key={rowIdx}
+            key={img.id}
             style={{
-              display: 'flex',
-              gap: 12,
+              flex: '1 1 calc(50% - 5px)',
+              minWidth: 0,
+              border: `1px solid ${BORDER}`,
+              borderRadius: 6,
+              overflow: 'hidden',
               pageBreakInside: 'avoid',
               breakInside: 'avoid',
-              maxWidth: isSingle ? 480 : undefined,
             }}
           >
-            {row.map((img) => (
-              <ImageCard key={img.id} img={img} maxHeight={220} />
-            ))}
-            {row.length === 1 && !isSingle && (
-              <div style={{ flex: '1 1 0', minWidth: 0 }} />
+            <div style={{ background: BG_ROW_ALT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
+              <img
+                src={img.file_url}
+                alt={img.caption || ''}
+                style={{ maxWidth: '100%', maxHeight: 180, width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto' }}
+              />
+            </div>
+            {img.caption && (
+              <div style={{ padding: '5px 10px', background: '#fff', borderTop: `1px solid ${BORDER}` }}>
+                <p style={{ fontSize: 9, color: TEXT_MUTED, margin: 0, textAlign: 'center', lineHeight: 1.4 }}>{img.caption}</p>
+              </div>
             )}
           </div>
         ))}
