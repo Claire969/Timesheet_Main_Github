@@ -219,10 +219,6 @@ function DayPageHeader({ eventName, centerLabel, reportDate, isContinuation, pag
 }
 
 // ─── Fixed repeat header (stamped on every physical page via position:fixed) ──
-// Rendered once at document level; shows on all pages except the cover.
-// The cover suppression is handled via CSS: .print-page:first-child ~ .repeat-header
-// does not apply since it lives outside .print-page, so we rely on the cover
-// having its own full-bleed header that visually overrides it.
 
 function RepeatHeader({ eventName, totalPages }: {
   eventName: string;
@@ -281,229 +277,119 @@ function PrintableDayPage({ dayData, dayIndex, totalEventDays, pageNumber, total
     <div className="print-page">
       <DayPageHeader {...headerProps} isContinuation={false} pageNumber={pageNumber} />
 
-      <div
-        style={{
-          paddingTop: 12,
-          boxDecorationBreak: 'clone',
-          WebkitBoxDecorationBreak: 'clone',
-        }}
-      >
-        {!hasData && (
-          <p style={{ fontSize: 11, color: TEXT_MUTED, fontStyle: 'italic' }}>
-            Aucune donnée enregistrée pour ce jour.
-          </p>
-        )}
+      {!hasData && (
+        <p style={{ fontSize: 11, color: TEXT_MUTED, fontStyle: 'italic' }}>Aucune donnée enregistrée pour ce jour.</p>
+      )}
 
-        {/* Summary */}
-        {day.summary && (
-          <div
-            style={{
-              ...sectionBlock,
-              background: '#f8fafc',
-              borderRadius: 6,
-              padding: '12px 16px',
-              border: `1px solid ${BORDER}`,
-            }}
-          >
-            <div style={sectionLabel}>Résumé du jour</div>
-            <p
-              style={{
-                fontSize: 11,
-                color: TEXT_PRIMARY,
-                lineHeight: 1.7,
-                margin: 0,
-                whiteSpace: 'pre-wrap',
-              }}
-            >
-              {day.summary}
-            </p>
-          </div>
-        )}
+      {/* Summary */}
+      {day.summary && (
+        <div style={{ ...sectionBlock, background: '#f8fafc', borderRadius: 6, padding: '12px 16px', border: `1px solid ${BORDER}` }}>
+          <div style={sectionLabel}>Résumé du jour</div>
+          <p style={{ fontSize: 11, color: TEXT_PRIMARY, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{day.summary}</p>
+        </div>
+      )}
 
-        {/* Hourly table */}
-        {sorted.length > 0 && (
-          <div style={sectionBlock}>
-            <div style={sectionLabel}>Suivi réseau horaire</div>
-            <table
-              style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                fontSize: 10,
-                borderRadius: 6,
-                overflow: 'hidden',
-              }}
-            >
-              <thead>
-                <tr>
-                  {['Heure', 'Utilisateurs Wi-Fi', 'Download (GB)', 'Upload (GB)'].map((h, i) => (
-                    <th
-                      key={h}
-                      style={{
-                        background: NAVY,
-                        color: '#fff',
-                        padding: '7px 12px',
-                        textAlign: i === 0 ? 'left' : 'right',
-                        fontWeight: 700,
-                        fontSize: 9,
-                        letterSpacing: '0.05em',
-                        textTransform: 'uppercase',
-                        borderRight: i < 3 ? '1px solid rgba(255,255,255,0.1)' : 'none',
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((row, i) => (
-                  <tr
-                    key={row.id}
+      {/* Hourly table */}
+      {sorted.length > 0 && (
+        <div style={sectionBlock}>
+          <div style={sectionLabel}>Suivi réseau horaire</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10, borderRadius: 6, overflow: 'hidden' }}>
+            <thead>
+              <tr>
+                {['Heure', 'Utilisateurs Wi-Fi', 'Download (GB)', 'Upload (GB)'].map((h, i) => (
+                  <th
+                    key={h}
                     style={{
-                      background: i % 2 === 0 ? BG_ROW_ALT : '#fff',
-                      borderBottom: `1px solid ${BORDER}`,
-                    }}
-                  >
-                    <td
-                      style={{
-                        padding: '5px 12px',
-                        fontWeight: 700,
-                        color: NAVY,
-                        fontVariantNumeric: 'tabular-nums',
-                        fontSize: 10,
-                      }}
-                    >
-                      {row.hour_label}
-                    </td>
-                    <td
-                      style={{
-                        padding: '5px 12px',
-                        color: TEXT_PRIMARY,
-                        fontVariantNumeric: 'tabular-nums',
-                        textAlign: 'right',
-                      }}
-                    >
-                      {row.wifi_users ?? '—'}
-                    </td>
-                    <td
-                      style={{
-                        padding: '5px 12px',
-                        color: TEXT_PRIMARY,
-                        fontVariantNumeric: 'tabular-nums',
-                        textAlign: 'right',
-                      }}
-                    >
-                      {row.bandwidth_out != null ? row.bandwidth_out.toFixed(2) : '—'}
-                    </td>
-                    <td
-                      style={{
-                        padding: '5px 12px',
-                        color: TEXT_PRIMARY,
-                        fontVariantNumeric: 'tabular-nums',
-                        textAlign: 'right',
-                      }}
-                    >
-                      {row.bandwidth_in != null ? row.bandwidth_in.toFixed(2) : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Charts */}
-            <div
-              style={{
-                marginTop: 20,
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 16,
-              }}
-            >
-              <div
-                style={{
-                  background: '#fff',
-                  border: `1px solid ${BORDER}`,
-                  borderRadius: 6,
-                  padding: '10px 12px',
-                }}
-              >
-                <PrintLineChart
-                  rows={sorted}
-                  field="wifi_users"
-                  color={ACCENT_BLUE}
-                  label="Utilisateurs Wi-Fi"
-                />
-              </div>
-              <div
-                style={{
-                  background: '#fff',
-                  border: `1px solid ${BORDER}`,
-                  borderRadius: 6,
-                  padding: '10px 12px',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-                  <span
-                    style={{
-                      fontSize: 9,
+                      background: NAVY,
+                      color: '#fff',
+                      padding: '7px 12px',
+                      textAlign: i === 0 ? 'left' : 'right',
                       fontWeight: 700,
-                      color: TEXT_SECONDARY,
+                      fontSize: 9,
+                      letterSpacing: '0.05em',
                       textTransform: 'uppercase',
-                      letterSpacing: '0.06em',
+                      borderRight: i < 3 ? '1px solid rgba(255,255,255,0.1)' : 'none',
                     }}
                   >
-                    Bande passante (GB)
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 8, color: TEXT_MUTED }}>
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        width: 12,
-                        height: 2,
-                        backgroundColor: ACCENT_GREEN,
-                        borderRadius: 1,
-                      }}
-                    />
-                    Download ↓
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 8, color: TEXT_MUTED }}>
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        width: 12,
-                        height: 2,
-                        backgroundColor: ACCENT_BLUE,
-                        borderRadius: 1,
-                      }}
-                    />
-                    Upload ↑
-                  </span>
-                </div>
-                <PrintLineChart
-                  rows={sorted}
-                  field="bandwidth_out"
-                  color={ACCENT_GREEN}
-                  label=""
-                  secondaryField="bandwidth_in"
-                  secondaryColor={ACCENT_BLUE}
-                  secondaryLabel="Upload ↑"
-                />
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((row, i) => (
+                <tr key={row.id} style={{ background: i % 2 === 0 ? BG_ROW_ALT : '#fff', borderBottom: `1px solid ${BORDER}` }}>
+                  <td style={{ padding: '5px 12px', fontWeight: 700, color: NAVY, fontVariantNumeric: 'tabular-nums', fontSize: 10 }}>{row.hour_label}</td>
+                  <td style={{ padding: '5px 12px', color: TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{row.wifi_users ?? '—'}</td>
+                  <td style={{ padding: '5px 12px', color: TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{row.bandwidth_out != null ? row.bandwidth_out.toFixed(2) : '—'}</td>
+                  <td style={{ padding: '5px 12px', color: TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{row.bandwidth_in != null ? row.bandwidth_in.toFixed(2) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Charts */}
+          <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '10px 12px' }}>
+              <PrintLineChart
+                rows={sorted}
+                field="wifi_users"
+                color={ACCENT_BLUE}
+                label="Utilisateurs Wi-Fi"
+              />
+            </div>
+            <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '10px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Bande passante (GB)</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 8, color: TEXT_MUTED }}>
+                  <span style={{ display: 'inline-block', width: 12, height: 2, backgroundColor: ACCENT_GREEN, borderRadius: 1 }} />
+                  Download ↓
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 8, color: TEXT_MUTED }}>
+                  <span style={{ display: 'inline-block', width: 12, height: 2, backgroundColor: ACCENT_BLUE, borderRadius: 1 }} />
+                  Upload ↑
+                </span>
               </div>
+              <PrintLineChart
+                rows={sorted}
+                field="bandwidth_out"
+                color={ACCENT_GREEN}
+                label=""
+                secondaryField="bandwidth_in"
+                secondaryColor={ACCENT_BLUE}
+                secondaryLabel="Upload ↑"
+              />
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {incidents.length > 0 && <IncidentsSection incidents={incidents} />}
-        {images.length > 0 && <ImagesSection images={images} />}
-      </div>
+      {/* Incidents — flow naturally after table/charts; each block is kept together */}
+      {incidents.length > 0 && (
+        <IncidentsSection incidents={incidents} />
+      )}
+
+      {/* Images — flow naturally; each image card is kept together */}
+      {images.length > 0 && (
+        <ImagesSection images={images} />
+      )}
     </div>
   );
 }
+
 // ─── Extracted section renderers ─────────────────────────────────────────────
 
 function IncidentsSection({ incidents }: { incidents: EventReportIncident[] }) {
   return (
-    <div style={{ ...sectionBlock, marginBottom: 16 }}>
+    <div
+      style={{
+        ...sectionBlock,
+        marginBottom: 16,
+        paddingTop: 14,
+        boxDecorationBreak: 'clone',
+        WebkitBoxDecorationBreak: 'clone',
+      }}
+    >
       <div style={sectionLabel}>
         Incidents
         <span style={{ fontSize: 9, background: NAVY_LIGHT, color: NAVY, padding: '1px 7px', borderRadius: 20, fontWeight: 700, marginLeft: 4 }}>
@@ -629,7 +515,15 @@ function ImagesSection({ images }: { images: EventReportImage[] }) {
 
   if (count === 1) {
     return (
-      <div style={{ ...sectionBlock, marginBottom: 16 }}>
+      <div
+        style={{
+          ...sectionBlock,
+          marginBottom: 16,
+          paddingTop: 14,
+          boxDecorationBreak: 'clone',
+          WebkitBoxDecorationBreak: 'clone',
+        }}
+      >
         <div style={sectionLabel}>Captures / Photos</div>
         <CardImg img={images[0]} maxHeight={380} />
       </div>
@@ -638,7 +532,15 @@ function ImagesSection({ images }: { images: EventReportImage[] }) {
 
   if (count === 2) {
     return (
-      <div style={{ ...sectionBlock, marginBottom: 16 }}>
+      <div
+        style={{
+          ...sectionBlock,
+          marginBottom: 16,
+          paddingTop: 14,
+          boxDecorationBreak: 'clone',
+          WebkitBoxDecorationBreak: 'clone',
+        }}
+      >
         <div style={sectionLabel}>Captures / Photos</div>
         <div style={{ display: 'flex', gap: 10 }}>
           {images.map((img) => (
@@ -653,7 +555,15 @@ function ImagesSection({ images }: { images: EventReportImage[] }) {
 
   if (count === 3) {
     return (
-      <div style={{ ...sectionBlock, marginBottom: 16 }}>
+      <div
+        style={{
+          ...sectionBlock,
+          marginBottom: 16,
+          paddingTop: 14,
+          boxDecorationBreak: 'clone',
+          WebkitBoxDecorationBreak: 'clone',
+        }}
+      >
         <div style={sectionLabel}>Captures / Photos</div>
         <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
           {images.slice(0, 2).map((img) => (
@@ -673,7 +583,15 @@ function ImagesSection({ images }: { images: EventReportImage[] }) {
   }
 
   return (
-    <div style={{ ...sectionBlock, marginBottom: 16 }}>
+    <div
+      style={{
+        ...sectionBlock,
+        marginBottom: 16,
+        paddingTop: 14,
+        boxDecorationBreak: 'clone',
+        WebkitBoxDecorationBreak: 'clone',
+      }}
+    >
       <div style={sectionLabel}>Captures / Photos</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {rows.map((row, rowIdx) => (
@@ -940,7 +858,6 @@ export function PrintableReport({ data }: PrintableReportProps) {
       </div>
 
       {/* ═══════════════════════════ REPEAT HEADER ═══════════════════════════ */}
-      {/* position:fixed in @media print — stamps on every page after the cover */}
       {eventDays.length > 0 && (
         <RepeatHeader eventName={report.event_name} totalPages={eventDays.length + 1} />
       )}
