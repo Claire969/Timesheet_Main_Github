@@ -478,40 +478,65 @@ function IncidentsSection({ incidents }: { incidents: EventReportIncident[] }) {
   );
 }
 
+function ImageCard({ img, maxHeight }: { img: EventReportImage; maxHeight: number }) {
+  return (
+    <div
+      style={{
+        flex: '1 1 0',
+        minWidth: 0,
+        border: `1px solid ${BORDER}`,
+        borderRadius: 6,
+        overflow: 'hidden',
+      }}
+    >
+      <div style={{ background: BG_ROW_ALT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, minHeight: 40, maxHeight, overflow: 'hidden' }}>
+        <img
+          src={img.file_url}
+          alt={img.caption || ''}
+          style={{ maxWidth: '100%', maxHeight: maxHeight - 16, width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto' }}
+        />
+      </div>
+      {img.caption && (
+        <div style={{ padding: '5px 10px', background: '#fff', borderTop: `1px solid ${BORDER}` }}>
+          <p style={{ fontSize: 9, color: TEXT_MUTED, margin: 0, textAlign: 'center', lineHeight: 1.4 }}>{img.caption}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ImagesSection({ images }: { images: EventReportImage[] }) {
   const isSingle = images.length === 1;
+
+  const rows: EventReportImage[][] = [];
+  if (isSingle) {
+    rows.push([images[0]]);
+  } else {
+    for (let i = 0; i < images.length; i += 2) {
+      rows.push(images.slice(i, i + 2));
+    }
+  }
+
   return (
     <div style={sectionBlock}>
       <div style={sectionLabel}>Captures / Photos</div>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: isSingle ? 'minmax(0, 480px)' : '1fr 1fr',
-        gap: 12,
-        justifyContent: isSingle ? 'start' : undefined,
-      }}>
-        {images.map((img) => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {rows.map((row, rowIdx) => (
           <div
-            key={img.id}
+            key={rowIdx}
             style={{
-              border: `1px solid ${BORDER}`,
-              borderRadius: 6,
-              overflow: 'hidden',
+              display: 'flex',
+              gap: 12,
               pageBreakInside: 'avoid',
               breakInside: 'avoid',
-              pageBreakBefore: 'auto',
+              maxWidth: isSingle ? 480 : undefined,
             }}
           >
-            <div style={{ background: BG_ROW_ALT, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, minHeight: 40, maxHeight: isSingle ? 220 : 220, overflow: 'hidden' }}>
-              <img
-                src={img.file_url}
-                alt={img.caption || ''}
-                style={{ maxWidth: '100%', maxHeight: isSingle ? 200 : 200, width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto' }}
-              />
-            </div>
-            {img.caption && (
-              <div style={{ padding: '5px 10px', background: '#fff', borderTop: `1px solid ${BORDER}` }}>
-                <p style={{ fontSize: 9, color: TEXT_MUTED, margin: 0, textAlign: 'center', lineHeight: 1.4 }}>{img.caption}</p>
-              </div>
+            {row.map((img) => (
+              <ImageCard key={img.id} img={img} maxHeight={220} />
+            ))}
+            {row.length === 1 && !isSingle && (
+              <div style={{ flex: '1 1 0', minWidth: 0 }} />
             )}
           </div>
         ))}
