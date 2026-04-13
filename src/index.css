@@ -45,9 +45,17 @@
     box-sizing: border-box;
   }
 
-  /* Day pages: add extra top padding to clear the fixed repeat-header (~35px) + 4mm gap below it */
+  /* Day pages: add extra top padding to clear the fixed repeat-header */
   .print-page:not(:first-child) {
     padding-top: calc(14mm + 38px + 4mm);
+  }
+
+  /* Make continuation fragments of a day leave space under the fixed header */
+  .print-page .day-flow {
+    padding-top: 14mm;
+    margin-top: -14mm;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
   }
 
   .print-page:last-child {
