@@ -143,7 +143,7 @@ export function AppNav({ onExportExcel, onOpenClients }: AppNavProps) {
             <button
               onClick={() => { timesheetDd.setOpen(false); userDd.setOpen(false); toolsDd.setOpen(v => !v); }}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive('/event-reports')
+                isActive('/event-reports') || isActive('/client-database')
                   ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                   : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
               }`}
@@ -171,13 +171,17 @@ export function AppNav({ onExportExcel, onOpenClients }: AppNavProps) {
                   <ClipboardList size={14} className="text-gray-400 dark:text-gray-500 shrink-0" />
                   Rapports événement
                 </button>
-                <div className="flex items-center gap-2.5 px-3.5 py-2 text-sm text-gray-400 dark:text-gray-500 cursor-not-allowed select-none">
-                  <Database size={14} className="shrink-0" />
+                <button
+                  onClick={() => { closeAll(); navigate('/client-database'); }}
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2 text-sm transition-colors text-left ${
+                    isActive('/client-database')
+                      ? 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20'
+                      : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Database size={14} className="text-gray-400 dark:text-gray-500 shrink-0" />
                   Base clients
-                  <span className="ml-auto text-[10px] font-semibold bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
-                    Bientôt
-                  </span>
-                </div>
+                </button>
               </div>
             )}
           </div>

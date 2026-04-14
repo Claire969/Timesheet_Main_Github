@@ -11,6 +11,7 @@ import { EventReports } from './pages/EventReports';
 import { EventReportForm } from './pages/EventReportForm';
 import { EventReportDetail } from './pages/EventReportDetail';
 import { EventReportDayEditor } from './pages/EventReportDayEditor';
+import { ClientDatabase } from './pages/ClientDatabase';
 import { DevDeployButtons } from './components/DevDeployButtons';
 
 export type Forfait = 'none' | 'halfDay' | 'fullDay';
@@ -128,6 +129,14 @@ function App() {
             element={
               <RequireAuth>
                 <EventReportDayEditor />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/client-database"
+            element={
+              <RequireAuth>
+                <ClientDatabase />
               </RequireAuth>
             }
           />
