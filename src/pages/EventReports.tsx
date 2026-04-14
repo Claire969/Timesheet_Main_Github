@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, ArrowLeft, Calendar, Building2, Trash2, Archive, ArchiveRestore } from 'lucide-react';
 import { reportApi } from '../lib/eventReportApi';
 import type { EventReport } from '../lib/eventReportTypes';
-import { ThemeToggle } from '../components/ThemeToggle';
+import { AppNav } from '../components/AppNav';
 
 type ReportRow = EventReport & { venue_client_name?: string; venue_client_logo?: string };
 
@@ -160,34 +160,21 @@ export const EventReports = () => {
   );
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
-      <header className="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/')}
-              className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 transition-colors text-sm"
-            >
-              <ArrowLeft size={16} />
-              Retour
-            </button>
-            <span className="text-gray-300 dark:text-gray-600">|</span>
-            <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">Rapports événement</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <button
-              onClick={() => navigate('/event-reports/new')}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm px-4 py-2.5 shadow-sm transition-colors"
-            >
-              <Plus size={16} />
-              Nouveau rapport
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-white dark:bg-gray-900 pt-14">
+      <AppNav />
 
       <main className="max-w-5xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Rapports événement</h1>
+          <button
+            onClick={() => navigate('/event-reports/new')}
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm px-4 py-2.5 shadow-sm transition-colors"
+          >
+            <Plus size={16} />
+            Nouveau rapport
+          </button>
+        </div>
+
         {isLoading && (
           <div className="text-center py-16 text-gray-400 dark:text-gray-500 text-sm">Chargement...</div>
         )}

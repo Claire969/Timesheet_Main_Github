@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, supabaseEnabled } from '../lib/supabaseClient';
-import { LogOut, Plus, X, Users, CreditCard as Edit2, Archive, ArchiveRestore, LayoutGrid, List, FileSpreadsheet, Download, ClipboardList } from 'lucide-react';
+import { Plus, X, Users, CreditCard as Edit2, Archive, ArchiveRestore, LayoutGrid, List, FileSpreadsheet, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppState } from '../App';
 import type { Client } from '../App';
 import * as XLSX from 'xlsx';
-import { ThemeToggle } from '../components/ThemeToggle';
+import { AppNav } from '../components/AppNav';
 
 const fmtEur = (n: number) => Number.isInteger(n) ? `${n} €` : `${n.toFixed(2)} €`;
 
@@ -253,16 +253,6 @@ useEffect(() => {
     XLSX.writeFile(wb, `timesheet-backup-${today}.xlsx`);
   };
 
-  const handleSignOut = async () => {
-    try {
-      sessionStorage.setItem('force_msal_prompt', '1');
-      await supabase.auth.signOut();
-      navigate('/login');
-    } catch (error) {
-      console.error('Erreur lors de la déconnexion:', error);
-    }
-  };
-
   const validateClientForm = () => {
     const errors: Record<string, string> = {};
     if (!clientFormData.name.trim()) errors.name = 'Le nom est requis';
@@ -405,7 +395,8 @@ useEffect(() => {
   };
 
   return (
-    <div className="relative min-h-screen bg-white dark:bg-gray-900">
+    <div className="relative min-h-screen bg-white dark:bg-gray-900 pt-14">
+      <AppNav onExportExcel={handleExportExcel} onOpenClients={() => setIsClientsModalOpen(true)} />
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-10"
@@ -417,75 +408,14 @@ useEffect(() => {
           opacity: 0.14,
         }}
       />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 hidden sm:block"
-        style={{
-          backgroundImage: "url('/images/ui/eva-walk.png')",
-          backgroundRepeat: "no-repeat",
-          backgroundPosition: "right center",
-          backgroundSize: "clamp(320px, 55vw, 700px)",
-          opacity: 0.14,
-        }}
-      />
-      <header className="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-5xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <img src="/images/ui/logo-clear-computing.png" alt="Clear Computing" className="h-8 w-auto max-w-[180px] object-contain" />
-            <div className="flex items-center gap-2">
-              <ThemeToggle />
-              <div className="hidden sm:flex items-center gap-2">
-                {installPrompt && (
-                  <button onClick={handleInstall} className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm px-4 py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
-                    <Download size={14} />
-                    Installer l'app
-                  </button>
-                )}
-                <button onClick={handleExportExcel} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm px-4 py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
-                  <FileSpreadsheet size={14} />
-                  Exporter Excel
-                </button>
-                <button onClick={() => setIsClientsModalOpen(true)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm px-4 py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
-                  <Users size={14} />
-                  Gestion clients
-                </button>
-                <button onClick={() => navigate('/event-reports')} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm px-4 py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
-                  <ClipboardList size={14} />
-                  Rapports événement
-                </button>
-              </div>
-              <button onClick={handleSignOut} className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs px-3 py-2 sm:text-sm sm:px-4 sm:py-3 shadow-sm transition-colors whitespace-nowrap shrink-0">
-                <LogOut size={14} />
-                Déconnexion
-              </button>
-            </div>
-          </div>
-          <div className="sm:hidden mt-3 text-center">
-            <h1 className="text-4xl font-black tracking-tight text-gray-900 dark:text-gray-100">Timesheet</h1>
-            <p className="mt-1 text-base text-slate-500 dark:text-slate-400">{user?.email || 'Mode preview'}</p>
-          </div>
-          <div className="sm:hidden mt-4 flex items-center justify-center gap-2 flex-wrap">
-            {installPrompt && (
-              <button onClick={handleInstall} className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs px-3 py-2 whitespace-nowrap shrink-0 shadow-sm transition-colors">
-                <Download size={13} />
-                Installer l'app
-              </button>
-            )}
-            <button onClick={handleExportExcel} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs px-3 py-2 whitespace-nowrap shrink-0 shadow-sm transition-colors">
-              <FileSpreadsheet size={13} />
-              Exporter Excel
-            </button>
-            <button onClick={() => setIsClientsModalOpen(true)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs px-3 py-2 whitespace-nowrap shrink-0 shadow-sm transition-colors">
-              <Users size={13} />
-              Gestion clients
-            </button>
-            <button onClick={() => navigate('/event-reports')} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs px-3 py-2 whitespace-nowrap shrink-0 shadow-sm transition-colors">
-              <ClipboardList size={13} />
-              Rapports événement
-            </button>
-          </div>
+      {installPrompt && (
+        <div className="flex justify-center pt-3">
+          <button onClick={handleInstall} className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm px-4 py-2 shadow-sm transition-colors whitespace-nowrap">
+            <Download size={14} />
+            Installer l'app
+          </button>
         </div>
-      </header>
+      )}
 
       <main className="max-w-5xl mx-auto px-6 py-16 pb-28 relative min-h-[clamp(780px,110vh,1200px)]">
         <div
@@ -500,11 +430,10 @@ useEffect(() => {
           }}
         />
         <div className="relative z-10">
-        <div className="hidden sm:block text-center mb-12">
+        <div className="text-center mb-12">
           <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-gray-900 dark:text-gray-100 mb-4">Timesheet</h1>
           <p className="mt-1 text-base sm:text-2xl text-slate-500 dark:text-slate-400">{user?.email || 'Mode preview'}</p>
         </div>
-        <div className="sm:hidden mb-8" />
 
         {fetchError && (
           <div className="mb-6 px-4 py-3 bg-red-50/70 dark:bg-red-900/30 backdrop-blur-sm border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300">

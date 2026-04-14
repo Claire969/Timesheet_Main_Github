@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { ArrowLeft, Plus, X, CreditCard as Edit2 } from 'lucide-react';
+import { AppNav } from '../components/AppNav';
 import { useAppState } from '../App';
 import type { Forfait } from '../App';
 import { supabase, supabaseEnabled } from '../lib/supabaseClient';
@@ -572,7 +573,8 @@ export const ClientTimesheets = () => {
   );
 
   return (
-    <div className="relative min-h-screen bg-white">
+    <div className="relative min-h-screen bg-white dark:bg-gray-900 pt-14">
+      <AppNav />
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-10"
@@ -585,17 +587,12 @@ export const ClientTimesheets = () => {
           transform: "translateY(32px)"
         }}
       />
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-2">
-          <button onClick={() => navigate('/')} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors text-sm font-medium w-auto">
-            <ArrowLeft size={15} />
-            Retour
-          </button>
-          <img src="/images/ui/logo-clear-computing.png" alt="Clear_Computing" className="h-7 w-auto" />
-        </div>
-      </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-10 sm:space-y-12">
+        <button onClick={() => navigate('/')} className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 transition-colors text-sm">
+          <ArrowLeft size={15} />
+          Retour
+        </button>
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="flex items-center gap-3 min-w-0">
             {client.logoUrl && (

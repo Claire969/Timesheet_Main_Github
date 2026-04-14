@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CreditCard as Edit, Calendar, Building2, MapPin, Download } from 'lucide-react';
 import { reportApi, dayApi } from '../lib/eventReportApi';
 import type { EventReport, EventReportDay } from '../lib/eventReportTypes';
-import { ThemeToggle } from '../components/ThemeToggle';
+import { AppNav } from '../components/AppNav';
 import { ExportModal } from '../components/ExportModal';
 import { usePdfExport } from '../lib/usePdfExport';
 
@@ -87,9 +87,11 @@ export const EventReportDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
-      <header className="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-white dark:bg-gray-900 pt-14">
+      <AppNav />
+
+      <main className="max-w-3xl mx-auto px-4 py-8 space-y-8">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => navigate('/event-reports')}
@@ -102,7 +104,6 @@ export const EventReportDetail = () => {
             <h1 className="text-base font-bold text-gray-900 dark:text-gray-100 truncate">{report.event_name}</h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <ThemeToggle />
             {allValidated && (
               <button
                 onClick={() => setShowExportModal(true)}
@@ -122,9 +123,6 @@ export const EventReportDetail = () => {
             </button>
           </div>
         </div>
-      </header>
-
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-8">
         <div className="p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 space-y-3">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>

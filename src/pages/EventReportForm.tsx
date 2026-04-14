@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { reportApi } from '../lib/eventReportApi';
-import { ThemeToggle } from '../components/ThemeToggle';
+import { AppNav } from '../components/AppNav';
 
 interface ClientRow { id: string; name: string; logo_url: string | null; }
 
@@ -95,9 +95,11 @@ export const EventReportForm = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
-      <header className="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+    <div className="min-h-screen bg-white dark:bg-gray-900 pt-14">
+      <AppNav />
+
+      <main className="max-w-2xl mx-auto px-4 py-8">
+        <div className="flex items-center gap-3 mb-6">
           <button
             onClick={() => navigate(isEdit && id ? `/event-reports/${id}` : '/event-reports')}
             className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 transition-colors text-sm"
@@ -109,11 +111,7 @@ export const EventReportForm = () => {
           <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex-1">
             {isEdit ? 'Modifier le rapport' : 'Nouveau rapport'}
           </h1>
-          <ThemeToggle />
         </div>
-      </header>
-
-      <main className="max-w-2xl mx-auto px-4 py-8">
         <form onSubmit={handleSubmit} className="space-y-5">
           {error && (
             <div className="px-4 py-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300">

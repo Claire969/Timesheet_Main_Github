@@ -7,7 +7,7 @@ import { uploadImageBlob, deleteStorageImage, createSignedImageUrl } from '../li
 import { WifiNetworksSection } from '../components/WifiNetworksSection';
 import { HourlyCharts } from '../components/HourlyCharts';
 import { AiPolishButton } from '../components/AiPolishButton';
-import { ThemeToggle } from '../components/ThemeToggle';
+import { AppNav } from '../components/AppNav';
 import type {
   EventReportDay,
   EventReportHourlyRow,
@@ -639,9 +639,11 @@ export const EventReportDayEditor = () => {
   const hours = Array.from({ length: 24 }, (_, i) => pad(i));
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <header className="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pt-14">
+      <AppNav />
+
+      <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => navigate(`/event-reports/${reportId}`)}
@@ -667,7 +669,6 @@ export const EventReportDayEditor = () => {
                 Validé
               </span>
             )}
-            <ThemeToggle />
             <button
               onClick={handleSaveDay}
               disabled={isSaving}
@@ -688,9 +689,6 @@ export const EventReportDayEditor = () => {
             )}
           </div>
         </div>
-      </header>
-
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
         {error && (
           <div className="px-4 py-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-300">
             {error}
