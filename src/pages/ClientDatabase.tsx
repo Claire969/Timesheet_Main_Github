@@ -1,9 +1,23 @@
 import { AppNav } from '../components/AppNav';
 import { Database, Upload, ChevronDown } from 'lucide-react';
+// Types follow the client → category → documents hierarchy.
+// FUTURE: filter doc_clients by authenticated user via doc_client_access table.
+import type { DocClient, DocCategory } from '../lib/clientDocumentTypes';
 
 const selectCls = 'flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 transition-colors cursor-pointer';
 
 export function ClientDatabase() {
+  // FUTURE: replace with real data from supabase filtered by auth.uid()
+  const clients: DocClient[] = [];
+  const categories: DocCategory[] = [];
+
+  const selectedClient = null as DocClient | null;
+  const selectedCategory = null as DocCategory | null;
+
+  const visibleCategories = categories.filter(
+    (c) => selectedClient == null || c.client_id === selectedClient.id
+  );
+
   return (
     <div className="relative min-h-screen bg-white dark:bg-gray-900 pt-14 overflow-hidden">
       <AppNav />
@@ -12,8 +26,8 @@ export function ClientDatabase() {
         src="/images/ui/map.png"
         alt=""
         aria-hidden="true"
-        className="hidden sm:block absolute bottom-0 left-0 w-[420px] lg:w-[540px] h-auto object-contain pointer-events-none select-none z-0"
-        style={{ opacity: 0.11 }}
+        className="hidden sm:block absolute top-14 left-0 w-[460px] lg:w-[580px] h-auto object-contain pointer-events-none select-none z-0"
+        style={{ opacity: 0.18 }}
       />
 
       <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -26,11 +40,11 @@ export function ClientDatabase() {
 
         <div className="flex flex-wrap items-center gap-3">
           <button className={selectCls}>
-            <span>Tous les clients</span>
+            <span>{selectedClient ? selectedClient.name : 'Tous les clients'}</span>
             <ChevronDown size={14} className="text-gray-400" />
           </button>
-          <button className={selectCls}>
-            <span>Toutes les catégories</span>
+          <button className={selectCls} disabled={clients.length === 0}>
+            <span>{selectedCategory ? selectedCategory.name : 'Toutes les catégories'}</span>
             <ChevronDown size={14} className="text-gray-400" />
           </button>
           <div className="sm:ml-auto">
