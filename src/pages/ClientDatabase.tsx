@@ -5,10 +5,18 @@ const selectCls = 'flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 b
 
 export function ClientDatabase() {
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 pt-14">
+    <div className="relative min-h-screen bg-white dark:bg-gray-900 pt-14 overflow-hidden">
       <AppNav />
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      <img
+        src="/images/ui/map.png"
+        alt=""
+        aria-hidden="true"
+        className="hidden sm:block absolute bottom-0 left-0 w-[420px] lg:w-[540px] h-auto object-contain pointer-events-none select-none z-0"
+        style={{ opacity: 0.11 }}
+      />
+
+      <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Base clients</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
