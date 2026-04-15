@@ -13,6 +13,7 @@ import type { DocClientEntry, DocCategoryEntry, DocFileEntry } from '../lib/clie
 
 // FUTURE: filter clients by auth.uid() via doc_client_access when per-user
 // visibility is implemented. The fetchClients() call is the single place to add that filter.
+// Clients come from the Supabase doc_clients table and are mapped to disk folders by client ID.
 
 const selectCls = 'flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 transition-colors cursor-pointer';
 

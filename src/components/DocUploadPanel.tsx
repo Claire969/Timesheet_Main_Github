@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { X, Upload, Plus, FolderPlus, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, Upload, FolderPlus, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import type { DocClientEntry, DocCategoryEntry, DocFileEntry } from '../lib/clientDocsApi';
 import { createCategory, uploadFiles, fetchCategories } from '../lib/clientDocsApi';
 
@@ -21,30 +21,21 @@ export function DocUploadPanel({
   onUploaded,
 }: Props) {
   const [clientSlug, setClientSlug] = useState(initialClientSlug ?? (clients[0]?.slug ?? ''));
-  const [newClientName, setNewClientName] = useState('');
   const [categories, setCategories] = useState<DocCategoryEntry[]>([]);
-  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [categorySlug, setCategorySlug] = useState(initialCategorySlug ?? '');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [showNewCategory, setShowNewCategory] = useState(false);
-  const [showNewClient, setShowNewClient] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const resolvedClientSlug = showNewClient
-    ? clientSlug
-    : clientSlug;
-
   const loadCategories = useCallback(async (slug: string) => {
     if (!slug) return;
-    setCategoriesLoaded(false);
     const cats = await fetchCategories(slug).catch(() => []);
     setCategories(cats);
-    setCategoriesLoaded(true);
     if (cats.length > 0 && !categorySlug) setCategorySlug(cats[0].slug);
   }, [categorySlug]);
 
@@ -82,14 +73,13 @@ export function DocUploadPanel({
   };
 
   const handleUpload = async () => {
-    const slug = showNewClient ? newClientName.trim().toLowerCase().replace(/\s+/g, '-') : clientSlug;
-    if (!slug || !categorySlug || files.length === 0) return;
+    if (!clientSlug || !categorySlug || files.length === 0) return;
     setStatus('uploading');
     setErrorMsg('');
     try {
-      const result = await uploadFiles(slug, categorySlug, files);
+      const result = await uploadFiles(clientSlug, categorySlug, files);
       setStatus('done');
-      onUploaded(result.uploaded, slug, categorySlug);
+      onUploaded(result.uploaded, clientSlug, categorySlug);
       setTimeout(onClose, 1200);
     } catch (e) {
       setStatus('error');
@@ -97,11 +87,7 @@ export function DocUploadPanel({
     }
   };
 
-  const effectiveClientSlug = showNewClient
-    ? newClientName.trim().toLowerCase().replace(/\s+/g, '-')
-    : clientSlug;
-
-  const canUpload = effectiveClientSlug && categorySlug && files.length > 0 && status === 'idle';
+  const canUpload = clientSlug && categorySlug && files.length > 0 && status === 'idle';
 
   return (
     <div
@@ -119,45 +105,16 @@ export function DocUploadPanel({
         <div className="p-5 space-y-4 overflow-y-auto">
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Client</label>
-            {!showNewClient ? (
-              <div className="flex gap-2">
-                <select
-                  value={clientSlug}
-                  onChange={(e) => handleClientChange(e.target.value)}
-                  className="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {clients.length === 0 && <option value="">— aucun client —</option>}
-                  {clients.map(c => (
-                    <option key={c.slug} value={c.slug}>{c.name}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => { setShowNewClient(true); setCategorySlug(''); setCategories([]); }}
-                  className="px-3 py-2 text-xs font-medium text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center gap-1"
-                >
-                  <Plus size={12} /> Nouveau
-                </button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="Nom du client"
-                  value={newClientName}
-                  onChange={(e) => setNewClientName(e.target.value)}
-                  className="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                {clients.length > 0 && (
-                  <button
-                    onClick={() => { setShowNewClient(false); setClientSlug(clients[0].slug); }}
-                    className="px-3 py-2 text-xs text-gray-500 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                  >
-                    Annuler
-                  </button>
-                )}
-              </div>
-            )}
+            <select
+              value={clientSlug}
+              onChange={(e) => handleClientChange(e.target.value)}
+              className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {clients.length === 0 && <option value="">— aucun client —</option>}
+              {clients.map(c => (
+                <option key={c.slug} value={c.slug}>{c.name}</option>
+              ))}
+            </select>
           </div>
 
           <div className="space-y-1.5">
@@ -168,7 +125,7 @@ export function DocUploadPanel({
                   value={categorySlug}
                   onChange={(e) => setCategorySlug(e.target.value)}
                   className="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={!clientSlug && !newClientName}
+                  disabled={!clientSlug}
                 >
                   {categories.length === 0 && <option value="">— aucune catégorie —</option>}
                   {categories.map(c => (
@@ -198,7 +155,7 @@ export function DocUploadPanel({
                   disabled={creatingCategory || !newCategoryName.trim()}
                   className="px-3 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors flex items-center gap-1"
                 >
-                  {creatingCategory ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                  {creatingCategory ? <Loader2 size={12} className="animate-spin" /> : <FolderPlus size={12} />}
                   Créer
                 </button>
                 <button

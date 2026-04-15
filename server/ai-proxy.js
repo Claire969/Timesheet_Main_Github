@@ -8,12 +8,20 @@ import { createRequire } from 'node:module';
 
 const _require = createRequire(import.meta.url);
 const Busboy = (await import('busboy')).default;
+const { createClient } = await import('@supabase/supabase-js');
 
 const CLIENT_DOCS_ROOT = process.env.CLIENT_DOCS_ROOT ?? '/home/admin/timesheet-data/client-docs';
 
 const PORT = process.env.AI_PROXY_PORT ?? 3579;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY ?? '';
 const DEPLOY_TOKEN = process.env.DEPLOY_TOKEN ?? '';
+
+const SUPABASE_URL = process.env.SUPABASE_URL ?? '';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
+
+const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  : null;
 
 const DEPLOY_ACTIONS = {
   deploy_dev: `sudo -u admin -H bash -lc '/home/admin/update-timesheet.sh'`,
@@ -267,6 +275,11 @@ function slugify(name) {
     .slice(0, 80) || 'untitled';
 }
 
+function clientIdToSlug(clientId) {
+  if (!clientId) return '';
+  return clientId.replace(/-/g, '').slice(0, 12).toLowerCase();
+}
+
 function safeFilename(original) {
   const base = path.basename(original);
   return base.replace(/[^a-zA-Z0-9._\- ]/g, '_').slice(0, 200) || 'file';
@@ -323,18 +336,24 @@ function parseQuery(url) {
   return Object.fromEntries(u.searchParams.entries());
 }
 
-function handleClientDocs(req, res) {
+async function handleClientDocs(req, res) {
   const u = new URL(req.url, 'http://localhost');
   const pathname = u.pathname;
   const q = parseQuery(req.url);
 
   if (req.method === 'GET' && pathname === '/client-docs/clients') {
     try {
-      fs.mkdirSync(CLIENT_DOCS_ROOT, { recursive: true });
-      const entries = fs.readdirSync(CLIENT_DOCS_ROOT, { withFileTypes: true });
-      const clients = entries
-        .filter(e => e.isDirectory())
-        .map(e => ({ slug: e.name, name: e.name }));
+      if (!supabase) return json(res, 503, { error: 'Supabase not configured' });
+      const { data: dbClients, error: err } = await supabase
+        .from('doc_clients')
+        .select('id, name')
+        .order('name');
+      if (err) throw err;
+      const clients = (dbClients || []).map(c => ({
+        id: c.id,
+        name: c.name,
+        slug: clientIdToSlug(c.id),
+      }));
       return json(res, 200, clients);
     } catch (e) {
       return json(res, 500, { error: e.message });
@@ -530,7 +549,7 @@ const server = http.createServer(async (req, res) => {
 
   const u = new URL(req.url, 'http://localhost');
   if (u.pathname.startsWith('/client-docs/')) {
-    const handled = handleClientDocs(req, res);
+    const handled = await handleClientDocs(req, res);
     if (handled !== null) return;
   }
 

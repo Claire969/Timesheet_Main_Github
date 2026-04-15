@@ -1,4 +1,5 @@
 export interface DocClientEntry {
+  id: string;
   slug: string;
   name: string;
 }
