@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { X, Upload, FolderPlus, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, Upload, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import type { DocClientEntry, DocCategoryEntry, DocFileEntry } from '../lib/clientDocsApi';
 import { createCategory, uploadFiles, fetchCategories } from '../lib/clientDocsApi';
 
@@ -22,10 +22,8 @@ export function DocUploadPanel({
 }: Props) {
   const [clientSlug, setClientSlug] = useState(initialClientSlug ?? (clients[0]?.slug ?? ''));
   const [categories, setCategories] = useState<DocCategoryEntry[]>([]);
-  const [categorySlug, setCategorySlug] = useState(initialCategorySlug ?? '');
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [creatingCategory, setCreatingCategory] = useState(false);
-  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [categoryInput, setCategoryInput] = useState(initialCategorySlug ?? '');
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState<Status>('idle');
@@ -36,14 +34,18 @@ export function DocUploadPanel({
     if (!slug) return;
     const cats = await fetchCategories(slug).catch(() => []);
     setCategories(cats);
-    if (cats.length > 0 && !categorySlug) setCategorySlug(cats[0].slug);
-  }, [categorySlug]);
+  }, []);
 
   const handleClientChange = async (slug: string) => {
     setClientSlug(slug);
-    setCategorySlug('');
+    setCategoryInput('');
+    setShowSuggestions(false);
     await loadCategories(slug);
   };
+
+  const filteredSuggestions = categoryInput.trim()
+    ? categories.filter(c => c.name.toLowerCase().includes(categoryInput.toLowerCase()))
+    : categories;
 
   const handleAddFiles = (incoming: FileList | null) => {
     if (!incoming) return;
@@ -56,30 +58,31 @@ export function DocUploadPanel({
     handleAddFiles(e.dataTransfer.files);
   };
 
-  const handleCreateCategory = async () => {
-    if (!newCategoryName.trim() || !clientSlug) return;
-    setCreatingCategory(true);
-    try {
-      const cat = await createCategory(clientSlug, newCategoryName.trim());
-      setCategories(prev => [...prev, cat]);
-      setCategorySlug(cat.slug);
-      setNewCategoryName('');
-      setShowNewCategory(false);
-    } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : 'Erreur');
-    } finally {
-      setCreatingCategory(false);
-    }
+  const handleSuggestionClick = (catName: string) => {
+    setCategoryInput(catName);
+    setShowSuggestions(false);
   };
 
   const handleUpload = async () => {
-    if (!clientSlug || !categorySlug || files.length === 0) return;
+    const catNameTrimmed = categoryInput.trim();
+    if (!clientSlug || !catNameTrimmed || files.length === 0) return;
+
     setStatus('uploading');
     setErrorMsg('');
+
     try {
-      const result = await uploadFiles(clientSlug, categorySlug, files);
+      const existingCat = categories.find(c => c.name.toLowerCase() === catNameTrimmed.toLowerCase());
+      let usedCatSlug = existingCat?.slug;
+
+      if (!usedCatSlug) {
+        const newCat = await createCategory(clientSlug, catNameTrimmed);
+        usedCatSlug = newCat.slug;
+        setCategories(prev => [...prev, newCat]);
+      }
+
+      const result = await uploadFiles(clientSlug, usedCatSlug, files);
       setStatus('done');
-      onUploaded(result.uploaded, clientSlug, categorySlug);
+      onUploaded(result.uploaded, clientSlug, usedCatSlug);
       setTimeout(onClose, 1200);
     } catch (e) {
       setStatus('error');
@@ -87,7 +90,7 @@ export function DocUploadPanel({
     }
   };
 
-  const canUpload = clientSlug && categorySlug && files.length > 0 && status === 'idle';
+  const canUpload = clientSlug && categoryInput.trim() && files.length > 0 && status === 'idle';
 
   return (
     <div
@@ -119,53 +122,34 @@ export function DocUploadPanel({
 
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Catégorie</label>
-            {!showNewCategory ? (
-              <div className="flex gap-2">
-                <select
-                  value={categorySlug}
-                  onChange={(e) => setCategorySlug(e.target.value)}
-                  className="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={!clientSlug}
-                >
-                  {categories.length === 0 && <option value="">— aucune catégorie —</option>}
-                  {categories.map(c => (
-                    <option key={c.slug} value={c.slug}>{c.name}</option>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Saisissez ou sélectionnez"
+                value={categoryInput}
+                onChange={(e) => {
+                  setCategoryInput(e.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                disabled={!clientSlug}
+                className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              />
+              {showSuggestions && clientSlug && filteredSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto">
+                  {filteredSuggestions.map(cat => (
+                    <button
+                      key={cat.slug}
+                      onClick={() => handleSuggestionClick(cat.name)}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      {cat.name}
+                    </button>
                   ))}
-                </select>
-                <button
-                  onClick={() => setShowNewCategory(true)}
-                  className="px-3 py-2 text-xs font-medium text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center gap-1"
-                >
-                  <FolderPlus size={12} /> Nouvelle
-                </button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="Nom de la catégorie"
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleCreateCategory(); }}
-                  className="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  onClick={handleCreateCategory}
-                  disabled={creatingCategory || !newCategoryName.trim()}
-                  className="px-3 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors flex items-center gap-1"
-                >
-                  {creatingCategory ? <Loader2 size={12} className="animate-spin" /> : <FolderPlus size={12} />}
-                  Créer
-                </button>
-                <button
-                  onClick={() => { setShowNewCategory(false); setNewCategoryName(''); }}
-                  className="px-3 py-2 text-xs text-gray-500 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                >
-                  Annuler
-                </button>
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div
