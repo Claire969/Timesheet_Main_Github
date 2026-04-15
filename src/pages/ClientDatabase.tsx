@@ -1,31 +1,32 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { AppNav } from '../components/AppNav';
 import { DocFileCard } from '../components/DocFileCard';
 import { DocViewerModal } from '../components/DocViewerModal';
 import { DocUploadPanel } from '../components/DocUploadPanel';
 import { Database, Upload, ChevronDown } from 'lucide-react';
+import { useAppState } from '../App';
 import {
-  fetchClients,
   fetchCategories,
   fetchFiles,
+  slugifyClientName,
 } from '../lib/clientDocsApi';
 import type { DocClientEntry, DocCategoryEntry, DocFileEntry } from '../lib/clientDocsApi';
-
-// FUTURE: filter clients by auth.uid() via doc_client_access when per-user
-// visibility is implemented. The fetchClients() call is the single place to add that filter.
-// Clients come from the Supabase doc_clients table and are mapped to disk folders by client ID.
 
 const selectCls = 'flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 transition-colors cursor-pointer';
 
 export function ClientDatabase() {
-  const [clients, setClients] = useState<DocClientEntry[]>([]);
+  const { clients: appClients } = useAppState();
+  const clients: DocClientEntry[] = appClients
+    .filter(c => !c.isArchived)
+    .map(c => ({ slug: slugifyClientName(c.name), name: c.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   const [categories, setCategories] = useState<DocCategoryEntry[]>([]);
   const [files, setFiles] = useState<DocFileEntry[]>([]);
 
   const [selectedClient, setSelectedClient] = useState<DocClientEntry | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<DocCategoryEntry | null>(null);
 
-  const [loadingClients, setLoadingClients] = useState(true);
   const [loadingFiles, setLoadingFiles] = useState(false);
 
   const [viewerFile, setViewerFile] = useState<DocFileEntry | null>(null);
@@ -33,15 +34,6 @@ export function ClientDatabase() {
 
   const [clientDropOpen, setClientDropOpen] = useState(false);
   const [categoryDropOpen, setCategoryDropOpen] = useState(false);
-
-  const loadClients = useCallback(async () => {
-    setLoadingClients(true);
-    const result = await fetchClients().catch(() => [] as DocClientEntry[]);
-    setClients(result);
-    setLoadingClients(false);
-  }, []);
-
-  useEffect(() => { loadClients(); }, [loadClients]);
 
   const loadCategories = useCallback(async (client: DocClientEntry) => {
     const cats = await fetchCategories(client.slug).catch(() => [] as DocCategoryEntry[]);
@@ -77,7 +69,6 @@ export function ClientDatabase() {
   };
 
   const handleUploaded = async (newFiles: DocFileEntry[], clientSlug: string, categorySlug: string) => {
-    await loadClients();
     const updatedClient = clients.find(c => c.slug === clientSlug) ?? { slug: clientSlug, name: clientSlug };
     setSelectedClient(updatedClient);
     const cats = await loadCategories(updatedClient);
@@ -144,8 +135,8 @@ export function ClientDatabase() {
                     {c.name}
                   </button>
                 ))}
-                {!loadingClients && clients.length === 0 && (
-                  <p className="px-3.5 py-2 text-xs text-gray-400">Aucun client</p>
+                {clients.length === 0 && (
+                  <p className="px-3.5 py-2 text-xs text-gray-400">Aucun client dans la base</p>
                 )}
               </div>
             )}
