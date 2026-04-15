@@ -1,6 +1,15 @@
 import http from 'node:http';
 import https from 'node:https';
 import { exec } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { Readable } from 'node:stream';
+import { createRequire } from 'node:module';
+
+const _require = createRequire(import.meta.url);
+const Busboy = (await import('busboy')).default;
+
+const CLIENT_DOCS_ROOT = process.env.CLIENT_DOCS_ROOT ?? '/home/admin/timesheet-data/client-docs';
 
 const PORT = process.env.AI_PROXY_PORT ?? 3579;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY ?? '';
@@ -247,6 +256,269 @@ function callOpenAIVisionBase64(base64DataUri, targetHour) {
   });
 }
 
+// ─── Client Docs helpers ─────────────────────────────────────────────────────
+
+function slugify(name) {
+  return name
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'untitled';
+}
+
+function safeFilename(original) {
+  const base = path.basename(original);
+  return base.replace(/[^a-zA-Z0-9._\- ]/g, '_').slice(0, 200) || 'file';
+}
+
+function resolveDocsPath(...parts) {
+  const resolved = path.resolve(CLIENT_DOCS_ROOT, ...parts);
+  if (!resolved.startsWith(path.resolve(CLIENT_DOCS_ROOT))) {
+    throw new Error('Path traversal detected');
+  }
+  return resolved;
+}
+
+function getTypeLabel(filename) {
+  const ext = path.extname(filename).toLowerCase();
+  if (ext === '.pdf') return 'PDF';
+  if (['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'].includes(ext)) return 'Image';
+  if (['.doc', '.docx', '.odt', '.rtf', '.txt'].includes(ext)) return 'DOC';
+  if (['.xls', '.xlsx', '.ods', '.csv'].includes(ext)) return 'XLSX';
+  return 'Autre';
+}
+
+function getMime(filename) {
+  const ext = path.extname(filename).toLowerCase();
+  const map = {
+    '.pdf': 'application/pdf',
+    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+    '.png': 'image/png', '.gif': 'image/gif',
+    '.webp': 'image/webp', '.svg': 'image/svg+xml',
+    '.doc': 'application/msword',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.xls': 'application/vnd.ms-excel',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.txt': 'text/plain',
+    '.csv': 'text/csv',
+  };
+  return map[ext] || 'application/octet-stream';
+}
+
+function uniqueFilename(dir, filename) {
+  const ext = path.extname(filename);
+  const base = path.basename(filename, ext);
+  let candidate = filename;
+  let counter = 1;
+  while (fs.existsSync(path.join(dir, candidate))) {
+    candidate = `${base}-${counter}${ext}`;
+    counter++;
+  }
+  return candidate;
+}
+
+function parseQuery(url) {
+  const u = new URL(url, 'http://localhost');
+  return Object.fromEntries(u.searchParams.entries());
+}
+
+function handleClientDocs(req, res) {
+  const u = new URL(req.url, 'http://localhost');
+  const pathname = u.pathname;
+  const q = parseQuery(req.url);
+
+  if (req.method === 'GET' && pathname === '/client-docs/clients') {
+    try {
+      fs.mkdirSync(CLIENT_DOCS_ROOT, { recursive: true });
+      const entries = fs.readdirSync(CLIENT_DOCS_ROOT, { withFileTypes: true });
+      const clients = entries
+        .filter(e => e.isDirectory())
+        .map(e => ({ slug: e.name, name: e.name }));
+      return json(res, 200, clients);
+    } catch (e) {
+      return json(res, 500, { error: e.message });
+    }
+  }
+
+  if (req.method === 'GET' && pathname === '/client-docs/categories') {
+    const { client } = q;
+    if (!client) return json(res, 400, { error: 'client required' });
+    try {
+      const clientDir = resolveDocsPath(client);
+      if (!fs.existsSync(clientDir)) return json(res, 200, []);
+      const entries = fs.readdirSync(clientDir, { withFileTypes: true });
+      const categories = entries
+        .filter(e => e.isDirectory())
+        .map(e => ({ slug: e.name, name: e.name, clientSlug: client }));
+      return json(res, 200, categories);
+    } catch (e) {
+      return json(res, 500, { error: e.message });
+    }
+  }
+
+  if (req.method === 'GET' && pathname === '/client-docs/list') {
+    const { client, category } = q;
+    if (!client || !category) return json(res, 400, { error: 'client and category required' });
+    try {
+      const catDir = resolveDocsPath(client, category);
+      if (!fs.existsSync(catDir)) return json(res, 200, []);
+      const entries = fs.readdirSync(catDir, { withFileTypes: true });
+      const files = entries
+        .filter(e => e.isFile())
+        .map(e => {
+          const stat = fs.statSync(path.join(catDir, e.name));
+          const encodedName = encodeURIComponent(e.name);
+          const encodedClient = encodeURIComponent(client);
+          const encodedCat = encodeURIComponent(category);
+          return {
+            name: e.name,
+            size: stat.size,
+            modifiedAt: stat.mtime.toISOString(),
+            type: getTypeLabel(e.name),
+            mime: getMime(e.name),
+            url: `/client-docs/file?client=${encodedClient}&category=${encodedCat}&name=${encodedName}`,
+            downloadUrl: `/client-docs/download?client=${encodedClient}&category=${encodedCat}&name=${encodedName}`,
+          };
+        });
+      return json(res, 200, files);
+    } catch (e) {
+      return json(res, 500, { error: e.message });
+    }
+  }
+
+  if (req.method === 'POST' && pathname === '/client-docs/category') {
+    let body = '';
+    req.on('data', c => { body += c; });
+    req.on('end', () => {
+      try {
+        const { clientSlug, categoryName } = JSON.parse(body);
+        if (!clientSlug || !categoryName) return json(res, 400, { error: 'clientSlug and categoryName required' });
+        const catSlug = slugify(categoryName);
+        const catDir = resolveDocsPath(clientSlug, catSlug);
+        fs.mkdirSync(catDir, { recursive: true });
+        return json(res, 200, { slug: catSlug, name: catSlug, clientSlug });
+      } catch (e) {
+        return json(res, 500, { error: e.message });
+      }
+    });
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/client-docs/upload') {
+    const bb = Busboy({ headers: req.headers, limits: { fileSize: 100 * 1024 * 1024 } });
+    const fields = {};
+    const uploads = [];
+    const errors = [];
+
+    bb.on('field', (name, val) => { fields[name] = val; });
+
+    bb.on('file', (fieldname, fileStream, info) => {
+      const { filename } = info;
+      let clientSlug, categorySlug;
+
+      const doUpload = () => {
+        clientSlug = fields.clientSlug;
+        categorySlug = fields.categorySlug;
+
+        if (!clientSlug || !categorySlug) {
+          fileStream.resume();
+          errors.push(`Missing clientSlug or categorySlug for file ${filename}`);
+          return;
+        }
+
+        try {
+          const targetDir = resolveDocsPath(clientSlug, categorySlug);
+          fs.mkdirSync(targetDir, { recursive: true });
+          const safe = safeFilename(filename);
+          const finalName = uniqueFilename(targetDir, safe);
+          const filePath = path.join(targetDir, finalName);
+          const writeStream = fs.createWriteStream(filePath);
+
+          const p = new Promise((resolve, reject) => {
+            fileStream.pipe(writeStream);
+            writeStream.on('finish', () => {
+              const stat = fs.statSync(filePath);
+              const encodedName = encodeURIComponent(finalName);
+              const encodedClient = encodeURIComponent(clientSlug);
+              const encodedCat = encodeURIComponent(categorySlug);
+              uploads.push({
+                name: finalName,
+                size: stat.size,
+                modifiedAt: stat.mtime.toISOString(),
+                type: getTypeLabel(finalName),
+                mime: getMime(finalName),
+                url: `/client-docs/file?client=${encodedClient}&category=${encodedCat}&name=${encodedName}`,
+                downloadUrl: `/client-docs/download?client=${encodedClient}&category=${encodedCat}&name=${encodedName}`,
+              });
+              resolve();
+            });
+            writeStream.on('error', reject);
+            fileStream.on('error', reject);
+          });
+          uploads._promises = uploads._promises || [];
+          uploads._promises.push(p);
+        } catch (e) {
+          fileStream.resume();
+          errors.push(e.message);
+        }
+      };
+
+      if (fields.clientSlug && fields.categorySlug) {
+        doUpload();
+      } else {
+        setImmediate(doUpload);
+      }
+    });
+
+    bb.on('finish', async () => {
+      try {
+        await Promise.all(uploads._promises || []);
+        if (errors.length && uploads.length === 0) {
+          return json(res, 400, { error: errors.join('; ') });
+        }
+        return json(res, 200, { uploaded: uploads, errors });
+      } catch (e) {
+        return json(res, 500, { error: e.message });
+      }
+    });
+
+    bb.on('error', (e) => json(res, 500, { error: e.message }));
+    req.pipe(bb);
+    return;
+  }
+
+  if (req.method === 'GET' && (pathname === '/client-docs/file' || pathname === '/client-docs/download')) {
+    const { client, category, name } = q;
+    if (!client || !category || !name) return json(res, 400, { error: 'client, category, name required' });
+    try {
+      const filePath = resolveDocsPath(client, category, name);
+      if (!fs.existsSync(filePath)) return json(res, 404, { error: 'File not found' });
+      const stat = fs.statSync(filePath);
+      const mime = getMime(name);
+      const headers = {
+        'Content-Type': mime,
+        'Content-Length': stat.size,
+        'Cache-Control': 'private, max-age=3600',
+      };
+      if (pathname === '/client-docs/download') {
+        headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(name)}"`;
+      } else {
+        headers['Content-Disposition'] = `inline; filename="${encodeURIComponent(name)}"`;
+      }
+      res.writeHead(200, headers);
+      fs.createReadStream(filePath).pipe(res);
+    } catch (e) {
+      return json(res, 500, { error: e.message });
+    }
+    return;
+  }
+
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const server = http.createServer(async (req, res) => {
   addCors(res);
 
@@ -256,12 +528,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === 'POST' && (req.url === '/deploy/dev' || req.url === '/deploy/prod')) {
+  const u = new URL(req.url, 'http://localhost');
+  if (u.pathname.startsWith('/client-docs/')) {
+    const handled = handleClientDocs(req, res);
+    if (handled !== null) return;
+  }
+
+  if (req.method === 'POST' && (u.pathname === '/deploy/dev' || u.pathname === '/deploy/prod')) {
     const token = req.headers['x-deploy-token'];
     if (!DEPLOY_TOKEN || token !== DEPLOY_TOKEN) {
       return json(res, 403, { error: 'Forbidden' });
     }
-    const action = req.url === '/deploy/dev' ? 'deploy_dev' : 'deploy_prod';
+    const action = u.pathname === '/deploy/dev' ? 'deploy_dev' : 'deploy_prod';
     try {
       const output = await runDeploy(action);
       return json(res, 200, { ok: true, output });
@@ -270,7 +548,7 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  if (req.method !== 'POST' || req.url !== '/ai-assist') {
+  if (req.method !== 'POST' || u.pathname !== '/ai-assist') {
     return text(res, 404, 'Not found');
   }
 
