@@ -20,7 +20,7 @@ export default defineConfig({
     proxy: {
       '/ai-assist': `http://127.0.0.1:${AI_PROXY_PORT}`,
       '/deploy': `http://127.0.0.1:${AI_PROXY_PORT}`,
-      '/client-docs': `http://127.0.0.1:${AI_PROXY_PORT}`,
+      '/client-docs': `http://172.17.0.1:${AI_PROXY_PORT}`,
     },
   },
 })
