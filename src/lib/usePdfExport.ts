@@ -50,6 +50,8 @@ export function usePdfExport() {
   const exportPdf = useCallback(async (report: ReportRow, days: EventReportDay[]) => {
     setIsExporting(true);
     try {
+      console.log(`[PDF Export] Report: ${report.id}, Days received: ${days.length}, Day IDs: ${days.map(d => d.id).join(', ')}`);
+
       const [wifiNetworks, setupSteps, ...dayDataArrays] = await Promise.all([
         wifiApi.listForReport(report.id),
         setupStepApi.listForReport(report.id),
@@ -63,6 +65,8 @@ export function usePdfExport() {
           return { day, hourlyRows, incidents, images };
         }),
       ]);
+
+      console.log(`[PDF Export] Processed day data: ${dayDataArrays.length} days`);
 
       const data: PrintableReportData = {
         report,

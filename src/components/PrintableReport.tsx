@@ -883,8 +883,13 @@ interface PrintableReportProps {
 
 export function PrintableReport({ data }: PrintableReportProps) {
   const { report, days, wifiNetworks, setupSteps } = data;
+
+  console.log(`[PrintableReport] Rendering with ${days.length} total days:`, days.map(d => ({ id: d.day.id, is_setup: d.day.is_setup_day, date: d.day.report_date })));
+
   const setupDay = days.find((d) => d.day.is_setup_day);
   const eventDays = days.filter((d) => !d.day.is_setup_day);
+
+  console.log(`[PrintableReport] Setup days: ${setupDay ? 1 : 0}, Event days: ${eventDays.length}`);
 
   return (
     <div
@@ -1235,17 +1240,25 @@ export function PrintableReport({ data }: PrintableReportProps) {
 
       {eventDays.length > 0 && <RepeatHeader eventName={report.event_name} totalPages={eventDays.length + 1} />}
 
-      {eventDays.map((dayData, i) => (
-        <PrintableDayPage
-          key={dayData.day.id}
-          dayData={dayData}
-          dayIndex={i}
-          totalEventDays={eventDays.length}
-          pageNumber={i + 2}
-          totalPages={eventDays.length + 1}
-          eventName={report.event_name}
-        />
-      ))}
+      {eventDays.length > 0 ? (
+        eventDays.map((dayData, i) => (
+          <PrintableDayPage
+            key={dayData.day.id}
+            dayData={dayData}
+            dayIndex={i}
+            totalEventDays={eventDays.length}
+            pageNumber={i + 2}
+            totalPages={eventDays.length + 1}
+            eventName={report.event_name}
+          />
+        ))
+      ) : (
+        <div className="print-page" style={{ padding: '20px' }}>
+          <p style={{ fontSize: 11, color: TEXT_MUTED, fontStyle: 'italic' }}>
+            Aucun jour d'événement enregistré.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
