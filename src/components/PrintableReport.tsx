@@ -381,19 +381,132 @@ function RepeatHeader({ eventName, totalPages }: { eventName: string; totalPages
   );
 }
 
-// ─── Day page ───────────────────────────────────────────────────────────────
+// ─── Daily totals block (event days only) ───────────────────────────────────
+
+function DailyTotalsBlock({ rows }: { rows: EventReportHourlyRow[] }) {
+  if (rows.length === 0) return null;
+
+  const totalDownload = rows.reduce((sum, r) => sum + (r.bandwidth_out ?? 0), 0);
+  const totalUpload = rows.reduce((sum, r) => sum + (r.bandwidth_in ?? 0), 0);
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 12,
+        marginTop: 16,
+        marginBottom: 8,
+        pageBreakInside: 'avoid',
+        breakInside: 'avoid',
+      }}
+    >
+      {[
+        { label: 'Total Download', value: `${totalDownload.toFixed(2)} GB`, color: ACCENT_GREEN },
+        { label: 'Total Upload', value: `${totalUpload.toFixed(2)} GB`, color: ACCENT_BLUE },
+      ].map(({ label, value, color }) => (
+        <div
+          key={label}
+          style={{
+            flex: 1,
+            background: '#f8fafc',
+            border: `1px solid ${BORDER}`,
+            borderTop: `3px solid ${color}`,
+            borderRadius: 6,
+            padding: '10px 14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 3,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 8,
+              fontWeight: 700,
+              color: TEXT_MUTED,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+            }}
+          >
+            {label}
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 900, color, fontVariantNumeric: 'tabular-nums' }}>
+            {value}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Setup / Montage day (compact) ──────────────────────────────────────────
+
+function PrintableSetupDayPage({
+  dayData,
+  pageNumber,
+  totalPages,
+  eventName,
+}: {
+  dayData: PrintableDayData;
+  pageNumber: number;
+  totalPages: number;
+  eventName: string;
+}) {
+  const { day, incidents, images } = dayData;
+  const hasData = !!day.summary || incidents.length > 0 || images.length > 0;
+
+  return (
+    <div className="print-page">
+      <DayPageHeader
+        eventName={eventName}
+        centerLabel="Montage — Préparation"
+        reportDate={day.report_date}
+        isContinuation={false}
+        pageNumber={pageNumber}
+        totalPages={totalPages}
+      />
+
+      <div className="day-flow">
+        {!hasData && (
+          <p style={{ fontSize: 11, color: TEXT_MUTED, fontStyle: 'italic' }}>
+            Aucune donnée enregistrée pour ce jour de montage.
+          </p>
+        )}
+
+        {day.summary && (
+          <div
+            style={{
+              ...sectionBlock,
+              background: '#f8fafc',
+              borderRadius: 6,
+              padding: '12px 16px',
+              border: `1px solid ${BORDER}`,
+            }}
+          >
+            <div style={sectionLabel}>Notes de montage</div>
+            <p style={{ fontSize: 11, color: TEXT_PRIMARY, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>
+              {day.summary}
+            </p>
+          </div>
+        )}
+
+        {incidents.length > 0 && <IncidentsSection incidents={incidents} />}
+        {images.length > 0 && <ImagesSection images={images} />}
+      </div>
+    </div>
+  );
+}
+
+// ─── Event day (detailed) ────────────────────────────────────────────────────
 
 function PrintableDayPage({
   dayData,
   dayIndex,
-  totalEventDays,
   pageNumber,
   totalPages,
   eventName,
 }: {
   dayData: PrintableDayData;
   dayIndex: number;
-  totalEventDays: number;
   pageNumber: number;
   totalPages: number;
   eventName: string;
@@ -402,20 +515,18 @@ function PrintableDayPage({
   const sorted = [...hourlyRows].sort((a, b) => a.hour_label.localeCompare(b.hour_label));
   const hasData = sorted.length > 0 || !!day.summary || incidents.length > 0 || images.length > 0;
 
-  const dayTypeLabel = day.is_setup_day ? 'Montage' : 'Événement';
-  const dayNumberLabel = day.is_setup_day ? 'Montage' : `Jour ${dayIndex + 1}`;
-  const centerLabel = `${dayNumberLabel} — ${dayTypeLabel}`;
-
-  const headerProps = {
-    eventName,
-    centerLabel,
-    reportDate: day.report_date,
-    totalPages,
-  };
+  const centerLabel = `Jour ${dayIndex + 1} — Événement`;
 
   return (
     <div className="print-page">
-      <DayPageHeader {...headerProps} isContinuation={false} pageNumber={pageNumber} />
+      <DayPageHeader
+        eventName={eventName}
+        centerLabel={centerLabel}
+        reportDate={day.report_date}
+        isContinuation={false}
+        pageNumber={pageNumber}
+        totalPages={totalPages}
+      />
 
       <div className="day-flow">
         {!hasData && (
@@ -435,15 +546,7 @@ function PrintableDayPage({
             }}
           >
             <div style={sectionLabel}>Résumé du jour</div>
-            <p
-              style={{
-                fontSize: 11,
-                color: TEXT_PRIMARY,
-                lineHeight: 1.7,
-                margin: 0,
-                whiteSpace: 'pre-wrap',
-              }}
-            >
+            <p style={{ fontSize: 11, color: TEXT_PRIMARY, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>
               {day.summary}
             </p>
           </div>
@@ -505,34 +608,13 @@ function PrintableDayPage({
                     >
                       {row.hour_label}
                     </td>
-                    <td
-                      style={{
-                        padding: '5px 12px',
-                        color: TEXT_PRIMARY,
-                        fontVariantNumeric: 'tabular-nums',
-                        textAlign: 'right',
-                      }}
-                    >
+                    <td style={{ padding: '5px 12px', color: TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>
                       {row.wifi_users ?? '—'}
                     </td>
-                    <td
-                      style={{
-                        padding: '5px 12px',
-                        color: TEXT_PRIMARY,
-                        fontVariantNumeric: 'tabular-nums',
-                        textAlign: 'right',
-                      }}
-                    >
+                    <td style={{ padding: '5px 12px', color: TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>
                       {row.bandwidth_out != null ? row.bandwidth_out.toFixed(2) : '—'}
                     </td>
-                    <td
-                      style={{
-                        padding: '5px 12px',
-                        color: TEXT_PRIMARY,
-                        fontVariantNumeric: 'tabular-nums',
-                        textAlign: 'right',
-                      }}
-                    >
+                    <td style={{ padding: '5px 12px', color: TEXT_PRIMARY, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>
                       {row.bandwidth_in != null ? row.bandwidth_in.toFixed(2) : '—'}
                     </td>
                   </tr>
@@ -541,59 +623,21 @@ function PrintableDayPage({
             </table>
 
             <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <div
-                style={{
-                  background: '#fff',
-                  border: `1px solid ${BORDER}`,
-                  borderRadius: 6,
-                  padding: '10px 12px',
-                }}
-              >
+              <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '10px 12px' }}>
                 <PrintLineChart rows={sorted} field="wifi_users" color={ACCENT_BLUE} label="Utilisateurs Wi-Fi" />
               </div>
 
-              <div
-                style={{
-                  background: '#fff',
-                  border: `1px solid ${BORDER}`,
-                  borderRadius: 6,
-                  padding: '10px 12px',
-                }}
-              >
+              <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '10px 12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-                  <span
-                    style={{
-                      fontSize: 9,
-                      fontWeight: 700,
-                      color: TEXT_SECONDARY,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.06em',
-                    }}
-                  >
+                  <span style={{ fontSize: 9, fontWeight: 700, color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Bande passante (GB)
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 8, color: TEXT_MUTED }}>
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        width: 12,
-                        height: 2,
-                        backgroundColor: ACCENT_GREEN,
-                        borderRadius: 1,
-                      }}
-                    />
+                    <span style={{ display: 'inline-block', width: 12, height: 2, backgroundColor: ACCENT_GREEN, borderRadius: 1 }} />
                     Download ↓
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 8, color: TEXT_MUTED }}>
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        width: 12,
-                        height: 2,
-                        backgroundColor: ACCENT_BLUE,
-                        borderRadius: 1,
-                      }}
-                    />
+                    <span style={{ display: 'inline-block', width: 12, height: 2, backgroundColor: ACCENT_BLUE, borderRadius: 1 }} />
                     Upload ↑
                   </span>
                 </div>
@@ -609,6 +653,8 @@ function PrintableDayPage({
                 />
               </div>
             </div>
+
+            <DailyTotalsBlock rows={sorted} />
           </div>
         )}
 
@@ -815,7 +861,7 @@ function ImagesSection({ images }: { images: EventReportImage[] }) {
     return (
       <div style={{ ...sectionBlock, marginBottom: 16 }}>
         <div style={sectionLabel}>Captures / Photos</div>
-        <CardImg img={images[0]} maxHeight={380} />
+        <CardImg img={images[0]} maxHeight={480} />
       </div>
     );
   }
@@ -824,10 +870,10 @@ function ImagesSection({ images }: { images: EventReportImage[] }) {
     return (
       <div style={{ ...sectionBlock, marginBottom: 16 }}>
         <div style={sectionLabel}>Captures / Photos</div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {images.map((img) => (
-            <div key={img.id} style={{ flex: '1 1 0', minWidth: 0 }}>
-              <CardImg img={img} maxHeight={300} />
+            <div key={img.id} style={{ width: '100%' }}>
+              <CardImg img={img} maxHeight={400} />
             </div>
           ))}
         </div>
@@ -839,14 +885,16 @@ function ImagesSection({ images }: { images: EventReportImage[] }) {
     return (
       <div style={{ ...sectionBlock, marginBottom: 16 }}>
         <div style={sectionLabel}>Captures / Photos</div>
-        <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
-          {images.slice(0, 2).map((img) => (
-            <div key={img.id} style={{ flex: '1 1 0', minWidth: 0 }}>
-              <CardImg img={img} maxHeight={240} />
-            </div>
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <CardImg img={images[0]} maxHeight={380} />
+          <div style={{ display: 'flex', gap: 10 }}>
+            {images.slice(1).map((img) => (
+              <div key={img.id} style={{ flex: '1 1 0', minWidth: 0 }}>
+                <CardImg img={img} maxHeight={280} />
+              </div>
+            ))}
+          </div>
         </div>
-        <CardImg img={images[2]} maxHeight={300} />
       </div>
     );
   }
@@ -859,12 +907,20 @@ function ImagesSection({ images }: { images: EventReportImage[] }) {
   return (
     <div style={{ ...sectionBlock, marginBottom: 16 }}>
       <div style={sectionLabel}>Captures / Photos</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {rows.map((row, rowIdx) => (
-          <div key={rowIdx} style={{ display: 'flex', gap: 10 }}>
+          <div
+            key={rowIdx}
+            style={{
+              display: 'flex',
+              gap: 10,
+              pageBreakInside: 'avoid',
+              breakInside: 'avoid',
+            }}
+          >
             {row.map((img) => (
               <div key={img.id} style={{ flex: '1 1 0', minWidth: 0 }}>
-                <CardImg img={img} maxHeight={220} />
+                <CardImg img={img} maxHeight={280} />
               </div>
             ))}
             {row.length === 1 && <div style={{ flex: '1 1 0', minWidth: 0 }} />}
@@ -1238,7 +1294,22 @@ export function PrintableReport({ data }: PrintableReportProps) {
         </div>
       </div>
 
-      {eventDays.length > 0 && <RepeatHeader eventName={report.event_name} totalPages={eventDays.length + 1} />}
+      {/* Setup / montage day — compact, before event days */}
+      {setupDay && (
+        <PrintableSetupDayPage
+          dayData={setupDay}
+          pageNumber={2}
+          totalPages={eventDays.length + (setupDay ? 1 : 0) + 1}
+          eventName={report.event_name}
+        />
+      )}
+
+      {eventDays.length > 0 && (
+        <RepeatHeader
+          eventName={report.event_name}
+          totalPages={eventDays.length + (setupDay ? 1 : 0) + 1}
+        />
+      )}
 
       {eventDays.length > 0 ? (
         eventDays.map((dayData, i) => (
@@ -1246,9 +1317,9 @@ export function PrintableReport({ data }: PrintableReportProps) {
             key={dayData.day.id}
             dayData={dayData}
             dayIndex={i}
-            totalEventDays={eventDays.length}
-            pageNumber={i + 2}
-            totalPages={eventDays.length + 1}
+
+            pageNumber={i + (setupDay ? 3 : 2)}
+            totalPages={eventDays.length + (setupDay ? 1 : 0) + 1}
             eventName={report.event_name}
           />
         ))
@@ -1259,6 +1330,205 @@ export function PrintableReport({ data }: PrintableReportProps) {
           </p>
         </div>
       )}
+
+      {/* ═══════════════════ STREAMING SESSION SUMMARY ═══════════════════════ */}
+      <StreamingSessionSummary eventDays={eventDays} report={report} />
+    </div>
+  );
+}
+
+// ─── Streaming session summary ───────────────────────────────────────────────
+
+function StreamingSessionSummary({
+  eventDays,
+  report,
+}: {
+  eventDays: PrintableDayData[];
+  report: { event_name: string; start_date: string | null; total_days: number; venue_client_name?: string };
+}) {
+  const allRows = eventDays.flatMap((d) => d.hourlyRows);
+  const totalDownload = allRows.reduce((sum, r) => sum + (r.bandwidth_out ?? 0), 0);
+  const totalUpload = allRows.reduce((sum, r) => sum + (r.bandwidth_in ?? 0), 0);
+  const peakUsers = allRows.reduce((max, r) => Math.max(max, r.wifi_users ?? 0), 0);
+  const totalIncidents = eventDays.reduce((sum, d) => sum + d.incidents.length, 0);
+
+  return (
+    <div
+      className="print-page"
+      style={{ pageBreakBefore: 'always', breakBefore: 'page' }}
+    >
+      <div
+        style={{
+          background: NAVY,
+          padding: '9px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 0,
+        }}
+      >
+        <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: '0.04em' }}>
+          {report.event_name}
+        </div>
+        <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', letterSpacing: '0.02em', textAlign: 'center', flex: 'none', padding: '0 16px' }}>
+          Résumé de la session de streaming
+        </div>
+        <div style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.04em', flex: 1, textAlign: 'right' }} />
+      </div>
+      <div style={{ height: 3, background: `linear-gradient(90deg, ${ACCENT_BLUE} 0%, #38bdf8 100%)`, marginBottom: 24 }} />
+
+      <div style={{ padding: '0 4px' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: 12,
+            marginBottom: 24,
+          }}
+        >
+          {[
+            { label: 'Total Download', value: allRows.length > 0 ? `${totalDownload.toFixed(2)} GB` : '—', color: ACCENT_GREEN },
+            { label: 'Total Upload', value: allRows.length > 0 ? `${totalUpload.toFixed(2)} GB` : '—', color: ACCENT_BLUE },
+            { label: 'Pic utilisateurs Wi-Fi', value: peakUsers > 0 ? String(peakUsers) : '—', color: NAVY },
+            { label: 'Incidents enregistrés', value: String(totalIncidents), color: totalIncidents > 0 ? ACCENT_ORANGE : ACCENT_GREEN },
+          ].map(({ label, value, color }) => (
+            <div
+              key={label}
+              style={{
+                background: '#f8fafc',
+                border: `1px solid ${BORDER}`,
+                borderTop: `3px solid ${color}`,
+                borderRadius: 6,
+                padding: '12px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+              }}
+            >
+              <div style={{ fontSize: 8, fontWeight: 700, color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                {label}
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 900, color, fontVariantNumeric: 'tabular-nums' }}>
+                {value}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div
+          style={{
+            border: `1px solid ${BORDER}`,
+            borderRadius: 8,
+            overflow: 'hidden',
+            marginBottom: 24,
+          }}
+        >
+          <div
+            style={{
+              background: NAVY_LIGHT,
+              borderBottom: `1px solid #c7d8ee`,
+              padding: '8px 16px',
+              fontSize: 9,
+              fontWeight: 800,
+              color: NAVY,
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+            }}
+          >
+            Récapitulatif par jour
+          </div>
+
+          {eventDays.length === 0 ? (
+            <div style={{ padding: '14px 16px' }}>
+              <p style={{ fontSize: 11, color: TEXT_MUTED, fontStyle: 'italic', margin: 0 }}>
+                Aucun jour d'événement disponible.
+              </p>
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+              <thead>
+                <tr>
+                  {['Jour', 'Date', 'Download (GB)', 'Upload (GB)', 'Pic utilisateurs', 'Incidents'].map((h, i) => (
+                    <th
+                      key={h}
+                      style={{
+                        background: '#fff',
+                        borderBottom: `1px solid ${BORDER}`,
+                        color: TEXT_SECONDARY,
+                        padding: '7px 14px',
+                        textAlign: i <= 1 ? 'left' : 'right',
+                        fontWeight: 700,
+                        fontSize: 9,
+                        letterSpacing: '0.05em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {eventDays.map((d, i) => {
+                  const rows = d.hourlyRows;
+                  const dl = rows.reduce((s, r) => s + (r.bandwidth_out ?? 0), 0);
+                  const ul = rows.reduce((s, r) => s + (r.bandwidth_in ?? 0), 0);
+                  const peak = rows.reduce((m, r) => Math.max(m, r.wifi_users ?? 0), 0);
+                  return (
+                    <tr key={d.day.id} style={{ background: i % 2 === 0 ? BG_ROW_ALT : '#fff', borderBottom: `1px solid ${BORDER}` }}>
+                      <td style={{ padding: '7px 14px', fontWeight: 700, color: NAVY }}>Jour {i + 1}</td>
+                      <td style={{ padding: '7px 14px', color: TEXT_SECONDARY }}>
+                        {d.day.report_date
+                          ? (() => { const [y, m, dd] = d.day.report_date!.split('-'); return `${dd}/${m}/${y}`; })()
+                          : '—'}
+                      </td>
+                      <td style={{ padding: '7px 14px', color: TEXT_PRIMARY, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                        {rows.length > 0 ? dl.toFixed(2) : '—'}
+                      </td>
+                      <td style={{ padding: '7px 14px', color: TEXT_PRIMARY, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                        {rows.length > 0 ? ul.toFixed(2) : '—'}
+                      </td>
+                      <td style={{ padding: '7px 14px', color: TEXT_PRIMARY, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                        {peak > 0 ? peak : '—'}
+                      </td>
+                      <td style={{ padding: '7px 14px', color: d.incidents.length > 0 ? ACCENT_ORANGE : TEXT_PRIMARY, textAlign: 'right', fontWeight: d.incidents.length > 0 ? 700 : 400 }}>
+                        {d.incidents.length}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div
+          style={{
+            background: '#f8fafc',
+            border: `1px solid ${BORDER}`,
+            borderRadius: 8,
+            padding: '14px 16px',
+          }}
+        >
+          <div style={{ fontSize: 9, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
+            Observations générales
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[
+              { label: 'Qualité du réseau', value: '—' },
+              { label: 'Stabilité de la connexion', value: '—' },
+              { label: 'Remarques techniques', value: '—' },
+            ].map(({ label, value }) => (
+              <div key={label} style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: '0 12px', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  {label}
+                </span>
+                <span style={{ fontSize: 11, color: TEXT_MUTED, fontStyle: 'italic' }}>{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
