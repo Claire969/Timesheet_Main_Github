@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ChevronDown, ExternalLink, FileSpreadsheet, Users, ClipboardList, Database, Clock, Shield, LogOut } from 'lucide-react';
+import { ChevronDown, ExternalLink, FileSpreadsheet, Users, ClipboardList, Database, Clock, Shield, LogOut, Wifi } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
@@ -181,6 +181,18 @@ export function AppNav({ onExportExcel, onOpenClients }: AppNavProps) {
                 >
                   <Database size={14} className="text-gray-400 dark:text-gray-500 shrink-0" />
                   Base clients
+                </button>
+                <div className="my-1 mx-3 border-t border-gray-100 dark:border-gray-700" />
+                <button
+                  onClick={() => { closeAll(); navigate('/wifi-pdf'); }}
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2 text-sm transition-colors text-left ${
+                    isActive('/wifi-pdf')
+                      ? 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20'
+                      : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Wifi size={14} className="text-gray-400 dark:text-gray-500 shrink-0" />
+                  Wi-Fi PDF Generator
                 </button>
               </div>
             )}

@@ -12,6 +12,7 @@ import { EventReportForm } from './pages/EventReportForm';
 import { EventReportDetail } from './pages/EventReportDetail';
 import { EventReportDayEditor } from './pages/EventReportDayEditor';
 import { ClientDatabase } from './pages/ClientDatabase';
+import { WifiPdfGenerator } from './pages/WifiPdfGenerator';
 import { DevDeployButtons } from './components/DevDeployButtons';
 
 export type Forfait = 'none' | 'halfDay' | 'fullDay';
@@ -137,6 +138,14 @@ function App() {
             element={
               <RequireAuth>
                 <ClientDatabase />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/wifi-pdf"
+            element={
+              <RequireAuth>
+                <WifiPdfGenerator />
               </RequireAuth>
             }
           />
