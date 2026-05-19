@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, QrCode, Upload, X } from 'lucide-react';
+import QRCode from 'qrcode';
 import { useAppState } from '../App';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -15,273 +16,25 @@ interface WifiFormData {
   documentType: DocumentType;
   ssid: string;
   password: string;
+  speed: string;
   footerNote: string;
   language: Language;
   manualLogoDataUrl: string | null;
 }
 
-// ─── QR code generation (pure canvas, no dependency) ────────────────────────
-// Implements the Wi-Fi QR payload: WIFI:T:WPA;S:<ssid>;P:<password>;;
+// ─── QR code generation via `qrcode` package ────────────────────────────────
+// Standard Wi-Fi payload: WIFI:T:WPA;S:<ssid>;P:<password>;;
+// Rendered to a 400×400 canvas for crisp display at all sizes.
 
-function generateWifiQrDataUrl(ssid: string, password: string): string {
-  const payload = `WIFI:T:WPA;S:${escapeQr(ssid)};P:${escapeQr(password)};;`;
-  return qrToDataUrl(payload, 280);
-}
-
-function escapeQr(s: string): string {
-  return s.replace(/[\\;,":]/g, (c) => '\\' + c);
-}
-
-// Reed-Solomon QR code generator (Mode: byte, EC level M)
-// This is a self-contained implementation to avoid any external package.
-function qrToDataUrl(text: string, size: number): string {
-  const modules = generateQrMatrix(text);
-  const n = modules.length;
-  const cellSize = Math.floor(size / (n + 8));
-  const margin = Math.floor((size - cellSize * n) / 2);
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, size, size);
-  ctx.fillStyle = '#000000';
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      if (modules[r][c]) {
-        ctx.fillRect(margin + c * cellSize, margin + r * cellSize, cellSize, cellSize);
-      }
-    }
-  }
-  return canvas.toDataURL('image/png');
-}
-
-// ── Minimal QR matrix generator (byte mode, EC=M) ───────────────────────────
-// Based on the QR Code spec. Supports ASCII payloads up to ~50 chars.
-
-function generateQrMatrix(text: string): boolean[][] {
-  // Encode bytes
-  const bytes = Array.from(text).map((c) => c.charCodeAt(0));
-  // Use version 3 (29x29) which handles up to 32 bytes at EC=M
-  // For longer payloads fall back to version 5 (37x37) — 64 bytes
-  const version = bytes.length <= 32 ? 3 : bytes.length <= 64 ? 5 : 7;
-  const size = 17 + version * 4;
-
-  // Build data codewords
-  const data = encodeBytes(bytes, version);
-
-  // Build matrix with patterns
-  const matrix: (boolean | null)[][] = Array.from({ length: size }, () => new Array(size).fill(null));
-  addFinderPatterns(matrix, size);
-  addTimingPatterns(matrix, size);
-  addAlignmentPatterns(matrix, size, version);
-  reserveFormatArea(matrix, size);
-
-  // Place data
-  placeData(matrix, data, size);
-
-  // Best mask
-  const masked = applyBestMask(matrix, size);
-
-  // Write format info (mask pattern 0 for simplicity)
-  writeFormatInfo(masked, size, 0);
-
-  return masked.map((row) => row.map((v) => v === true));
-}
-
-function encodeBytes(bytes: number[], version: number): number[] {
-  // EC codewords count per version at EC=M
-  const ecCounts: Record<number, number> = { 3: 26, 5: 36, 7: 40 };
-  const totalCodewords: Record<number, number> = { 3: 28, 5: 64, 7: 124 };
-  const ecCount = ecCounts[version] ?? 26;
-  const total = totalCodewords[version] ?? 28;
-  const dataCapacity = total - ecCount;
-
-  const bits: number[] = [];
-  // Mode: byte = 0100
-  pushBits(bits, 0b0100, 4);
-  // Character count indicator (8 bits for version 1-9)
-  pushBits(bits, bytes.length, 8);
-  for (const b of bytes) pushBits(bits, b, 8);
-  // Terminator
-  for (let i = 0; i < 4 && bits.length < dataCapacity * 8; i++) bits.push(0);
-  // Pad to byte boundary
-  while (bits.length % 8 !== 0) bits.push(0);
-  // Pad codewords
-  const padBytes = [0xec, 0x11];
-  let pi = 0;
-  while (bits.length < dataCapacity * 8) { pushBits(bits, padBytes[pi % 2], 8); pi++; }
-
-  // Pack bits into codewords
-  const codewords: number[] = [];
-  for (let i = 0; i < bits.length; i += 8) {
-    let b = 0;
-    for (let j = 0; j < 8; j++) b = (b << 1) | (bits[i + j] ?? 0);
-    codewords.push(b);
-  }
-
-  // EC codewords via Reed-Solomon
-  const ec = rsEncode(codewords, ecCount);
-  return [...codewords, ...ec];
-}
-
-function pushBits(arr: number[], val: number, len: number) {
-  for (let i = len - 1; i >= 0; i--) arr.push((val >> i) & 1);
-}
-
-// Reed-Solomon encoder
-function rsEncode(data: number[], ecLen: number): number[] {
-  const gen = rsGenerator(ecLen);
-  const msg = [...data, ...new Array(ecLen).fill(0)];
-  for (let i = 0; i < data.length; i++) {
-    const coef = msg[i];
-    if (coef !== 0) {
-      for (let j = 1; j <= ecLen; j++) {
-        msg[i + j] ^= gfMul(gen[j], coef);
-      }
-    }
-  }
-  return msg.slice(data.length);
-}
-
-const GF_EXP = new Array(512).fill(0);
-const GF_LOG = new Array(256).fill(0);
-(function initGF() {
-  let x = 1;
-  for (let i = 0; i < 255; i++) {
-    GF_EXP[i] = x;
-    GF_LOG[x] = i;
-    x <<= 1;
-    if (x & 0x100) x ^= 0x11d;
-  }
-  for (let i = 255; i < 512; i++) GF_EXP[i] = GF_EXP[i - 255];
-})();
-
-function gfMul(a: number, b: number): number {
-  if (a === 0 || b === 0) return 0;
-  return GF_EXP[GF_LOG[a] + GF_LOG[b]];
-}
-
-function rsGenerator(degree: number): number[] {
-  let g = [1];
-  for (let i = 0; i < degree; i++) {
-    const next = new Array(g.length + 1).fill(0);
-    for (let j = 0; j < g.length; j++) {
-      next[j] ^= g[j];
-      next[j + 1] ^= gfMul(g[j], GF_EXP[i]);
-    }
-    g = next;
-  }
-  return g;
-}
-
-// Pattern helpers
-function setRect(matrix: (boolean | null)[][], r: number, c: number, h: number, w: number, val: boolean) {
-  for (let dr = 0; dr < h; dr++)
-    for (let dc = 0; dc < w; dc++)
-      if (r + dr >= 0 && r + dr < matrix.length && c + dc >= 0 && c + dc < matrix[0].length)
-        matrix[r + dr][c + dc] = val;
-}
-
-function addFinder(matrix: (boolean | null)[][], r: number, c: number) {
-  setRect(matrix, r, c, 7, 7, true);
-  setRect(matrix, r + 1, c + 1, 5, 5, false);
-  setRect(matrix, r + 2, c + 2, 3, 3, true);
-}
-
-function addFinderPatterns(matrix: (boolean | null)[][], size: number) {
-  addFinder(matrix, 0, 0);
-  addFinder(matrix, 0, size - 7);
-  addFinder(matrix, size - 7, 0);
-  // Separators (already white from null → false)
-  // Horizontal separators
-  for (let c = 0; c < 8; c++) { matrix[7][c] = false; matrix[size - 8][c] = false; matrix[7][size - 1 - c] = false; }
-  for (let r = 0; r < 8; r++) { matrix[r][7] = false; matrix[r][size - 8] = false; matrix[size - 1 - r][7] = false; }
-}
-
-function addTimingPatterns(matrix: (boolean | null)[][], size: number) {
-  for (let i = 8; i < size - 8; i++) {
-    matrix[6][i] = i % 2 === 0;
-    matrix[i][6] = i % 2 === 0;
-  }
-}
-
-const ALIGNMENT_POSITIONS: Record<number, number[]> = {
-  3: [22],
-  5: [26],
-  7: [22, 34],
-};
-
-function addAlignmentPatterns(matrix: (boolean | null)[][], size: number, version: number) {
-  const pos = ALIGNMENT_POSITIONS[version] ?? [];
-  const centers = [6, ...pos];
-  for (const r of centers) {
-    for (const c of centers) {
-      if (matrix[r][c] !== null) continue;
-      setRect(matrix, r - 2, c - 2, 5, 5, true);
-      setRect(matrix, r - 1, c - 1, 3, 3, false);
-      matrix[r][c] = true;
-    }
-  }
-}
-
-function reserveFormatArea(matrix: (boolean | null)[][], size: number) {
-  for (let i = 0; i < 9; i++) {
-    if (matrix[8][i] === null) matrix[8][i] = false;
-    if (matrix[i][8] === null) matrix[i][8] = false;
-  }
-  for (let i = 0; i < 8; i++) {
-    if (matrix[8][size - 1 - i] === null) matrix[8][size - 1 - i] = false;
-    if (matrix[size - 1 - i][8] === null) matrix[size - 1 - i][8] = false;
-  }
-  matrix[size - 8][8] = true; // dark module
-}
-
-function placeData(matrix: (boolean | null)[][], data: number[], size: number) {
-  const bits: number[] = [];
-  for (const b of data) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
-
-  let idx = 0;
-  let upward = true;
-  for (let right = size - 1; right >= 1; right -= 2) {
-    if (right === 6) right = 5;
-    for (let row = 0; row < size; row++) {
-      const r = upward ? size - 1 - row : row;
-      for (let col = 0; col < 2; col++) {
-        const c = right - col;
-        if (matrix[r][c] === null) {
-          matrix[r][c] = idx < bits.length ? bits[idx++] === 1 : false;
-        }
-      }
-    }
-    upward = !upward;
-  }
-}
-
-function applyBestMask(matrix: (boolean | null)[][], size: number): (boolean | null)[][] {
-  // Use mask 0: (row + col) % 2 === 0
-  return matrix.map((row, r) =>
-    row.map((v, c) => (v === null ? false : v !== ((r + c) % 2 === 0)))
-  );
-}
-
-function writeFormatInfo(matrix: (boolean | null)[][], size: number, maskPattern: number) {
-  // EC level M = 0b00, mask 0 = 0b000 → format bits
-  // Pre-computed format string for EC=M, mask=0: 101010000010010
-  const formatBits = [1,0,1,0,1,0,0,0,0,0,1,0,0,1,0];
-  const pos1: [number, number][] = [
-    [8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],
-    [7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8],
-  ];
-  const pos2: [number, number][] = [
-    [size-1,8],[size-2,8],[size-3,8],[size-4,8],[size-5,8],[size-6,8],[size-7,8],
-    [8,size-8],[8,size-7],[8,size-6],[8,size-5],[8,size-4],[8,size-3],[8,size-2],[8,size-1],
-  ];
-  formatBits.forEach((b, i) => {
-    if (i < pos1.length) matrix[pos1[i][0]][pos1[i][1]] = b === 1;
-    if (i < pos2.length) matrix[pos2[i][0]][pos2[i][1]] = b === 1;
+async function generateWifiQrDataUrl(ssid: string, password: string): Promise<string> {
+  const escaped = (s: string) => s.replace(/[\\;,":]/g, (c) => '\\' + c);
+  const payload = `WIFI:T:WPA;S:${escaped(ssid)};P:${escaped(password)};;`;
+  return QRCode.toDataURL(payload, {
+    width: 400,
+    margin: 3,
+    color: { dark: '#000000', light: '#ffffff' },
+    errorCorrectionLevel: 'M',
   });
-  void maskPattern;
 }
 
 // ─── Labels ──────────────────────────────────────────────────────────────────
@@ -292,6 +45,7 @@ const LABELS = {
     guest: 'GUEST WI-FI',
     network: 'Réseau',
     password: 'Mot de passe',
+    speed: 'Débit',
     scan: 'Scannez pour vous connecter',
     connect: 'ou connectez-vous manuellement',
   },
@@ -300,14 +54,14 @@ const LABELS = {
     guest: 'GUEST WI-FI',
     network: 'Network',
     password: 'Password',
+    speed: 'Speed',
     scan: 'Scan to connect',
     connect: 'or connect manually',
   },
 };
 
 // ─── Logo resolution ─────────────────────────────────────────────────────────
-// Clients from the app state are used to resolve logos by name match.
-// This allows new logos to be added in the client database without code changes.
+// Priority: client database logo → manual upload → null (placeholder shown)
 
 function resolveLogoUrl(
   venueClientId: string,
@@ -322,7 +76,7 @@ function resolveLogoUrl(
   return null;
 }
 
-// ─── Wi-Fi sheet preview ─────────────────────────────────────────────────────
+// ─── Wi-Fi sheet ─────────────────────────────────────────────────────────────
 
 interface SheetProps {
   form: WifiFormData;
@@ -337,6 +91,16 @@ function WifiSheet({ form, logoUrl, qrDataUrl }: SheetProps) {
   const accentColor = isStaff ? '#1e3a5f' : '#1a6b3c';
   const accentLight = isStaff ? '#e8f0fa' : '#e6f4ec';
 
+  const credentialCols = form.speed
+    ? ['1fr 1fr 1fr']
+    : ['1fr 1fr'];
+
+  const credentialItems = [
+    { label: labels.network, value: form.ssid || '—' },
+    { label: labels.password, value: form.password || '—' },
+    ...(form.speed ? [{ label: labels.speed, value: form.speed }] : []),
+  ];
+
   return (
     <div
       id="wifi-sheet"
@@ -350,7 +114,10 @@ function WifiSheet({ form, logoUrl, qrDataUrl }: SheetProps) {
         boxSizing: 'border-box',
         position: 'relative',
         overflow: 'hidden',
-      }}
+        // Ensure colors print correctly
+        WebkitPrintColorAdjust: 'exact',
+        printColorAdjust: 'exact',
+      } as React.CSSProperties}
     >
       {/* Top bar */}
       <div style={{ background: accentColor, height: 8, width: '100%', flexShrink: 0 }} />
@@ -441,12 +208,12 @@ function WifiSheet({ form, logoUrl, qrDataUrl }: SheetProps) {
           gap: 24,
         }}
       >
-        {/* QR code */}
+        {/* QR code block */}
         <div
           style={{
             background: accentLight,
             borderRadius: 16,
-            padding: 24,
+            padding: '24px 32px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -456,13 +223,43 @@ function WifiSheet({ form, logoUrl, qrDataUrl }: SheetProps) {
           <div style={{ fontSize: 13, fontWeight: 700, color: accentColor, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             {labels.scan}
           </div>
-          {qrDataUrl ? (
-            <img src={qrDataUrl} alt="QR Code" style={{ width: 200, height: 200, imageRendering: 'pixelated' }} />
-          ) : (
-            <div style={{ width: 200, height: 200, background: '#e2e8f0', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#94a3b8' }}>
-              QR Code
-            </div>
-          )}
+
+          {/* QR rendered at native 240px — crisp, no scaling blur */}
+          <div
+            style={{
+              background: '#ffffff',
+              padding: 12,
+              borderRadius: 10,
+              lineHeight: 0,
+            }}
+          >
+            {qrDataUrl ? (
+              <img
+                src={qrDataUrl}
+                alt="QR Code Wi-Fi"
+                width={240}
+                height={240}
+                style={{ display: 'block', imageRendering: 'pixelated' }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: 240,
+                  height: 240,
+                  background: '#f1f5f9',
+                  borderRadius: 6,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 12,
+                  color: '#94a3b8',
+                }}
+              >
+                Entrez SSID + mot de passe
+              </div>
+            )}
+          </div>
+
           <div style={{ fontSize: 11, color: '#64748b' }}>{labels.connect}</div>
         </div>
 
@@ -471,14 +268,11 @@ function WifiSheet({ form, logoUrl, qrDataUrl }: SheetProps) {
           style={{
             width: '100%',
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
+            gridTemplateColumns: credentialCols[0],
             gap: 20,
           }}
         >
-          {[
-            { label: labels.network, value: form.ssid || '—' },
-            { label: labels.password, value: form.password || '—' },
-          ].map(({ label, value }) => (
+          {credentialItems.map(({ label, value }) => (
             <div
               key={label}
               style={{
@@ -548,6 +342,7 @@ const DEFAULT_FORM: WifiFormData = {
   documentType: 'staff',
   ssid: '',
   password: '',
+  speed: '',
   footerNote: '',
   language: 'fr',
   manualLogoDataUrl: null,
@@ -563,7 +358,7 @@ export function WifiPdfGenerator() {
   // Recompute QR whenever ssid/password changes
   useEffect(() => {
     if (form.ssid || form.password) {
-      setQrDataUrl(generateWifiQrDataUrl(form.ssid, form.password));
+      generateWifiQrDataUrl(form.ssid, form.password).then(setQrDataUrl);
     } else {
       setQrDataUrl('');
     }
@@ -594,20 +389,39 @@ export function WifiPdfGenerator() {
 
   return (
     <>
-      {/* Print styles — hide everything except the sheet */}
+      {/*
+        Print CSS strategy:
+        - Hide the entire app shell (nav, form panel, preview wrapper) with display:none.
+        - Show only #wifi-sheet at its natural A4 width, positioned normally.
+        - Force-print background colors and images so colored bars, QR, logo all appear.
+        - Do NOT use visibility:hidden which bleeds through and causes blank pages.
+      */}
       <style>{`
         @media print {
-          body * { visibility: hidden !important; }
-          #wifi-sheet, #wifi-sheet * { visibility: visible !important; }
+          @page { size: A4 portrait; margin: 0; }
+
+          body > * { display: none !important; }
+          #wifi-sheet-print-root { display: block !important; }
+
           #wifi-sheet {
-            position: fixed !important;
-            top: 0 !important; left: 0 !important;
             width: 794px !important;
-            transform: none !important;
+            min-height: 1123px !important;
             box-shadow: none !important;
+            position: relative !important;
+            transform: none !important;
+          }
+
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
         }
       `}</style>
+
+      {/* Hidden print root — lives outside the scrollable preview wrapper */}
+      <div id="wifi-sheet-print-root" style={{ display: 'none' }}>
+        <WifiSheet form={form} logoUrl={logoUrl} qrDataUrl={qrDataUrl} />
+      </div>
 
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         {/* Page header */}
@@ -771,6 +585,11 @@ export function WifiPdfGenerator() {
               <div>
                 <label className={labelClass}>Mot de passe</label>
                 <input className={fieldClass} value={form.password} onChange={(e) => set('password', e.target.value)} placeholder="••••••••" />
+              </div>
+
+              <div>
+                <label className={labelClass}>Débit / vitesse (optionnel)</label>
+                <input className={fieldClass} value={form.speed} onChange={(e) => set('speed', e.target.value)} placeholder="ex: 500 Mbps" />
               </div>
 
               <div>
