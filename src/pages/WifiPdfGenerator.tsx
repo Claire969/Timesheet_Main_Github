@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, QrCode, Upload, X } from 'lucide-react';
 import QRCode from 'qrcode';
@@ -31,8 +30,8 @@ async function generateWifiQrDataUrl(ssid: string, password: string): Promise<st
   const escaped = (s: string) => s.replace(/[\\;,":]/g, (c) => '\\' + c);
   const payload = `WIFI:T:WPA;S:${escaped(ssid)};P:${escaped(password)};;`;
   return QRCode.toDataURL(payload, {
-    width: 480,
-    margin: 4,
+    width: 400,
+    margin: 3,
     color: { dark: '#000000', light: '#ffffff' },
     errorCorrectionLevel: 'M',
   });
@@ -209,50 +208,46 @@ function WifiSheet({ form, logoUrl, qrDataUrl }: SheetProps) {
           gap: 24,
         }}
       >
-        {/* QR code block — full width so image is centred in the document */}
+        {/* QR code block */}
         <div
           style={{
             background: accentLight,
             borderRadius: 16,
-            padding: '28px 40px',
-            width: '100%',
-            boxSizing: 'border-box',
+            padding: '24px 32px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: 14,
+            gap: 12,
           }}
         >
           <div style={{ fontSize: 13, fontWeight: 700, color: accentColor, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             {labels.scan}
           </div>
 
-          {/* White quiet-zone wrapper */}
+          {/* QR rendered at native 240px — crisp, no scaling blur */}
           <div
             style={{
               background: '#ffffff',
-              padding: 16,
-              borderRadius: 12,
+              padding: 12,
+              borderRadius: 10,
               lineHeight: 0,
-              display: 'inline-flex',
             }}
           >
             {qrDataUrl ? (
-              // Generated at 480px, displayed at 280px — no CSS scaling, no blur
               <img
                 src={qrDataUrl}
                 alt="QR Code Wi-Fi"
-                width={280}
-                height={280}
-                style={{ display: 'block' }}
+                width={240}
+                height={240}
+                style={{ display: 'block', imageRendering: 'pixelated' }}
               />
             ) : (
               <div
                 style={{
-                  width: 280,
-                  height: 280,
+                  width: 240,
+                  height: 240,
                   background: '#f1f5f9',
-                  borderRadius: 8,
+                  borderRadius: 6,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -395,22 +390,27 @@ export function WifiPdfGenerator() {
   return (
     <>
       {/*
-        Print strategy:
-        The sheet is rendered via a React portal into #print-root, which is a direct child
-        of <body> defined in index.html (no display:none on it).
-        On screen we hide #print-root with CSS. On print we hide #root and show #print-root.
-        Both are direct body children so display:none on one never affects the other.
-        print-color-adjust:exact preserves background colours, borders, and images.
+        Print CSS strategy:
+        - Hide the entire app shell (nav, form panel, preview wrapper) with display:none.
+        - Show only #wifi-sheet at its natural A4 width, positioned normally.
+        - Force-print background colors and images so colored bars, QR, logo all appear.
+        - Do NOT use visibility:hidden which bleeds through and causes blank pages.
       */}
       <style>{`
-        #print-root { display: none; }
         @media print {
           @page { size: A4 portrait; margin: 0; }
-          #root   { display: none !important; }
-          #print-root {
-            display: block !important;
-            width: 794px;
+
+          body > * { display: none !important; }
+          #wifi-sheet-print-root { display: block !important; }
+
+          #wifi-sheet {
+            width: 794px !important;
+            min-height: 1123px !important;
+            box-shadow: none !important;
+            position: relative !important;
+            transform: none !important;
           }
+
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
@@ -418,10 +418,10 @@ export function WifiPdfGenerator() {
         }
       `}</style>
 
-      {createPortal(
-        <WifiSheet form={form} logoUrl={logoUrl} qrDataUrl={qrDataUrl} />,
-        document.getElementById('print-root')!
-      )}
+      {/* Hidden print root — lives outside the scrollable preview wrapper */}
+      <div id="wifi-sheet-print-root" style={{ display: 'none' }}>
+        <WifiSheet form={form} logoUrl={logoUrl} qrDataUrl={qrDataUrl} />
+      </div>
 
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         {/* Page header */}
