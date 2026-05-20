@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, QrCode, Upload, X } from 'lucide-react';
 import QRCode from 'qrcode';
@@ -395,32 +396,20 @@ export function WifiPdfGenerator() {
     <>
       {/*
         Print strategy:
-        The sheet inside #wifi-sheet-print-root is always rendered — positioned off-screen
-        with fixed+left:-9999px so the browser fully lays it out and paints it.
-        display:none would prevent rendering, which is why earlier versions printed blank.
-        On print, we move it to 0,0 and hide everything else.
+        The sheet is rendered via a React portal into #print-root, which is a direct child
+        of <body> defined in index.html (no display:none on it).
+        On screen we hide #print-root with CSS. On print we hide #root and show #print-root.
+        Both are direct body children so display:none on one never affects the other.
+        print-color-adjust:exact preserves background colours, borders, and images.
       */}
       <style>{`
-        @media screen {
-          #wifi-sheet-print-root {
-            position: fixed;
-            left: -9999px;
-            top: 0;
-            width: 794px;
-            pointer-events: none;
-            z-index: -1;
-          }
-        }
+        #print-root { display: none; }
         @media print {
           @page { size: A4 portrait; margin: 0; }
-          body > * { display: none !important; }
-          #wifi-sheet-print-root {
+          #root   { display: none !important; }
+          #print-root {
             display: block !important;
-            position: fixed !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 794px !important;
-            z-index: 9999 !important;
+            width: 794px;
           }
           * {
             -webkit-print-color-adjust: exact !important;
@@ -429,10 +418,10 @@ export function WifiPdfGenerator() {
         }
       `}</style>
 
-      {/* Always-rendered off-screen print root — never display:none */}
-      <div id="wifi-sheet-print-root">
-        <WifiSheet form={form} logoUrl={logoUrl} qrDataUrl={qrDataUrl} />
-      </div>
+      {createPortal(
+        <WifiSheet form={form} logoUrl={logoUrl} qrDataUrl={qrDataUrl} />,
+        document.getElementById('print-root')!
+      )}
 
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         {/* Page header */}
