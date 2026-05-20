@@ -30,8 +30,8 @@ async function generateWifiQrDataUrl(ssid: string, password: string): Promise<st
   const escaped = (s: string) => s.replace(/[\\;,":]/g, (c) => '\\' + c);
   const payload = `WIFI:T:WPA;S:${escaped(ssid)};P:${escaped(password)};;`;
   return QRCode.toDataURL(payload, {
-    width: 400,
-    margin: 3,
+    width: 480,
+    margin: 4,
     color: { dark: '#000000', light: '#ffffff' },
     errorCorrectionLevel: 'M',
   });
@@ -208,46 +208,50 @@ function WifiSheet({ form, logoUrl, qrDataUrl }: SheetProps) {
           gap: 24,
         }}
       >
-        {/* QR code block */}
+        {/* QR code block — full width so image is centred in the document */}
         <div
           style={{
             background: accentLight,
             borderRadius: 16,
-            padding: '24px 32px',
+            padding: '28px 40px',
+            width: '100%',
+            boxSizing: 'border-box',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: 12,
+            gap: 14,
           }}
         >
           <div style={{ fontSize: 13, fontWeight: 700, color: accentColor, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             {labels.scan}
           </div>
 
-          {/* QR rendered at native 240px — crisp, no scaling blur */}
+          {/* White quiet-zone wrapper */}
           <div
             style={{
               background: '#ffffff',
-              padding: 12,
-              borderRadius: 10,
+              padding: 16,
+              borderRadius: 12,
               lineHeight: 0,
+              display: 'inline-flex',
             }}
           >
             {qrDataUrl ? (
+              // Generated at 480px, displayed at 280px — no CSS scaling, no blur
               <img
                 src={qrDataUrl}
                 alt="QR Code Wi-Fi"
-                width={240}
-                height={240}
-                style={{ display: 'block', imageRendering: 'pixelated' }}
+                width={280}
+                height={280}
+                style={{ display: 'block' }}
               />
             ) : (
               <div
                 style={{
-                  width: 240,
-                  height: 240,
+                  width: 280,
+                  height: 280,
                   background: '#f1f5f9',
-                  borderRadius: 6,
+                  borderRadius: 8,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -390,27 +394,34 @@ export function WifiPdfGenerator() {
   return (
     <>
       {/*
-        Print CSS strategy:
-        - Hide the entire app shell (nav, form panel, preview wrapper) with display:none.
-        - Show only #wifi-sheet at its natural A4 width, positioned normally.
-        - Force-print background colors and images so colored bars, QR, logo all appear.
-        - Do NOT use visibility:hidden which bleeds through and causes blank pages.
+        Print strategy:
+        The sheet inside #wifi-sheet-print-root is always rendered — positioned off-screen
+        with fixed+left:-9999px so the browser fully lays it out and paints it.
+        display:none would prevent rendering, which is why earlier versions printed blank.
+        On print, we move it to 0,0 and hide everything else.
       */}
       <style>{`
+        @media screen {
+          #wifi-sheet-print-root {
+            position: fixed;
+            left: -9999px;
+            top: 0;
+            width: 794px;
+            pointer-events: none;
+            z-index: -1;
+          }
+        }
         @media print {
           @page { size: A4 portrait; margin: 0; }
-
           body > * { display: none !important; }
-          #wifi-sheet-print-root { display: block !important; }
-
-          #wifi-sheet {
+          #wifi-sheet-print-root {
+            display: block !important;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
             width: 794px !important;
-            min-height: 1123px !important;
-            box-shadow: none !important;
-            position: relative !important;
-            transform: none !important;
+            z-index: 9999 !important;
           }
-
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
@@ -418,8 +429,8 @@ export function WifiPdfGenerator() {
         }
       `}</style>
 
-      {/* Hidden print root — lives outside the scrollable preview wrapper */}
-      <div id="wifi-sheet-print-root" style={{ display: 'none' }}>
+      {/* Always-rendered off-screen print root — never display:none */}
+      <div id="wifi-sheet-print-root">
         <WifiSheet form={form} logoUrl={logoUrl} qrDataUrl={qrDataUrl} />
       </div>
 
