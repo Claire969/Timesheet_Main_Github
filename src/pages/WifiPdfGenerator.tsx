@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, QrCode, Upload, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useAppState } from '../App';
+import { supabase, supabaseEnabled } from '../lib/supabaseClient';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -343,10 +344,36 @@ const DEFAULT_FORM: WifiFormData = {
 
 export function WifiPdfGenerator() {
   const navigate = useNavigate();
-  const { clients } = useAppState();
+  const { clients, setClients } = useAppState();
   const [form, setForm] = useState<WifiFormData>(DEFAULT_FORM);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const logoInputRef = useRef<HTMLInputElement>(null);
+
+  // Load clients if not already populated (e.g. direct navigation to this page)
+  useEffect(() => {
+    if (!supabaseEnabled || clients.length > 0) return;
+    supabase
+      .schema('timesheet')
+      .from('clients')
+      .select('id,name,logo_url,half_hour,hour,travel_half_hour,half_day,full_day,created_at')
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        if (!data) return;
+        setClients(data.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          logoUrl: r.logo_url ?? undefined,
+          isArchived: false,
+          rates: {
+            halfHour: Number(r.half_hour) || 0,
+            hour: Number(r.hour) || 0,
+            travelHalfHour: Number(r.travel_half_hour) || 0,
+            halfDay: Number(r.half_day) || 0,
+            fullDay: Number(r.full_day) || 0,
+          },
+        })));
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Recompute QR whenever ssid/password changes
   useEffect(() => {
@@ -517,10 +544,40 @@ export function WifiPdfGenerator() {
               <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Logo</div>
 
               {form.venueClientId && clientHasLogo ? (
-                <p className="text-xs text-green-700 dark:text-green-400 font-medium">
-                  Logo récupéré depuis la base clients.
-                </p>
+                /* Client has a DB logo — show preview, offer manual override */
+                <div className="space-y-2">
+                  <img
+                    src={selectedClient!.logoUrl}
+                    alt={selectedClient!.name}
+                    className="h-12 max-w-full object-contain rounded"
+                  />
+                  <p className="text-xs text-green-700 dark:text-green-400 font-medium">
+                    Logo récupéré automatiquement depuis la base clients.
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={() => logoInputRef.current?.click()}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      <Upload size={12} />
+                      Remplacer par un upload
+                    </button>
+                    {form.manualLogoDataUrl && (
+                      <button
+                        onClick={() => set('manualLogoDataUrl', null)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                        title="Revenir au logo client"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                  {form.manualLogoDataUrl && (
+                    <img src={form.manualLogoDataUrl} alt="Logo personnalisé" className="h-10 object-contain rounded mt-1" />
+                  )}
+                </div>
               ) : (
+                /* No DB logo — manual upload only */
                 <>
                   {form.venueClientId && !clientHasLogo && (
                     <p className="text-xs text-amber-600 dark:text-amber-400">
@@ -545,12 +602,12 @@ export function WifiPdfGenerator() {
                       </button>
                     )}
                   </div>
-                  <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
                   {form.manualLogoDataUrl && (
                     <img src={form.manualLogoDataUrl} alt="Logo" className="h-10 object-contain rounded" />
                   )}
                 </>
               )}
+              <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
             </div>
 
             {/* Document */}
