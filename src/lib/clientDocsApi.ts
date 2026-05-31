@@ -22,8 +22,8 @@ export interface DocFileEntry {
   categorySlug: string;
 }
 
-async function apiGet<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+async function apiReq<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, init);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
     throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
@@ -31,17 +31,24 @@ async function apiGet<T>(url: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-async function apiPost<T>(url: string, body: unknown): Promise<T> {
-  const res = await fetch(url, {
+function apiGet<T>(url: string) {
+  return apiReq<T>(url);
+}
+
+function apiPost<T>(url: string, body: unknown) {
+  return apiReq<T>(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
-  }
-  return res.json() as Promise<T>;
+}
+
+function apiPatch<T>(url: string, body: unknown) {
+  return apiReq<T>(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 export async function fetchCategories(clientSlug: string): Promise<DocCategoryEntry[]> {
@@ -54,6 +61,29 @@ export async function fetchFiles(clientSlug: string, categorySlug: string): Prom
 
 export async function createCategory(clientSlug: string, categoryName: string): Promise<DocCategoryEntry> {
   return apiPost('/client-docs/category', { clientSlug, categoryName });
+}
+
+export async function renameCategory(
+  clientSlug: string,
+  categorySlug: string,
+  newName: string,
+): Promise<DocCategoryEntry> {
+  return apiPatch('/client-docs/category', { clientSlug, categorySlug, newName });
+}
+
+export async function deleteCategory(
+  clientSlug: string,
+  categorySlug: string,
+): Promise<{ ok: boolean; movedTo: string; movedFiles: string[] }> {
+  const res = await fetch(
+    `/client-docs/category?client=${encodeURIComponent(clientSlug)}&category=${encodeURIComponent(categorySlug)}`,
+    { method: 'DELETE' },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
 }
 
 export async function uploadFiles(
@@ -83,20 +113,11 @@ export interface UpdateMetaPayload {
 
 export interface UpdateMetaResult {
   file: DocFileEntry;
-  movedTo?: string; // new categorySlug if file was moved
+  movedTo?: string;
 }
 
 export async function updateMeta(payload: UpdateMetaPayload): Promise<UpdateMetaResult> {
-  const res = await fetch('/client-docs/meta', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
-  }
-  return res.json() as Promise<UpdateMetaResult>;
+  return apiPatch('/client-docs/meta', payload);
 }
 
 export async function deleteFile(clientSlug: string, categorySlug: string, filename: string): Promise<void> {
@@ -125,8 +146,9 @@ export function slugifyClientName(name: string): string {
     .slice(0, 80) || 'untitled';
 }
 
-// Case-insensitive category lookup in a local list
 export function findCategoryCI(cats: DocCategoryEntry[], nameOrSlug: string): DocCategoryEntry | undefined {
   const lower = nameOrSlug.trim().toLowerCase();
   return cats.find(c => c.name.toLowerCase() === lower || c.slug.toLowerCase() === lower);
 }
+
+export const DEFAULT_CATEGORY_SLUG = 'general';

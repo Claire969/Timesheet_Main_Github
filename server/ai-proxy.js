@@ -460,7 +460,14 @@ async function handleClientDocs(req, res) {
     if (!client) return json(res, 400, { error: 'client required' });
     try {
       const clientDir = resolveDocsPath(client);
-      if (!fs.existsSync(clientDir)) return json(res, 200, []);
+
+      // Ensure the default "general" category always exists
+      const defaultCatDir = resolveDocsPath(client, 'general');
+      if (!fs.existsSync(defaultCatDir)) {
+        fs.mkdirSync(defaultCatDir, { recursive: true });
+        writeCatDisplayName(client, 'general', 'Général');
+      }
+
       const entries = fs.readdirSync(clientDir, { withFileTypes: true });
       const categories = entries
         .filter(e => e.isDirectory())
@@ -686,6 +693,83 @@ async function handleClientDocs(req, res) {
       return json(res, 500, { error: e.message });
     }
     return;
+  }
+
+  // ── PATCH /client-docs/category — rename ─────────────────────────────────
+  if (req.method === 'PATCH' && pathname === '/client-docs/category') {
+    try {
+      const { clientSlug, categorySlug, newName } = await readBodyJson(req);
+      if (!clientSlug || !categorySlug || !newName?.trim()) {
+        return json(res, 400, { error: 'clientSlug, categorySlug, newName required' });
+      }
+      const catDir = resolveDocsPath(clientSlug, categorySlug);
+      if (!fs.existsSync(catDir)) return json(res, 404, { error: 'Category not found' });
+
+      // Check the new name doesn't collide with an existing different category
+      const clientDir = resolveDocsPath(clientSlug);
+      const existing = findExistingCategory(clientDir, clientSlug, newName.trim());
+      if (existing && existing.slug !== categorySlug) {
+        return json(res, 409, { error: 'A category with this name already exists', existing });
+      }
+
+      writeCatDisplayName(clientSlug, categorySlug, newName.trim());
+      return json(res, 200, { slug: categorySlug, name: newName.trim(), clientSlug });
+    } catch (e) {
+      return json(res, 500, { error: e.message });
+    }
+  }
+
+  // ── DELETE /client-docs/category — delete + move orphans to default ───────
+  if (req.method === 'DELETE' && pathname === '/client-docs/category') {
+    const { client, category } = q;
+    if (!client || !category) return json(res, 400, { error: 'client and category required' });
+    try {
+      const DEFAULT_CAT_SLUG = 'general';
+      const DEFAULT_CAT_NAME = 'Général';
+      const catDir = resolveDocsPath(client, category);
+      if (!fs.existsSync(catDir)) return json(res, 404, { error: 'Category not found' });
+
+      // Move all real files to the default category first
+      const clientDir = resolveDocsPath(client);
+      const defaultCatDir = resolveDocsPath(client, DEFAULT_CAT_SLUG);
+      fs.mkdirSync(defaultCatDir, { recursive: true });
+
+      // Ensure default cat has a display name
+      const defaultNamePath = resolveDocsPath(client, DEFAULT_CAT_SLUG, '._catname');
+      if (!fs.existsSync(defaultNamePath)) {
+        writeCatDisplayName(client, DEFAULT_CAT_SLUG, DEFAULT_CAT_NAME);
+      }
+
+      const entries = fs.readdirSync(catDir, { withFileTypes: true });
+      const movedFiles = [];
+      for (const e of entries) {
+        if (!e.isFile()) continue;
+        // Move both real files and sidecars, skip hidden helper files
+        const isMeta = e.name.startsWith('._meta_');
+        const isCatname = e.name === '._catname';
+        if (isCatname) continue;
+        const src = path.join(catDir, e.name);
+        if (isMeta) {
+          // Handled together with the real file below
+          continue;
+        }
+        const dstName = uniqueFilename(defaultCatDir, e.name);
+        fs.renameSync(src, path.join(defaultCatDir, dstName));
+        // Move sidecar if it exists
+        const metaSrc = path.join(catDir, `._meta_${e.name}.json`);
+        if (fs.existsSync(metaSrc)) {
+          fs.renameSync(metaSrc, path.join(defaultCatDir, `._meta_${dstName}.json`));
+        }
+        movedFiles.push(dstName);
+      }
+
+      // Remove the now-empty category directory
+      fs.rmSync(catDir, { recursive: true, force: true });
+
+      return json(res, 200, { ok: true, movedTo: DEFAULT_CAT_SLUG, movedFiles });
+    } catch (e) {
+      return json(res, 500, { error: e.message });
+    }
   }
 
   return null;
