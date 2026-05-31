@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase, supabaseEnabled } from './supabaseClient';
 import { useAppState } from '../App';
 
@@ -8,12 +8,20 @@ import { useAppState } from '../App';
 export function useLoadClients() {
   const { clients, setClients } = useAppState();
   const fetching = useRef(false);
+  const [loading, setLoading] = useState(() => supabaseEnabled && clients.length === 0);
 
   useEffect(() => {
-    if (!supabaseEnabled) return;
-    if (clients.length > 0) return;    // already loaded (e.g. came from Home)
+    if (!supabaseEnabled) {
+      setLoading(false);
+      return;
+    }
+    if (clients.length > 0) {    // already loaded (e.g. came from Home)
+      setLoading(false);
+      return;
+    }
     if (fetching.current) return;      // already in flight
     fetching.current = true;
+    setLoading(true);
 
     supabase
       .schema('timesheet')
@@ -22,6 +30,7 @@ export function useLoadClients() {
       .order('created_at', { ascending: true })
       .then(({ data }) => {
         fetching.current = false;
+        setLoading(false);
         if (!data) return;
         setClients(data.map((r: any) => ({
           id: r.id,
@@ -37,6 +46,11 @@ export function useLoadClients() {
           },
         })));
       })
-      .catch(() => { fetching.current = false; });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      .catch(() => {
+        fetching.current = false;
+        setLoading(false);
+      });
+  }, [clients.length, setClients]);
+
+  return { loading };
 }
