@@ -94,6 +94,14 @@ function App() {
             }
           />
           <Route
+            path="/:clientSlug/ClientTimesheets"
+            element={
+              <RequireAuth>
+                <ClientTimesheets />
+              </RequireAuth>
+            }
+          />
+          <Route
             path="/event-reports"
             element={
               <RequireAuth>
