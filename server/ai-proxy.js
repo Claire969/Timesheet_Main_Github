@@ -402,7 +402,12 @@ function writeCatDisplayName(clientSlug, catSlug, displayName) {
 function findExistingCategory(clientDir, clientSlug, nameOrSlug) {
   if (!fs.existsSync(clientDir)) return null;
   const candidateSlug = slugify(nameOrSlug);
-  const entries = fs.readdirSync(clientDir, { withFileTypes: true });
+  let entries;
+  try {
+    entries = fs.readdirSync(clientDir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
   for (const e of entries) {
     if (!e.isDirectory()) continue;
     // Exact slug match
@@ -459,15 +464,14 @@ async function handleClientDocs(req, res) {
     const { client } = q;
     if (!client) return json(res, 400, { error: 'client required' });
     try {
-      const clientDir = resolveDocsPath(client);
-
-      // Ensure the default "general" category always exists
+      // Ensure the default "general" category always exists for this client
       const defaultCatDir = resolveDocsPath(client, 'general');
       if (!fs.existsSync(defaultCatDir)) {
         fs.mkdirSync(defaultCatDir, { recursive: true });
         writeCatDisplayName(client, 'general', 'Général');
       }
 
+      const clientDir = resolveDocsPath(client);
       const entries = fs.readdirSync(clientDir, { withFileTypes: true });
       const categories = entries
         .filter(e => e.isDirectory())
@@ -702,8 +706,13 @@ async function handleClientDocs(req, res) {
       if (!clientSlug || !categorySlug || !newName?.trim()) {
         return json(res, 400, { error: 'clientSlug, categorySlug, newName required' });
       }
+
+      // Ensure the category dir exists (may have just been auto-created by GET)
       const catDir = resolveDocsPath(clientSlug, categorySlug);
-      if (!fs.existsSync(catDir)) return json(res, 404, { error: 'Category not found' });
+      if (!fs.existsSync(catDir)) {
+        // Re-create it so the rename can proceed
+        fs.mkdirSync(catDir, { recursive: true });
+      }
 
       // Check the new name doesn't collide with an existing different category
       const clientDir = resolveDocsPath(clientSlug);

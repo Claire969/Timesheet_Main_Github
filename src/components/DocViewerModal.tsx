@@ -16,10 +16,8 @@ export function DocViewerModal({ file, categories, onClose, onSave, onDelete }: 
 
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(file.title);
-  const [editCategory, setEditCategory] = useState(file.categorySlug);
-  const [catInput, setCatInput] = useState(
-    categories.find(c => c.slug === file.categorySlug)?.name ?? file.categorySlug
-  );
+  const currentCatName = categories.find(c => c.slug === file.categorySlug)?.name ?? file.categorySlug;
+  const [catInput, setCatInput] = useState(currentCatName);
   const [showCatSugg, setShowCatSugg] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -30,10 +28,7 @@ export function DocViewerModal({ file, categories, onClose, onSave, onDelete }: 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const targetCat = categories.find(
-        c => c.name.toLowerCase() === catInput.trim().toLowerCase()
-      );
-      const newCategoryName = catInput.trim() !== (categories.find(c => c.slug === file.categorySlug)?.name ?? file.categorySlug)
+      const newCategoryName = catInput.trim().toLowerCase() !== currentCatName.toLowerCase()
         ? catInput.trim()
         : null;
       await onSave(editTitle.trim() || file.name, newCategoryName);
@@ -110,7 +105,7 @@ export function DocViewerModal({ file, categories, onClose, onSave, onDelete }: 
                   {saving ? 'Enregistrement…' : 'Enregistrer'}
                 </button>
                 <button
-                  onClick={() => { setEditing(false); setEditTitle(file.title); setCatInput(categories.find(c => c.slug === file.categorySlug)?.name ?? file.categorySlug); }}
+                  onClick={() => { setEditing(false); setEditTitle(file.title); setCatInput(currentCatName); }}
                   className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                 >
                   Annuler

@@ -5,6 +5,7 @@ import { AppNav } from '../components/AppNav';
 import { useAppState } from '../App';
 import type { Forfait } from '../App';
 import { supabase, supabaseEnabled } from '../lib/supabaseClient';
+import { useLoadClients } from '../lib/useLoadClients';
 
 const ensureDefaultProject = async (clientId: string): Promise<string | null> => {
   if (!supabaseEnabled) return null;
@@ -159,9 +160,9 @@ export const ClientTimesheets = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const { clients } = useAppState();
+  useLoadClients();
 
   const client = clients.find(c => c.id === clientId);
-  if (!client) return <Navigate to="/" replace />;
 
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -187,8 +188,9 @@ export const ClientTimesheets = () => {
   const PAGE_SIZE = 50;
 
   useEffect(() => {
+    if (!client) return;
     ensureDefaultProject(client.id).then(id => { if (id) setSelectedProjectId(id); });
-  }, [client.id]);
+  }, [client?.id]);
 
   const fetchEntries = useCallback(async () => {
     if (!supabaseEnabled || !selectedProjectId) { setEntries([]); return; }
@@ -205,6 +207,9 @@ export const ClientTimesheets = () => {
   }, [selectedProjectId]);
 
   useEffect(() => { fetchEntries(); setSelectedUnbilled(new Set()); setSelectedPending(new Set()); setSelectedArchived(new Set()); }, [fetchEntries]);
+
+  // Guard AFTER all hooks
+  if (!client) return <Navigate to="/" replace />;
 
   const sortEntries = (list: Entry[]) =>
     [...list].sort((a, b) => {

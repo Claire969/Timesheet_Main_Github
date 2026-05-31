@@ -423,22 +423,28 @@ export function WifiPdfGenerator() {
         @media print {
           @page { size: A4 portrait; margin: 0; }
 
-          /* Masque toute l'UI sans empêcher le rendu */
+          /* Hide the app UI — body children except the print root */
           body > * { visibility: hidden !important; }
 
-          /* Rend le print root visible et bien positionné */
-          #wifi-sheet-print-root {
+          /* Make the React root visible so fixed children inside it are shown */
+          #root { visibility: visible !important; }
+
+          /* Hide everything inside root except our sheet */
+          #root > * { visibility: hidden !important; }
+
+          /* Show only the print root and all its children */
+          #wifi-sheet-print-root,
+          #wifi-sheet-print-root * {
             visibility: visible !important;
+          }
+
+          #wifi-sheet-print-root {
             position: fixed !important;
             top: 0 !important;
             left: 0 !important;
             width: 794px !important;
             z-index: 9999 !important;
-          }
-
-          /* Rend tous les enfants du sheet visibles */
-          #wifi-sheet-print-root * {
-            visibility: visible !important;
+            pointer-events: none !important;
           }
 
           #wifi-sheet {
