@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { X, Upload, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import type { DocClientEntry, DocCategoryEntry, DocFileEntry } from '../lib/clientDocsApi';
-import { createCategory, uploadFiles, fetchCategories } from '../lib/clientDocsApi';
+import { createCategory, uploadFiles, fetchCategories, findCategoryCI } from '../lib/clientDocsApi';
 
 interface Props {
   clients: DocClientEntry[];
@@ -71,7 +71,7 @@ export function DocUploadPanel({
     setErrorMsg('');
 
     try {
-      const existingCat = categories.find(c => c.name.toLowerCase() === catNameTrimmed.toLowerCase());
+      const existingCat = findCategoryCI(categories, catNameTrimmed);
       let usedCatSlug = existingCat?.slug;
 
       if (!usedCatSlug) {

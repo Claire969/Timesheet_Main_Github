@@ -102,7 +102,7 @@ function text(res, status, str) {
 
 function addCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET, DELETE, PATCH');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
@@ -336,11 +336,105 @@ function parseQuery(url) {
   return Object.fromEntries(u.searchParams.entries());
 }
 
+// ─── Metadata sidecar helpers ────────────────────────────────────────────────
+// Metadata is stored in a hidden JSON sidecar: ._meta_<filename>.json
+// It holds user-editable fields (title, category display name) without
+// renaming the physical file or touching the directory structure.
+
+function metaPath(fileDir, filename) {
+  return path.join(fileDir, `._meta_${filename}.json`);
+}
+
+function readMeta(fileDir, filename) {
+  const mp = metaPath(fileDir, filename);
+  try {
+    return JSON.parse(fs.readFileSync(mp, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function writeMeta(fileDir, filename, meta) {
+  fs.writeFileSync(metaPath(fileDir, filename), JSON.stringify(meta), 'utf8');
+}
+
+function deleteMeta(fileDir, filename) {
+  try { fs.unlinkSync(metaPath(fileDir, filename)); } catch {}
+}
+
+function buildFileEntry(fileDir, filename, clientSlug, categorySlug) {
+  const stat = fs.statSync(path.join(fileDir, filename));
+  const meta = readMeta(fileDir, filename);
+  const encodedName = encodeURIComponent(filename);
+  const encodedClient = encodeURIComponent(clientSlug);
+  const encodedCat = encodeURIComponent(categorySlug);
+  return {
+    name: filename,
+    title: meta.title || filename,
+    size: stat.size,
+    modifiedAt: stat.mtime.toISOString(),
+    type: getTypeLabel(filename),
+    mime: getMime(filename),
+    url: `/client-docs/file?client=${encodedClient}&category=${encodedCat}&name=${encodedName}`,
+    downloadUrl: `/client-docs/download?client=${encodedClient}&category=${encodedCat}&name=${encodedName}`,
+    clientSlug,
+    categorySlug,
+  };
+}
+
+// ─── Category helpers ─────────────────────────────────────────────────────────
+
+// Read the canonical display name for a category directory.
+// If a ._catname file exists (written on category creation), use it.
+// Otherwise fall back to the slug itself.
+function readCatDisplayName(clientSlug, catSlug) {
+  const namePath = resolveDocsPath(clientSlug, catSlug, '._catname');
+  try { return fs.readFileSync(namePath, 'utf8').trim(); } catch { return catSlug; }
+}
+
+function writeCatDisplayName(clientSlug, catSlug, displayName) {
+  const namePath = resolveDocsPath(clientSlug, catSlug, '._catname');
+  fs.writeFileSync(namePath, displayName, 'utf8');
+}
+
+// Find an existing category directory by case-insensitive display name or slug.
+// Returns { slug, name } or null.
+function findExistingCategory(clientDir, clientSlug, nameOrSlug) {
+  if (!fs.existsSync(clientDir)) return null;
+  const candidateSlug = slugify(nameOrSlug);
+  const entries = fs.readdirSync(clientDir, { withFileTypes: true });
+  for (const e of entries) {
+    if (!e.isDirectory()) continue;
+    // Exact slug match
+    if (e.name === candidateSlug) {
+      return { slug: e.name, name: readCatDisplayName(clientSlug, e.name) };
+    }
+    // Case-insensitive display name match
+    const displayName = readCatDisplayName(clientSlug, e.name);
+    if (displayName.toLowerCase() === nameOrSlug.trim().toLowerCase()) {
+      return { slug: e.name, name: displayName };
+    }
+  }
+  return null;
+}
+
+async function readBodyJson(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', c => { body += c; });
+    req.on('end', () => {
+      try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
+    });
+    req.on('error', reject);
+  });
+}
+
 async function handleClientDocs(req, res) {
   const u = new URL(req.url, 'http://localhost');
   const pathname = u.pathname;
   const q = parseQuery(req.url);
 
+  // ── GET /client-docs/clients ─────────────────────────────────────────────
   if (req.method === 'GET' && pathname === '/client-docs/clients') {
     try {
       if (!supabase) return json(res, 503, { error: 'Supabase not configured' });
@@ -360,6 +454,7 @@ async function handleClientDocs(req, res) {
     }
   }
 
+  // ── GET /client-docs/categories ──────────────────────────────────────────
   if (req.method === 'GET' && pathname === '/client-docs/categories') {
     const { client } = q;
     if (!client) return json(res, 400, { error: 'client required' });
@@ -369,13 +464,18 @@ async function handleClientDocs(req, res) {
       const entries = fs.readdirSync(clientDir, { withFileTypes: true });
       const categories = entries
         .filter(e => e.isDirectory())
-        .map(e => ({ slug: e.name, name: e.name, clientSlug: client }));
+        .map(e => ({
+          slug: e.name,
+          name: readCatDisplayName(client, e.name),
+          clientSlug: client,
+        }));
       return json(res, 200, categories);
     } catch (e) {
       return json(res, 500, { error: e.message });
     }
   }
 
+  // ── GET /client-docs/list ────────────────────────────────────────────────
   if (req.method === 'GET' && pathname === '/client-docs/list') {
     const { client, category } = q;
     if (!client || !category) return json(res, 400, { error: 'client and category required' });
@@ -384,28 +484,15 @@ async function handleClientDocs(req, res) {
       if (!fs.existsSync(catDir)) return json(res, 200, []);
       const entries = fs.readdirSync(catDir, { withFileTypes: true });
       const files = entries
-        .filter(e => e.isFile())
-        .map(e => {
-          const stat = fs.statSync(path.join(catDir, e.name));
-          const encodedName = encodeURIComponent(e.name);
-          const encodedClient = encodeURIComponent(client);
-          const encodedCat = encodeURIComponent(category);
-          return {
-            name: e.name,
-            size: stat.size,
-            modifiedAt: stat.mtime.toISOString(),
-            type: getTypeLabel(e.name),
-            mime: getMime(e.name),
-            url: `/client-docs/file?client=${encodedClient}&category=${encodedCat}&name=${encodedName}`,
-            downloadUrl: `/client-docs/download?client=${encodedClient}&category=${encodedCat}&name=${encodedName}`,
-          };
-        });
+        .filter(e => e.isFile() && !e.name.startsWith('._'))
+        .map(e => buildFileEntry(catDir, e.name, client, category));
       return json(res, 200, files);
     } catch (e) {
       return json(res, 500, { error: e.message });
     }
   }
 
+  // ── POST /client-docs/category ───────────────────────────────────────────
   if (req.method === 'POST' && pathname === '/client-docs/category') {
     let body = '';
     req.on('data', c => { body += c; });
@@ -413,10 +500,20 @@ async function handleClientDocs(req, res) {
       try {
         const { clientSlug, categoryName } = JSON.parse(body);
         if (!clientSlug || !categoryName) return json(res, 400, { error: 'clientSlug and categoryName required' });
+
+        const clientDir = resolveDocsPath(clientSlug);
+        // Case-insensitive deduplication
+        const existing = findExistingCategory(clientDir, clientSlug, categoryName);
+        if (existing) {
+          return json(res, 200, { slug: existing.slug, name: existing.name, clientSlug });
+        }
+
         const catSlug = slugify(categoryName);
         const catDir = resolveDocsPath(clientSlug, catSlug);
         fs.mkdirSync(catDir, { recursive: true });
-        return json(res, 200, { slug: catSlug, name: catSlug, clientSlug });
+        // Persist the user-supplied display name (preserves original casing)
+        writeCatDisplayName(clientSlug, catSlug, categoryName.trim());
+        return json(res, 200, { slug: catSlug, name: categoryName.trim(), clientSlug });
       } catch (e) {
         return json(res, 500, { error: e.message });
       }
@@ -424,6 +521,7 @@ async function handleClientDocs(req, res) {
     return;
   }
 
+  // ── POST /client-docs/upload ─────────────────────────────────────────────
   if (req.method === 'POST' && pathname === '/client-docs/upload') {
     const bb = Busboy({ headers: req.headers, limits: { fileSize: 100 * 1024 * 1024 } });
     const fields = {};
@@ -434,11 +532,10 @@ async function handleClientDocs(req, res) {
 
     bb.on('file', (fieldname, fileStream, info) => {
       const { filename } = info;
-      let clientSlug, categorySlug;
 
       const doUpload = () => {
-        clientSlug = fields.clientSlug;
-        categorySlug = fields.categorySlug;
+        const clientSlug = fields.clientSlug;
+        const categorySlug = fields.categorySlug;
 
         if (!clientSlug || !categorySlug) {
           fileStream.resume();
@@ -457,19 +554,9 @@ async function handleClientDocs(req, res) {
           const p = new Promise((resolve, reject) => {
             fileStream.pipe(writeStream);
             writeStream.on('finish', () => {
-              const stat = fs.statSync(filePath);
-              const encodedName = encodeURIComponent(finalName);
-              const encodedClient = encodeURIComponent(clientSlug);
-              const encodedCat = encodeURIComponent(categorySlug);
-              uploads.push({
-                name: finalName,
-                size: stat.size,
-                modifiedAt: stat.mtime.toISOString(),
-                type: getTypeLabel(finalName),
-                mime: getMime(finalName),
-                url: `/client-docs/file?client=${encodedClient}&category=${encodedCat}&name=${encodedName}`,
-                downloadUrl: `/client-docs/download?client=${encodedClient}&category=${encodedCat}&name=${encodedName}`,
-              });
+              // title defaults to filename, stored in sidecar
+              writeMeta(targetDir, finalName, { title: finalName });
+              uploads.push(buildFileEntry(targetDir, finalName, clientSlug, categorySlug));
               resolve();
             });
             writeStream.on('error', reject);
@@ -507,6 +594,74 @@ async function handleClientDocs(req, res) {
     return;
   }
 
+  // ── PATCH /client-docs/meta — edit title (and optionally move category) ──
+  if (req.method === 'PATCH' && pathname === '/client-docs/meta') {
+    try {
+      const { clientSlug, categorySlug, filename, title, newCategoryName } = await readBodyJson(req);
+      if (!clientSlug || !categorySlug || !filename) {
+        return json(res, 400, { error: 'clientSlug, categorySlug, filename required' });
+      }
+
+      const srcDir = resolveDocsPath(clientSlug, categorySlug);
+      const srcFile = path.join(srcDir, filename);
+      if (!fs.existsSync(srcFile)) return json(res, 404, { error: 'File not found' });
+
+      // Update title in sidecar
+      const meta = readMeta(srcDir, filename);
+      if (title !== undefined) meta.title = title.trim() || filename;
+
+      let targetCategorySlug = categorySlug;
+
+      if (newCategoryName && newCategoryName.trim()) {
+        const clientDir = resolveDocsPath(clientSlug);
+        // Find or create the target category (case-insensitive dedup)
+        let targetCat = findExistingCategory(clientDir, clientSlug, newCategoryName);
+        if (!targetCat) {
+          const newSlug = slugify(newCategoryName);
+          const newCatDir = resolveDocsPath(clientSlug, newSlug);
+          fs.mkdirSync(newCatDir, { recursive: true });
+          writeCatDisplayName(clientSlug, newSlug, newCategoryName.trim());
+          targetCat = { slug: newSlug, name: newCategoryName.trim() };
+        }
+
+        if (targetCat.slug !== categorySlug) {
+          // Move the physical file
+          const dstDir = resolveDocsPath(clientSlug, targetCat.slug);
+          const dstName = uniqueFilename(dstDir, filename);
+          fs.renameSync(srcFile, path.join(dstDir, dstName));
+          // Move sidecar
+          deleteMeta(srcDir, filename);
+          writeMeta(dstDir, dstName, { ...meta, title: meta.title || dstName });
+          const entry = buildFileEntry(dstDir, dstName, clientSlug, targetCat.slug);
+          return json(res, 200, { file: entry, movedTo: targetCat.slug });
+        }
+      }
+
+      writeMeta(srcDir, filename, meta);
+      const entry = buildFileEntry(srcDir, filename, clientSlug, targetCategorySlug);
+      return json(res, 200, { file: entry });
+    } catch (e) {
+      return json(res, 500, { error: e.message });
+    }
+  }
+
+  // ── DELETE /client-docs/file ─────────────────────────────────────────────
+  if (req.method === 'DELETE' && pathname === '/client-docs/file') {
+    const { client, category, name } = q;
+    if (!client || !category || !name) return json(res, 400, { error: 'client, category, name required' });
+    try {
+      const fileDir = resolveDocsPath(client, category);
+      const filePath = path.join(fileDir, name);
+      if (!fs.existsSync(filePath)) return json(res, 404, { error: 'File not found' });
+      fs.unlinkSync(filePath);
+      deleteMeta(fileDir, name);
+      return json(res, 200, { ok: true });
+    } catch (e) {
+      return json(res, 500, { error: e.message });
+    }
+  }
+
+  // ── GET /client-docs/file  +  /client-docs/download ─────────────────────
   if (req.method === 'GET' && (pathname === '/client-docs/file' || pathname === '/client-docs/download')) {
     const { client, category, name } = q;
     if (!client || !category || !name) return json(res, 400, { error: 'client, category, name required' });
