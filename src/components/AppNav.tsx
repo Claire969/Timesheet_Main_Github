@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ChevronDown, ExternalLink, FileSpreadsheet, Users, ClipboardList, Database, Clock, Shield, LogOut, Wifi } from 'lucide-react';
+import { ChevronDown, ExternalLink, FileSpreadsheet, Users, ClipboardList, Database, Clock, Shield, LogOut, Wifi, LayoutGrid } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
@@ -75,8 +75,10 @@ export function AppNav({ onExportExcel, onOpenClients }: AppNavProps) {
   };
 
   const isActive = (path: string) =>
-    path === '/'
-      ? location.pathname === '/'
+    path === '/dashboard'
+      ? location.pathname === '/dashboard' || location.pathname === '/'
+      : path === '/timesheets'
+      ? location.pathname === '/timesheets' || location.pathname.startsWith('/client')
       : location.pathname.startsWith(path);
 
   const avatarUrl = getUserAvatar(user);
@@ -99,11 +101,24 @@ export function AppNav({ onExportExcel, onOpenClients }: AppNavProps) {
             />
           </button>
 
+          {/* Dashboard nav item */}
+          <button
+            onClick={() => { closeAll(); navigate('/dashboard'); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              isActive('/dashboard')
+                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+            }`}
+          >
+            <LayoutGrid size={14} />
+            Dashboard
+          </button>
+
           <div ref={timesheetDd.ref} className="relative">
             <button
               onClick={() => { toolsDd.setOpen(false); userDd.setOpen(false); timesheetDd.setOpen(v => !v); }}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive('/') || isActive('/client')
+                isActive('/timesheets')
                   ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                   : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
               }`}
@@ -115,14 +130,14 @@ export function AppNav({ onExportExcel, onOpenClients }: AppNavProps) {
             {timesheetDd.open && (
               <div className="absolute top-full left-0 mt-1 w-52 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1.5 z-50">
                 <button
-                  onClick={() => { closeAll(); navigate('/'); }}
+                  onClick={() => { closeAll(); navigate('/timesheets'); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
                 >
                   <Clock size={14} className="text-gray-400 dark:text-gray-500 shrink-0" />
                   Timesheet
                 </button>
                 <button
-                  onClick={() => { closeAll(); if (location.pathname !== '/') navigate('/'); onOpenClients?.(); }}
+                  onClick={() => { closeAll(); if (location.pathname !== '/timesheets') navigate('/timesheets'); onOpenClients?.(); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
                 >
                   <Users size={14} className="text-gray-400 dark:text-gray-500 shrink-0" />
