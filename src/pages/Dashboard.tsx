@@ -13,10 +13,16 @@ import {
   AlertCircle,
   Star,
   Info,
+  Calendar,
 } from 'lucide-react';
 import { AppNav } from '../components/AppNav';
 import { useAuth } from '../contexts/AuthContext';
+import { useAppState } from '../App';
+import { useLoadClients } from '../lib/useLoadClients';
 import { supabase, supabaseEnabled } from '../lib/supabaseClient';
+import { taskApi } from '../lib/taskApi';
+import { sortTasksByPriority, PRIORITY_LABELS, PRIORITY_ORDER } from '../lib/taskTypes';
+import type { Task, TaskPriority } from '../lib/taskTypes';
 
 function getUserFirstName(user: { email?: string | null; user_metadata?: { full_name?: string; name?: string } } | null): string {
   if (!user) return '';
@@ -126,51 +132,34 @@ function ModuleCard({ icon, title, description, comingSoon, onClick, iconBg, ico
   );
 }
 
-// --------------- Priority tasks (sidebar) ---------------
+// --------------- Priority tasks (sidebar) — uses real data ---------------
 
-type Priority = 'urgent' | 'important' | 'urgent-important' | 'normal';
-
-interface TaskItem {
-  id: number;
-  title: string;
-  client: string;
-  due: string;
-  priority: Priority;
-}
-
-const PRIORITY_CONFIG: Record<Priority, { label: string; labelClass: string; borderClass: string; icon: React.ReactNode }> = {
-  urgent: {
-    label: 'Urgent',
+const PRIORITY_BADGE_SIDEBAR: Record<TaskPriority, { label: string; labelClass: string; borderClass: string; icon: React.ReactNode }> = {
+  urgent_important: {
+    label: PRIORITY_LABELS.urgent_important,
     labelClass: 'bg-red-100 text-red-700',
     borderClass: 'border-l-red-500',
     icon: <AlertCircle size={14} className="text-red-500" />,
   },
+  urgent: {
+    label: PRIORITY_LABELS.urgent,
+    labelClass: 'bg-red-100 text-red-700',
+    borderClass: 'border-l-red-400',
+    icon: <AlertCircle size={14} className="text-red-400" />,
+  },
   important: {
-    label: 'Important',
+    label: PRIORITY_LABELS.important,
     labelClass: 'bg-orange-100 text-orange-700',
     borderClass: 'border-l-orange-400',
     icon: <Star size={14} className="text-orange-400" />,
   },
-  'urgent-important': {
-    label: 'Urgent + Important',
-    labelClass: 'bg-red-100 text-red-700',
-    borderClass: 'border-l-red-500',
-    icon: <Star size={14} className="text-red-500" />,
-  },
   normal: {
-    label: 'Normal',
+    label: PRIORITY_LABELS.normal,
     labelClass: 'bg-blue-100 text-blue-700',
     borderClass: 'border-l-blue-400',
     icon: <Info size={14} className="text-blue-500" />,
   },
 };
-
-const PLACEHOLDER_TASKS: TaskItem[] = [
-  { id: 1, title: 'Finaliser le rapport événement', client: 'TheEgg', due: "Aujourd'hui", priority: 'urgent' },
-  { id: 2, title: 'Relancer devis client', client: 'Pepibru', due: '22 mai 2025', priority: 'important' },
-  { id: 3, title: 'Vérification des documents', client: 'AfinIT Consulting', due: '23 mai 2025', priority: 'urgent-important' },
-  { id: 4, title: 'Préparer réunion client', client: 'Event Lounge', due: '26 mai 2025', priority: 'normal' },
-];
 
 // --------------- Recent documents from Supabase ---------------
 
@@ -213,8 +202,15 @@ export function Dashboard() {
   const { user } = useAuth();
   const firstName = getUserFirstName(user);
 
+  useLoadClients();
+  const { clients } = useAppState();
+  const clientMap = Object.fromEntries(clients.map(c => [c.id, c.name]));
+
   const [recentDocs, setRecentDocs] = useState<RecentDocRow[]>([]);
   const [docsLoading, setDocsLoading] = useState(true);
+
+  const [priorityTasks, setPriorityTasks] = useState<Task[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
 
   useEffect(() => {
     if (!supabaseEnabled) {
@@ -230,10 +226,7 @@ export function Dashboard() {
       .limit(5)
       .then(({ data, error }) => {
         if (cancelled) return;
-        if (error) {
-          setDocsLoading(false);
-          return;
-        }
+        if (error) { setDocsLoading(false); return; }
         const rows: RecentDocRow[] = (data ?? []).map((d: {
           id: string;
           name: string;
@@ -250,6 +243,21 @@ export function Dashboard() {
         setRecentDocs(rows);
         setDocsLoading(false);
       });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!supabaseEnabled) { setTasksLoading(false); return; }
+    let cancelled = false;
+
+    taskApi.listTasks().then(tasks => {
+      if (cancelled) return;
+      const active = tasks.filter(t => t.status !== 'completed');
+      const sorted = sortTasksByPriority(active).slice(0, 5);
+      setPriorityTasks(sorted);
+      setTasksLoading(false);
+    }).catch(() => setTasksLoading(false));
 
     return () => { cancelled = true; };
   }, []);
@@ -384,9 +392,9 @@ export function Dashboard() {
                     icon={<ListTodo size={18} />}
                     title="Todo List"
                     description="Suivez vos tâches et projets."
-                    iconBg="bg-gray-100"
-                    iconColor="text-gray-400"
-                    comingSoon
+                    iconBg="bg-teal-50"
+                    iconColor="text-teal-600"
+                    onClick={() => navigate('/todo')}
                   />
                 </div>
               </div>
@@ -466,31 +474,61 @@ export function Dashboard() {
               <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Tâches prioritaires</h2>
-                  <span className="text-xs font-medium text-gray-400 dark:text-gray-500 select-none">À venir</span>
+                  <button
+                    onClick={() => navigate('/todo')}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                  >
+                    Voir tout
+                  </button>
                 </div>
-                <div className="flex flex-col gap-3">
-                  {PLACEHOLDER_TASKS.map((task) => {
-                    const cfg = PRIORITY_CONFIG[task.priority];
-                    return (
-                      <div
-                        key={task.id}
-                        className={`border-l-4 pl-3 py-2 rounded-r-lg bg-gray-50 dark:bg-gray-800 ${cfg.borderClass}`}
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="shrink-0">{cfg.icon}</span>
-                            <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 leading-tight">{task.title}</span>
+
+                {tasksLoading ? (
+                  <div className="py-6 text-center text-xs text-gray-400">Chargement…</div>
+                ) : priorityTasks.length === 0 ? (
+                  <div className="py-6 text-center">
+                    <CheckSquare size={24} className="text-gray-200 mx-auto mb-2" />
+                    <p className="text-xs text-gray-400">Aucune tâche active.</p>
+                    <button
+                      onClick={() => navigate('/todo')}
+                      className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                    >
+                      + Créer une tâche
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {priorityTasks.map((task) => {
+                      const cfg = PRIORITY_BADGE_SIDEBAR[task.priority];
+                      const clientName = task.client_id ? (clientMap[task.client_id] ?? null) : null;
+                      return (
+                        <button
+                          key={task.id}
+                          onClick={() => navigate('/todo')}
+                          className={`border-l-4 pl-3 py-2 rounded-r-lg bg-gray-50 dark:bg-gray-800 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors w-full ${cfg.borderClass}`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="shrink-0">{cfg.icon}</span>
+                              <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 leading-tight line-clamp-1">{task.title}</span>
+                            </div>
+                            <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold ${cfg.labelClass}`}>
+                              {cfg.label}
+                            </span>
                           </div>
-                          <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold ${cfg.labelClass}`}>
-                            {cfg.label}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{task.client}</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Échéance : {task.due}</p>
-                      </div>
-                    );
-                  })}
-                </div>
+                          {clientName !== null && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{clientName}</p>
+                          )}
+                          {task.due_date && (
+                            <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-0.5">
+                              <Calendar size={10} />
+                              Échéance : {new Date(task.due_date + 'T00:00:00').toLocaleDateString('fr-BE', { day: '2-digit', month: 'short' })}
+                            </p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Recent clients */}

@@ -14,6 +14,7 @@ import { EventReportDetail } from './pages/EventReportDetail';
 import { EventReportDayEditor } from './pages/EventReportDayEditor';
 import { ClientDatabase } from './pages/ClientDatabase';
 import { WifiPdfGenerator } from './pages/WifiPdfGenerator';
+import { TodoPage } from './pages/TodoPage';
 import { DevDeployButtons } from './components/DevDeployButtons';
 
 export type Forfait = 'none' | 'halfDay' | 'fullDay';
@@ -171,6 +172,14 @@ function App() {
             element={
               <RequireAuth>
                 <WifiPdfGenerator />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/todo"
+            element={
+              <RequireAuth>
+                <TodoPage />
               </RequireAuth>
             }
           />

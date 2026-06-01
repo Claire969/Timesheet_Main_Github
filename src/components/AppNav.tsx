@@ -193,17 +193,14 @@ export function AppNav({ onExportExcel, onOpenClients }: AppNavProps) {
             <span className="hidden lg:inline">Wi-Fi</span>
           </button>
 
-          {/* Todo — disabled placeholder */}
-          <span
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed select-none"
-            title="À venir"
+          {/* Todo */}
+          <button
+            onClick={() => { closeAll(); navigate('/todo'); }}
+            className={navBtnClass(isActive('/todo'))}
           >
             <ListTodo size={14} />
-            <span className="hidden lg:inline">Todo</span>
-            <span className="hidden xl:inline text-[10px] font-semibold bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded-full leading-none">
-              bientôt
-            </span>
-          </span>
+            <span className="hidden lg:inline">Tâches</span>
+          </button>
 
           {/* Vault — external link, compact */}
           <a
