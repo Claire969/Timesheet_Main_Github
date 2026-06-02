@@ -8,14 +8,15 @@ import type {
   UpdateSubtaskPayload,
 } from './taskTypes';
 
-const TASKS_TABLE = 'timesheet.tasks';
-const SUBTASKS_TABLE = 'timesheet.subtasks';
+const TASKS_TABLE = 'tasks';
+const SUBTASKS_TABLE = 'subtasks';
+const timesheet = () => supabase.schema('timesheet');
 
 export const taskApi = {
   async listTasks(): Promise<Task[]> {
-    const { data, error } = await supabase
+    const { data, error } = await timesheet()
       .from(TASKS_TABLE)
-      .select('*, subtasks:timesheet.subtasks(*)')
+      .select('*, subtasks(*)')
       .order('position', { ascending: true })
       .order('created_at', { ascending: false });
 
@@ -27,14 +28,14 @@ export const taskApi = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Utilisateur non authentifié');
 
-    const { count } = await supabase
+    const { count } = await timesheet()
       .from(TASKS_TABLE)
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id);
 
     const position = (count ?? 0);
 
-    const { data, error } = await supabase
+    const { data, error } = await timesheet()
       .from(TASKS_TABLE)
       .insert({
         user_id: user.id,
@@ -55,7 +56,7 @@ export const taskApi = {
   },
 
   async updateTask(id: string, payload: UpdateTaskPayload): Promise<Task> {
-    const { data, error } = await supabase
+    const { data, error } = await timesheet()
       .from(TASKS_TABLE)
       .update(payload)
       .eq('id', id)
@@ -67,7 +68,7 @@ export const taskApi = {
   },
 
   async deleteTask(id: string): Promise<void> {
-    const { error } = await supabase
+    const { error } = await timesheet()
       .from(TASKS_TABLE)
       .delete()
       .eq('id', id);
@@ -89,18 +90,18 @@ export const taskApi = {
     });
   },
 
-  // ── Subtasks ────────────────────────────────────────────────────────────────
+  // ── Subtasks ─────────────────────────────────────────────────────────────────
 
   async createSubtask(payload: CreateSubtaskPayload): Promise<Subtask> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Utilisateur non authentifié');
 
-    const { count } = await supabase
+    const { count } = await timesheet()
       .from(SUBTASKS_TABLE)
       .select('*', { count: 'exact', head: true })
       .eq('task_id', payload.task_id);
 
-    const { data, error } = await supabase
+    const { data, error } = await timesheet()
       .from(SUBTASKS_TABLE)
       .insert({
         task_id: payload.task_id,
@@ -117,7 +118,7 @@ export const taskApi = {
   },
 
   async updateSubtask(id: string, payload: UpdateSubtaskPayload): Promise<Subtask> {
-    const { data, error } = await supabase
+    const { data, error } = await timesheet()
       .from(SUBTASKS_TABLE)
       .update(payload)
       .eq('id', id)
@@ -136,7 +137,7 @@ export const taskApi = {
   },
 
   async deleteSubtask(id: string): Promise<void> {
-    const { error } = await supabase
+    const { error } = await timesheet()
       .from(SUBTASKS_TABLE)
       .delete()
       .eq('id', id);
