@@ -156,13 +156,23 @@ const groupByDate = (entries: Entry[], dateKey: 'pendingAt' | 'archivedAt') => {
 
 type ConfirmDialog = { message: string; onConfirm: () => void } | null;
 
+const normalizeClientRouteKey = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+
 export const ClientTimesheets = () => {
-  const { clientId } = useParams<{ clientId: string }>();
+  const { clientId, clientSlug } = useParams<{ clientId?: string; clientSlug?: string }>();
   const navigate = useNavigate();
   const { clients } = useAppState();
-  useLoadClients();
+  const { loading: clientsLoading } = useLoadClients();
 
-  const client = clients.find(c => c.id === clientId);
+  const clientRouteKey = clientId ?? clientSlug ?? '';
+  const normalizedClientRouteKey = normalizeClientRouteKey(clientRouteKey);
+  const client = clients.find(c => c.id === clientRouteKey)
+    ?? clients.find(c => normalizeClientRouteKey(c.name) === normalizedClientRouteKey);
 
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -209,7 +219,16 @@ export const ClientTimesheets = () => {
   useEffect(() => { fetchEntries(); setSelectedUnbilled(new Set()); setSelectedPending(new Set()); setSelectedArchived(new Set()); }, [fetchEntries]);
 
   // Guard AFTER all hooks
-  if (!client) return <Navigate to="/" replace />;
+  if (!client) {
+    if (clientsLoading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-lg">Chargement...</div>
+        </div>
+      );
+    }
+    return <Navigate to="/" replace />;
+  }
 
   const sortEntries = (list: Entry[]) =>
     [...list].sort((a, b) => {

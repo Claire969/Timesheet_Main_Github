@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import { ArrowLeft, Printer, QrCode, Upload, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useAppState } from '../App';
@@ -347,7 +348,27 @@ export function WifiPdfGenerator() {
   const { clients, setClients } = useAppState();
   const [form, setForm] = useState<WifiFormData>(DEFAULT_FORM);
   const [qrDataUrl, setQrDataUrl] = useState('');
+  const [printRootEl, setPrintRootEl] = useState<HTMLElement | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const printRoot = document.getElementById('print-root');
+    if (!printRoot) return;
+
+    const previousCssText = printRoot.style.cssText;
+    printRoot.style.display = 'block';
+    printRoot.style.position = 'fixed';
+    printRoot.style.top = '0';
+    printRoot.style.left = '-9999px';
+    printRoot.style.width = '794px';
+    printRoot.style.zIndex = '-1';
+    printRoot.style.pointerEvents = 'none';
+    setPrintRootEl(printRoot);
+
+    return () => {
+      printRoot.style.cssText = previousCssText;
+    };
+  }, []);
 
   // Load clients if not already populated (e.g. direct navigation to this page)
   useEffect(() => {
@@ -429,16 +450,6 @@ export function WifiPdfGenerator() {
 
   return (
     <>
-      {/*
-        ─── FIX PDF BLANC ────────────────────────────────────────────────────────
-        Stratégie :
-        - Le print root est positionné hors écran (left: -9999px) au lieu de
-          display:none — ainsi le navigateur rend bien le contenu et charge
-          les images (QR, logo) AVANT l'impression.
-        - En mode print, on utilise visibility:hidden/visible plutôt que
-          display:none pour masquer l'UI sans empêcher le rendu du sheet.
-        ─────────────────────────────────────────────────────────────────────────
-      */}
       <style>{`
         @media print {
           @page { size: A4 portrait; margin: 0; }
@@ -466,8 +477,10 @@ export function WifiPdfGenerator() {
             top: 0 !important;
             left: 0 !important;
             width: 794px !important;
+            min-height: 1123px !important;
             z-index: 9999 !important;
             pointer-events: none !important;
+            background: #ffffff !important;
           }
 
           #wifi-sheet {
@@ -485,24 +498,10 @@ export function WifiPdfGenerator() {
         }
       `}</style>
 
-      {/*
-        ─── Print root hors écran (PAS display:none) ───────────────────────────
-        Positionné à left:-9999px → invisible à l'écran mais rendu par le
-        navigateur → QR code et logo sont bien chargés au moment de l'impression.
-      */}
-      <div
-        id="wifi-sheet-print-root"
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: '-9999px',
-          width: 794,
-          zIndex: -1,
-          pointerEvents: 'none',
-        }}
-      >
-        <WifiSheet form={form} logoUrl={logoUrl} qrDataUrl={qrDataUrl} />
-      </div>
+      {printRootEl && createPortal(
+        <WifiSheet form={form} logoUrl={logoUrl} qrDataUrl={qrDataUrl} />,
+        printRootEl
+      )}
 
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         {/* Page header */}

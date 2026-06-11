@@ -5,6 +5,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { RequireAuth } from './components/RequireAuth';
 import Login from './pages/Login';
 import { AuthCallback } from './pages/AuthCallback';
+import { Dashboard } from './pages/Dashboard';
 import { Home } from './pages/Home';
 import { ClientTimesheets } from './pages/ClientTimesheets';
 import { EventReports } from './pages/EventReports';
@@ -13,6 +14,7 @@ import { EventReportDetail } from './pages/EventReportDetail';
 import { EventReportDayEditor } from './pages/EventReportDayEditor';
 import { ClientDatabase } from './pages/ClientDatabase';
 import { WifiPdfGenerator } from './pages/WifiPdfGenerator';
+import { TodoPage } from './pages/TodoPage';
 import { DevDeployButtons } from './components/DevDeployButtons';
 
 export type Forfait = 'none' | 'halfDay' | 'fullDay';
@@ -81,12 +83,36 @@ function App() {
             path="/"
             element={
               <RequireAuth>
+                <Navigate to="/dashboard" replace />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <RequireAuth>
+                <Dashboard />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/timesheets"
+            element={
+              <RequireAuth>
                 <Home />
               </RequireAuth>
             }
           />
           <Route
             path="/client/:clientId"
+            element={
+              <RequireAuth>
+                <ClientTimesheets />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/:clientSlug/ClientTimesheets"
             element={
               <RequireAuth>
                 <ClientTimesheets />
@@ -146,6 +172,14 @@ function App() {
             element={
               <RequireAuth>
                 <WifiPdfGenerator />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/todo"
+            element={
+              <RequireAuth>
+                <TodoPage />
               </RequireAuth>
             }
           />
