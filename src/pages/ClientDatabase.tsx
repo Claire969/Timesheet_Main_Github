@@ -25,6 +25,8 @@ import type { DocClientEntry, DocCategoryEntry, DocFileEntry } from '../lib/clie
 
 const selectCls = 'flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 transition-colors cursor-pointer';
 
+const isGeneralCategory = (category: DocCategoryEntry | null) => category?.slug === DEFAULT_CATEGORY_SLUG;
+
 const fieldCls = 'w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500';
 
 // ─── Sort helpers ─────────────────────────────────────────────────────────────
@@ -345,7 +347,7 @@ export function ClientDatabase() {
   const [selectedCategory, setSelectedCategory] = useState<DocCategoryEntry | null>(null);
 
   const [loadingFiles, setLoadingFiles] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [sortKey, setSortKey] = useState<SortKey>('title');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
@@ -364,12 +366,28 @@ export function ClientDatabase() {
     return cats;
   }, []);
 
-  const loadFiles = useCallback(async (client: DocClientEntry, category: DocCategoryEntry) => {
+  const loadFiles = useCallback(async (
+    client: DocClientEntry,
+    category: DocCategoryEntry,
+    catsForClient = categories,
+  ) => {
     setLoadingFiles(true);
-    const result = await fetchFiles(client.slug, category.slug).catch(() => [] as DocFileEntry[]);
-    setFiles(result);
-    setLoadingFiles(false);
-  }, []);
+    try {
+      if (isGeneralCategory(category)) {
+        const sourceCategories = catsForClient.length > 0 ? catsForClient : [category];
+        const grouped = await Promise.all(
+          sourceCategories.map(cat => fetchFiles(client.slug, cat.slug).catch(() => [] as DocFileEntry[]))
+        );
+        setFiles(grouped.flat());
+        return;
+      }
+
+      const result = await fetchFiles(client.slug, category.slug).catch(() => [] as DocFileEntry[]);
+      setFiles(result);
+    } finally {
+      setLoadingFiles(false);
+    }
+  }, [categories]);
 
   const handleSelectClient = async (client: DocClientEntry | null) => {
     setSelectedClient(client);
@@ -378,17 +396,16 @@ export function ClientDatabase() {
     setClientDropOpen(false);
     if (!client) { setCategories([]); return; }
     const cats = await loadCategories(client);
-    if (cats.length > 0) {
-      setSelectedCategory(cats[0]);
-      await loadFiles(client, cats[0]);
-    }
+    const defaultCat = cats.find(c => c.slug === DEFAULT_CATEGORY_SLUG) ?? cats[0] ?? null;
+    setSelectedCategory(defaultCat);
+    if (defaultCat) await loadFiles(client, defaultCat, cats);
   };
 
   const handleSelectCategory = async (cat: DocCategoryEntry | null) => {
     setSelectedCategory(cat);
     setCategoryDropOpen(false);
     if (!cat || !selectedClient) { setFiles([]); return; }
-    await loadFiles(selectedClient, cat);
+    await loadFiles(selectedClient, cat, categories);
   };
 
   const handleUploaded = async (newFiles: DocFileEntry[], clientSlug: string, categorySlug: string) => {
@@ -408,6 +425,15 @@ export function ClientDatabase() {
   };
 
   const sortedFiles = sortFiles(files, sortKey, sortDir);
+  const categoryNameBySlug = new Map(categories.map(c => [c.slug, c.name]));
+  const categoryGroups = Object.entries(
+    sortedFiles.reduce<Record<string, DocFileEntry[]>>((acc, file) => {
+      const categoryName = categoryNameBySlug.get(file.categorySlug) ?? file.categorySlug;
+      if (!acc[categoryName]) acc[categoryName] = [];
+      acc[categoryName].push(file);
+      return acc;
+    }, {})
+  ).sort(([a], [b]) => a.localeCompare(b));
 
   // ── Edit save ───────────────────────────────────────────────────────────────
   const handleSaveMeta = async (file: DocFileEntry, title: string, newCategoryName: string | null) => {
@@ -455,9 +481,12 @@ export function ClientDatabase() {
     if (selectedCategory && !cats.find(c => c.slug === selectedCategory.slug)) {
       const defaultCat = cats.find(c => c.slug === DEFAULT_CATEGORY_SLUG) ?? cats[0] ?? null;
       setSelectedCategory(defaultCat);
-      if (defaultCat) await loadFiles(selectedClient, defaultCat);
+      if (defaultCat) await loadFiles(selectedClient, defaultCat, cats);
       else setFiles([]);
+      return;
     }
+
+    if (selectedCategory) await loadFiles(selectedClient, selectedCategory, cats);
   };
 
   const visibleCategories = selectedClient ? categories : [];
@@ -617,7 +646,19 @@ export function ClientDatabase() {
                 </button>
                 <div className="w-32" />
               </div>
-              {sortedFiles.map(f => (
+              {isGeneralCategory(selectedCategory) ? categoryGroups.map(([categoryName, group]) => (
+                <div key={categoryName} className="space-y-1">
+                  <div className="px-4 pt-3 pb-1 text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+                    {categoryName}
+                  </div>
+                  {group.map(f => (
+                    <DocFileCard key={`${f.categorySlug}/${f.name}`} file={f} viewMode="list"
+                      onClick={() => setViewerFile(f)}
+                      onEdit={() => setEditFile(f)}
+                      onDelete={() => setDeleteTarget(f)} />
+                  ))}
+                </div>
+              )) : sortedFiles.map(f => (
                 <DocFileCard key={`${f.categorySlug}/${f.name}`} file={f} viewMode="list"
                   onClick={() => setViewerFile(f)}
                   onEdit={() => setEditFile(f)}
