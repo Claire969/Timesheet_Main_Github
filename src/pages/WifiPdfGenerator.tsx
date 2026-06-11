@@ -422,7 +422,7 @@ export function WifiPdfGenerator() {
   }
 
   async function waitForPrintImages() {
-    const printRoot = document.getElementById('print-root');
+    const printRoot = document.getElementById('wifi-sheet-print-root');
     if (!printRoot) return;
 
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
@@ -454,8 +454,25 @@ export function WifiPdfGenerator() {
         @media print {
           @page { size: A4 portrait; margin: 0; }
 
-          #print-root {
-            display: block !important;
+          /* Hide the app UI — body children except the print root */
+          body > * { visibility: hidden !important; }
+
+          /* Global print CSS hides #root with display:none; restore it for this sheet. */
+          body > #root { display: block !important; }
+
+          /* Make the React root visible so fixed children inside it are shown */
+          #root { visibility: visible !important; }
+
+          /* Hide everything inside root except our sheet */
+          #root > * { visibility: hidden !important; }
+
+          /* Show only the print root and all its children */
+          #wifi-sheet-print-root,
+          #wifi-sheet-print-root * {
+            visibility: visible !important;
+          }
+
+          #wifi-sheet-print-root {
             position: fixed !important;
             top: 0 !important;
             left: 0 !important;
