@@ -302,7 +302,7 @@ function DayPageHeader({
             whiteSpace: 'nowrap',
           }}
         >
-          Page {pageNumber} / {totalPages}
+          Page {pageNumber}
         </div>
       </div>
 
@@ -372,7 +372,7 @@ function RepeatHeader({ eventName, totalPages }: { eventName: string; totalPages
             whiteSpace: 'nowrap',
           }}
         >
-          Rapport réseau · {totalPages} pages
+          Rapport réseau
         </div>
       </div>
 
@@ -438,42 +438,103 @@ function DailyTotalsBlock({ rows }: { rows: EventReportHourlyRow[] }) {
   );
 }
 
-// ─── Setup / Montage day (compact) ──────────────────────────────────────────
+// ─── Setup / Montage block (grouped) ────────────────────────────────────────
 
-function PrintableSetupDayPage({
-  dayData,
+function PrintableSetupBlock({
+  setupDays,
+  setupSteps,
   pageNumber,
   totalPages,
   eventName,
 }: {
-  dayData: PrintableDayData;
+  setupDays: PrintableDayData[];
+  setupSteps: EventReportSetupStep[];
   pageNumber: number;
   totalPages: number;
   eventName: string;
 }) {
-  const { day, incidents, images } = dayData;
-  const hasData = !!day.summary || incidents.length > 0 || images.length > 0;
+  const notes = setupDays.filter((d) => d.day.summary?.trim());
+  const incidents = setupDays.flatMap((d) => d.incidents);
+  const images = setupDays.flatMap((d) => d.images);
+  const usefulSetupSteps = setupSteps.filter((s) => s.text?.trim());
+  const dates = setupDays.map((d) => fmtDate(d.day.report_date)).filter((date) => date !== '—');
+  const hasUsefulContent = notes.length > 0 || usefulSetupSteps.length > 0 || incidents.length > 0 || images.length > 0;
+
+  if (setupDays.length === 0 || !hasUsefulContent) return null;
 
   return (
     <div className="print-page">
       <DayPageHeader
         eventName={eventName}
-        centerLabel="Montage — Préparation"
-        reportDate={day.report_date}
+        centerLabel="Montage / Préparation"
+        reportDate={null}
         isContinuation={false}
         pageNumber={pageNumber}
         totalPages={totalPages}
       />
 
       <div className="day-flow">
-        {!hasData && (
-          <p style={{ fontSize: 11, color: TEXT_MUTED, fontStyle: 'italic' }}>
-            Aucune donnée enregistrée pour ce jour de montage.
-          </p>
+        <div
+          style={{
+            ...sectionBlock,
+            background: '#fff7ed',
+            borderRadius: 6,
+            padding: '12px 16px',
+            border: `1px solid #fed7aa`,
+          }}
+        >
+          <div style={sectionLabel}>Bloc regroupé de préparation / montage</div>
+          {dates.length > 0 && (
+            <p style={{ fontSize: 11, color: TEXT_PRIMARY, lineHeight: 1.7, margin: 0 }}>
+              Dates regroupées : {dates.join(' · ')}
+            </p>
+          )}
+        </div>
+
+        {usefulSetupSteps.length > 0 && (
+          <div style={sectionBlock}>
+            <div style={sectionLabel}>Mise en place / Setup</div>
+            <div style={{ border: `1px solid ${BORDER}`, borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
+              {usefulSetupSteps.map((step, i, arr) => (
+                <div
+                  key={step.id}
+                  style={{
+                    display: 'flex',
+                    gap: 12,
+                    alignItems: 'flex-start',
+                    padding: '8px 14px',
+                    borderBottom: i < arr.length - 1 ? `1px solid ${BORDER}` : 'none',
+                    background: i % 2 === 0 ? BG_ROW_ALT : '#fff',
+                  }}
+                >
+                  <div
+                    style={{
+                      minWidth: 20,
+                      height: 20,
+                      borderRadius: '50%',
+                      background: NAVY,
+                      color: '#fff',
+                      fontSize: 9,
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      marginTop: 1,
+                    }}
+                  >
+                    {i + 1}
+                  </div>
+                  <div style={{ fontSize: 10.5, color: TEXT_PRIMARY, lineHeight: 1.6 }}>{step.text}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
-        {day.summary && (
+        {notes.map((d) => (
           <div
+            key={d.day.id}
             style={{
               ...sectionBlock,
               background: '#f8fafc',
@@ -482,12 +543,12 @@ function PrintableSetupDayPage({
               border: `1px solid ${BORDER}`,
             }}
           >
-            <div style={sectionLabel}>Notes de montage</div>
+            <div style={sectionLabel}>Notes de montage — {fmtDate(d.day.report_date)}</div>
             <p style={{ fontSize: 11, color: TEXT_PRIMARY, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>
-              {day.summary}
+              {d.day.summary}
             </p>
           </div>
-        )}
+        ))}
 
         {incidents.length > 0 && <IncidentsSection incidents={incidents} />}
         {images.length > 0 && <ImagesSection images={images} />}
@@ -856,6 +917,7 @@ function CardImg({ img, maxHeight }: { img: EventReportImage; maxHeight: number 
 
 function ImagesSection({ images }: { images: EventReportImage[] }) {
   const count = images.length;
+  if (count === 0) return null;
 
   if (count === 1) {
     return (
@@ -942,10 +1004,15 @@ export function PrintableReport({ data }: PrintableReportProps) {
 
   console.log(`[PrintableReport] Rendering with ${days.length} total days:`, days.map(d => ({ id: d.day.id, is_setup: d.day.is_setup_day, date: d.day.report_date })));
 
-  const setupDay = days.find((d) => d.day.is_setup_day);
+  const setupDays = days.filter((d) => d.day.is_setup_day);
   const eventDays = days.filter((d) => !d.day.is_setup_day);
+  const hasSetupBlock = setupDays.some((d) => d.day.summary?.trim() || d.incidents.length > 0 || d.images.length > 0)
+    || setupSteps.some((s) => s.text?.trim());
+  const setupPageCount = setupDays.length > 0 && hasSetupBlock ? 1 : 0;
+  const summaryPageCount = 1;
+  const totalPages = 1 + setupPageCount + Math.max(eventDays.length, 1) + summaryPageCount;
 
-  console.log(`[PrintableReport] Setup days: ${setupDay ? 1 : 0}, Event days: ${eventDays.length}`);
+  console.log(`[PrintableReport] Setup days: ${setupDays.length}, Event days: ${eventDays.length}`);
 
   return (
     <div
@@ -1236,7 +1303,7 @@ export function PrintableReport({ data }: PrintableReportProps) {
             </div>
           )}
 
-          {setupDay && setupDay.images.length > 0 && (
+          {setupDays.some((d) => d.images.length > 0) && (
             <div style={{ marginBottom: 0 }}>
               <div
                 style={{
@@ -1255,8 +1322,8 @@ export function PrintableReport({ data }: PrintableReportProps) {
                 Plan / Schéma de salle
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: setupDay.images.length === 1 ? '1fr' : '1fr 1fr', gap: 12 }}>
-                {setupDay.images.slice(0, 2).map((img) => (
+              <div style={{ display: 'grid', gridTemplateColumns: setupDays.flatMap((d) => d.images).length === 1 ? '1fr' : '1fr 1fr', gap: 12 }}>
+                {setupDays.flatMap((d) => d.images).slice(0, 2).map((img) => (
                   <div key={img.id} style={{ border: `1px solid ${BORDER}`, borderRadius: 6, overflow: 'hidden' }}>
                     <div style={{ background: BG_ROW_ALT, padding: 8, display: 'flex', justifyContent: 'center' }}>
                       <img
@@ -1294,12 +1361,13 @@ export function PrintableReport({ data }: PrintableReportProps) {
         </div>
       </div>
 
-      {/* Setup / montage day — compact, before event days */}
-      {setupDay && (
-        <PrintableSetupDayPage
-          dayData={setupDay}
+      {/* Setup / montage days — grouped before event days */}
+      {setupPageCount > 0 && (
+        <PrintableSetupBlock
+          setupDays={setupDays}
+          setupSteps={setupSteps}
           pageNumber={2}
-          totalPages={eventDays.length + (setupDay ? 1 : 0) + 1}
+          totalPages={totalPages}
           eventName={report.event_name}
         />
       )}
@@ -1307,7 +1375,7 @@ export function PrintableReport({ data }: PrintableReportProps) {
       {eventDays.length > 0 && (
         <RepeatHeader
           eventName={report.event_name}
-          totalPages={eventDays.length + (setupDay ? 1 : 0) + 1}
+          totalPages={totalPages}
         />
       )}
 
@@ -1317,9 +1385,8 @@ export function PrintableReport({ data }: PrintableReportProps) {
             key={dayData.day.id}
             dayData={dayData}
             dayIndex={i}
-
-            pageNumber={i + (setupDay ? 3 : 2)}
-            totalPages={eventDays.length + (setupDay ? 1 : 0) + 1}
+            pageNumber={i + 2 + setupPageCount}
+            totalPages={totalPages}
             eventName={report.event_name}
           />
         ))
@@ -1331,7 +1398,7 @@ export function PrintableReport({ data }: PrintableReportProps) {
         </div>
       )}
 
-      {/* ═══════════════════ STREAMING SESSION SUMMARY ═══════════════════════ */}
+      {/* ═══════════════════ NETWORK EVENT SUMMARY ═══════════════════════ */}
       <StreamingSessionSummary eventDays={eventDays} report={report} />
     </div>
   );
@@ -1371,7 +1438,7 @@ function StreamingSessionSummary({
           {report.event_name}
         </div>
         <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', letterSpacing: '0.02em', textAlign: 'center', flex: 'none', padding: '0 16px' }}>
-          Résumé de la session de streaming
+          Résumé de l’événement réseau
         </div>
         <div style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.04em', flex: 1, textAlign: 'right' }} />
       </div>
@@ -1500,33 +1567,6 @@ function StreamingSessionSummary({
               </tbody>
             </table>
           )}
-        </div>
-
-        <div
-          style={{
-            background: '#f8fafc',
-            border: `1px solid ${BORDER}`,
-            borderRadius: 8,
-            padding: '14px 16px',
-          }}
-        >
-          <div style={{ fontSize: 9, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
-            Observations générales
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {[
-              { label: 'Qualité du réseau', value: '—' },
-              { label: 'Stabilité de la connexion', value: '—' },
-              { label: 'Remarques techniques', value: '—' },
-            ].map(({ label, value }) => (
-              <div key={label} style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: '0 12px', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: TEXT_SECONDARY, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  {label}
-                </span>
-                <span style={{ fontSize: 11, color: TEXT_MUTED, fontStyle: 'italic' }}>{value}</span>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </div>

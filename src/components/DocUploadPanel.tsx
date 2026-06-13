@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { X, Upload, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import type { DocClientEntry, DocCategoryEntry, DocFileEntry } from '../lib/clientDocsApi';
 import { createCategory, uploadFiles, fetchCategories, findCategoryCI } from '../lib/clientDocsApi';
@@ -36,11 +36,25 @@ export function DocUploadPanel({
     setCategories(cats);
   }, []);
 
-  const handleClientChange = async (slug: string) => {
+  useEffect(() => {
+    if (!clientSlug) {
+      setCategories([]);
+      return;
+    }
+
+    void loadCategories(clientSlug);
+  }, [clientSlug, loadCategories]);
+
+  useEffect(() => {
+    if (!initialCategorySlug || categoryInput !== initialCategorySlug) return;
+    const initialCategory = categories.find((cat) => cat.slug === initialCategorySlug);
+    if (initialCategory) setCategoryInput(initialCategory.name);
+  }, [categories, categoryInput, initialCategorySlug]);
+
+  const handleClientChange = (slug: string) => {
     setClientSlug(slug);
     setCategoryInput('');
     setShowSuggestions(false);
-    await loadCategories(slug);
   };
 
   const filteredSuggestions = categoryInput.trim()
